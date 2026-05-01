@@ -15,15 +15,15 @@ const AvatarImage = ({ userId, avatarUrl, alt = 'Avatar', className = '', fallba
       if (u && !urls.includes(u)) urls.push(u);
     };
 
+    if (avatarUrl && !isDefaultAvatarUrl(avatarUrl)) {
+      add(normalizeAvatarUrl(avatarUrl));
+    }
+
     if (userId) {
       ['jpg', 'jpeg', 'png', 'webp'].forEach((ext) => {
         add(buildAvatarPublicUrl(`${userId}.${ext}`));
         add(buildAvatarPublicUrl(`avatars/${userId}.${ext}`));
       });
-    }
-
-    if (avatarUrl && !isDefaultAvatarUrl(avatarUrl)) {
-      add(normalizeAvatarUrl(avatarUrl));
     }
 
     const initialsFallback = `https://ui-avatars.com/api/?name=${encodeURIComponent(fallbackName || 'User')}&background=e2e8f0&color=334155&bold=true&size=200`;
@@ -41,6 +41,9 @@ const AvatarImage = ({ userId, avatarUrl, alt = 'Avatar', className = '', fallba
       src={candidates[index] || FALLBACK_AVATAR}
       alt={alt}
       className={className}
+      loading="eager"
+      decoding="async"
+      fetchPriority="high"
       onError={() => {
         setIndex((i) => (i < candidates.length - 1 ? i + 1 : i));
       }}
