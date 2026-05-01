@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ExternalLink, Github, Globe2, Linkedin, Mail, Phone } from 'lucide-react';
+import { Award, ExternalLink, Github, Globe2, Linkedin, Mail, Phone, ShieldCheck } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import AvatarImage from '../components/AvatarImage';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -32,11 +32,35 @@ const toExternalUrl = (value) => {
 
 const isImageUrl = (value) => /\.(png|jpe?g|webp|gif|avif)(\?.*)?$/i.test(String(value || ''));
 
+const generateDeterministicCode = (seed) => {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let hash = 0;
+  for (let i = 0; i < seed.length; i += 1) {
+    hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
+  }
+  let code = '';
+  for (let i = 0; i < 12; i += 1) {
+    hash = (hash * 1664525 + 1013904223) >>> 0;
+    code += alphabet[hash % alphabet.length];
+  }
+  return code;
+};
+
+const formatCertificateId = (cert) => {
+  const date = cert?.issued_at ? new Date(cert.issued_at) : new Date();
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  const random = generateDeterministicCode(String(cert?.id ?? `${y}${m}${d}`));
+  return `SkillPro-${y}-${m}-${d}-${random}`;
+};
+
 const PublicPortfolio = () => {
   const { username } = useParams();
   const [loading, setLoading] = useState(true);
   const [portfolio, setPortfolio] = useState(null);
   const [profile, setProfile] = useState(null);
+  const [certificates, setCertificates] = useState([]);
   const [error, setError] = useState('');
 
   const decodedUsername = useMemo(() => decodeURIComponent(username || ''), [username]);
@@ -72,6 +96,14 @@ const PublicPortfolio = () => {
           .eq('id', data.user_id)
           .maybeSingle();
         if (active) setProfile(profileData || null);
+
+        const { data: certRows } = await supabase
+          .from('certificates')
+          .select('id, course_id, issued_at, revoked_at, course:courses!certificates_course_id_fkey(title, category)')
+          .eq('user_id', data.user_id)
+          .is('revoked_at', null)
+          .order('issued_at', { ascending: false });
+        if (active) setCertificates(certRows || []);
       } catch (err) {
         if (!active) return;
         setError(err.message?.includes('student_portfolios') ? 'Portfolio publishing is not configured yet.' : err.message || 'Could not load portfolio.');
@@ -150,6 +182,10 @@ const PublicPortfolio = () => {
             <p className="mt-1 text-sm text-slate-300">@{portfolio.username}</p>
             {content.location ? <p className="mt-3 text-sm text-slate-200">{content.location}</p> : null}
             {profile?.education_level ? <p className="mt-2 text-sm text-slate-300">{profile.education_level}{profile.study_stream ? `, ${profile.study_stream}` : ''}</p> : null}
+            <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-emerald-300/30 bg-emerald-400/10 px-3 py-2 text-xs font-bold text-emerald-100">
+              <ShieldCheck size={15} />
+              SkillPro verified profile
+            </div>
           </div>
         </div>
       </section>
@@ -191,6 +227,45 @@ const PublicPortfolio = () => {
                 Open Resume / CV
                 <ExternalLink size={16} />
               </a>
+            </div>
+          </section>
+        ) : null}
+
+        {certificates.length ? (
+          <section className="rounded-2xl border border-emerald-200 bg-emerald-50 p-6 shadow-sm">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-emerald-700">
+                  <ShieldCheck size={14} />
+                  Verified SkillPro Proof
+                </p>
+                <h2 className="mt-2 text-2xl font-black text-slate-900">Certificates earned on SkillPro</h2>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  These certificates are pulled from SkillPro records and shown only when active.
+                </p>
+              </div>
+              <span className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white">{certificates.length} verified</span>
+            </div>
+            <div className="mt-5 grid gap-3 md:grid-cols-2">
+              {certificates.map((cert) => (
+                <div key={cert.id} className="rounded-xl border border-emerald-200 bg-white p-4">
+                  <p className="flex items-center gap-2 font-bold text-slate-900">
+                    <Award size={18} className="text-emerald-600" />
+                    {cert.course?.title || 'Verified SkillPro Certificate'}
+                  </p>
+                  {cert.course?.category ? <p className="mt-1 text-xs text-slate-500">{cert.course.category}</p> : null}
+                  <p className="mt-2 break-all font-mono text-xs font-semibold text-emerald-700">
+                    Verify ID: {formatCertificateId(cert)}
+                  </p>
+                  {cert.issued_at ? <p className="mt-2 text-sm font-semibold text-emerald-700">Issued {new Date(cert.issued_at).toLocaleDateString('en-IN')}</p> : null}
+                  <Link
+                    to={`/verify/${encodeURIComponent(formatCertificateId(cert))}`}
+                    className="mt-3 inline-flex rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700"
+                  >
+                    Verify Certificate
+                  </Link>
+                </div>
+              ))}
             </div>
           </section>
         ) : null}

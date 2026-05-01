@@ -130,6 +130,17 @@ import AdminCareerAnalytics from './pages/AdminCareerAnalytics';
 import PortfolioBuilder from './pages/PortfolioBuilder';
 import PublicPortfolio from './pages/PublicPortfolio';
 import AdminLoginOtpSettings from './pages/AdminLoginOtpSettings';
+import {
+  AchievementTimeline,
+  AdminAtRiskStudents,
+  AdminSecurityReview,
+  CourseCompletionChecklist,
+  CourseDoubtHelper,
+  ExamReadinessScore,
+  MotivationLeaderboard,
+  StudentDailyPlanner,
+  TeacherPerformancePanel,
+} from './pages/ZeroCostGrowthPanels';
 
 const ProtectedRoute = ({ children }) => {
   const { user, profile, realProfile, isImpersonating, loading } = useAuth();
@@ -345,6 +356,12 @@ function App() {
           <Route path="admin/exam-settings" element={<AdminRoute><AdminExamSettings /></AdminRoute>} />
           <Route index element={<Dashboard />} />
           <Route path="courses" element={<CourseList />} />
+          <Route path="daily-planner" element={<StudentDailyPlanner />} />
+          <Route path="course-checklist" element={<CourseCompletionChecklist />} />
+          <Route path="exam-readiness" element={<ExamReadinessScore />} />
+          <Route path="achievement-timeline" element={<AchievementTimeline />} />
+          <Route path="course-doubt-helper" element={<CourseDoubtHelper />} />
+          <Route path="leaderboard" element={<MotivationLeaderboard />} />
           <Route path="notes-library" element={<NotesLibrary />} />
           <Route path="all-in-one" element={<StaffAllInOneRoute><LiveExamProctoring forcedPanel="all-in-one" /></StaffAllInOneRoute>} />
           <Route path="write-test" element={<StudentWriteTest />} />
@@ -388,8 +405,12 @@ function App() {
           <Route path="portfolio" element={<PortfolioBuilder />} />
           <Route path="career-support" element={<CareerSupportDashboard />} />
           <Route path="teacher/career-queue" element={<TeacherRoute><TeacherCareerQueue /></TeacherRoute>} />
+          <Route path="teacher/performance" element={<TeacherRoute><TeacherPerformancePanel /></TeacherRoute>} />
+          <Route path="teacher/at-risk-students" element={<TeacherRoute><AdminAtRiskStudents teacherOnly /></TeacherRoute>} />
           <Route path="admin/career-queue" element={<AdminRoute><TeacherCareerQueue /></AdminRoute>} />
           <Route path="admin/career-analytics" element={<AdminRoute><AdminCareerAnalytics /></AdminRoute>} />
+          <Route path="admin/at-risk-students" element={<AdminRoute><AdminAtRiskStudents /></AdminRoute>} />
+          <Route path="admin/security-review" element={<AdminRoute><AdminSecurityReview /></AdminRoute>} />
           <Route path="resume-reviews" element={<PremiumPlusResumeReviews />} />
           <Route path="mock-interviews" element={<PremiumPlusMockInterviews />} />
           <Route path="personal-roadmap" element={<PremiumPlusRoadmap />} />

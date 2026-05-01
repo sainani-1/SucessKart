@@ -559,6 +559,35 @@ const Sidebar = ({ isMobile = false, mobileOpen = false, onClose = () => {}, onR
               {shouldShowText && <span className="truncate text-sm font-medium">Courses</span>}
             </NavLink>
 
+            {role === 'student' && (
+              <>
+                <NavLink to="/app/daily-planner" className={navItemClass} title="Daily Learning Planner">
+                  <Calendar size={28} />
+                  {shouldShowText && <span className="truncate text-sm font-medium">Daily Planner</span>}
+                </NavLink>
+                <NavLink to="/app/course-checklist" className={navItemClass} title="Course Checklist">
+                  <ClipboardList size={28} />
+                  {shouldShowText && <span className="truncate text-sm font-medium">Course Checklist</span>}
+                </NavLink>
+                <NavLink to="/app/exam-readiness" className={navItemClass} title="Exam Readiness">
+                  <CheckSquare size={28} />
+                  {shouldShowText && <span className="truncate text-sm font-medium">Exam Readiness</span>}
+                </NavLink>
+                <NavLink to="/app/achievement-timeline" className={navItemClass} title="Achievement Timeline">
+                  <Sparkles size={28} />
+                  {shouldShowText && <span className="truncate text-sm font-medium">Timeline</span>}
+                </NavLink>
+                <NavLink to="/app/course-doubt-helper" className={navItemClass} title="Course Doubt Helper">
+                  <MessageCircle size={28} />
+                  {shouldShowText && <span className="truncate text-sm font-medium">Doubt Helper</span>}
+                </NavLink>
+                <NavLink to="/app/leaderboard" className={navItemClass} title="Learning Leaderboard">
+                  <Trophy size={28} />
+                  {shouldShowText && <span className="truncate text-sm font-medium">Leaderboard</span>}
+                </NavLink>
+              </>
+            )}
+
             <NavLink to="/app/notes-library" className={navItemClass} title="Notes Library">
               <FileText size={28} />
               {shouldShowText && <span className="truncate text-sm font-medium">Notes Library</span>}
@@ -720,6 +749,14 @@ const Sidebar = ({ isMobile = false, mobileOpen = false, onClose = () => {}, onR
         {/* Teacher Specific */}
         {role === 'teacher' && (
           <>
+            <NavLink to="/app/teacher/performance" className={navItemClass} title="Teacher Performance">
+              <BarChart3 size={28} />
+              {shouldShowText && <span className="truncate text-sm font-medium">Performance</span>}
+            </NavLink>
+            <NavLink to="/app/teacher/at-risk-students" className={navItemClass} title="At Risk Students">
+              <ShieldAlert size={28} />
+              {shouldShowText && <span className="truncate text-sm font-medium">At Risk Students</span>}
+            </NavLink>
             <NavLink to="/app/all-in-one" className={navItemClass} title="All In One">
               <MonitorUp size={28} />
               {shouldShowText && <span className="truncate text-sm font-medium">All In One</span>}
@@ -804,6 +841,14 @@ const Sidebar = ({ isMobile = false, mobileOpen = false, onClose = () => {}, onR
         {/* Admin Specific */}
         {role === 'admin' && (
           <>
+            <NavLink to="/app/admin/at-risk-students" className={navItemClass} title="At Risk Students">
+              <ShieldAlert size={28} />
+              {shouldShowText && <span className="truncate text-sm font-medium">At Risk Students</span>}
+            </NavLink>
+            <NavLink to="/app/admin/security-review" className={navItemClass} title="Security Review">
+              <ShieldCheck size={28} />
+              {shouldShowText && <span className="truncate text-sm font-medium">Security Review</span>}
+            </NavLink>
             <NavLink to="/app/all-in-one" className={navItemClass} title="All In One">
               <MonitorUp size={28} />
               {shouldShowText && <span className="truncate text-sm font-medium">All In One</span>}
