@@ -111,6 +111,7 @@ import FacultyAttendance from './pages/FacultyAttendance';
 import AdminAccessCodes from './pages/AdminAccessCodes';
 import AdminLiveExamBookingControls from './pages/AdminLiveExamBookingControls';
 import AdminChooseMeet from './pages/AdminChooseMeet';
+import AdminDemoSessions from './pages/AdminDemoSessions';
 import ClassFeedback from './pages/ClassFeedback';
 import AdminAutoAssignedStudents from './pages/AdminAutoAssignedStudents';
 import AdminMFARules from './pages/AdminMFARules';
@@ -379,6 +380,7 @@ function App() {
           <Route path="my-students" element={<MyStudents />} />
           <Route path="assigned-classes" element={<AssignedClasses />} />
           <Route path="class-schedule" element={<ClassSchedule />} />
+          <Route path="demo-sessions" element={<AdminDemoSessions />} />
           <Route path="class-feedback" element={<ClassFeedback />} />
           <Route path="assistant" element={<UniversalAssistant />} />
           <Route path="live-exams" element={<LiveExamProctoring />} />
@@ -464,6 +466,7 @@ function App() {
           <Route path="admin/live-exam-booking-controls" element={<AdminRoute><AdminLiveExamBookingControls /></AdminRoute>} />
           <Route path="admin/allow-failed-to-book-slot" element={<AdminRoute><AdminLiveExamBookingControls /></AdminRoute>} />
           <Route path="admin/choose-meet" element={<AdminRoute><AdminChooseMeet /></AdminRoute>} />
+          <Route path="admin/demo-sessions" element={<AdminRoute><AdminDemoSessions /></AdminRoute>} />
           <Route path="admin/exam-retakes" element={<AdminRoute><AdminExamRetakes /></AdminRoute>} />
           <Route path="admin/settings" element={<AdminRoute><AdminSettings /></AdminRoute>} />
           <Route path="admin/website-protection" element={<AdminRoute><AdminWebsiteProtection /></AdminRoute>} />

@@ -24,7 +24,7 @@ import usePopup from '../hooks/usePopup.jsx';
 import LoadingSpinner from '../components/LoadingSpinner';
 import useDialog from '../hooks/useDialog.jsx';
 import LiveKitClassSession from '../components/LiveKitClassSession';
-import { getLiveKitTokenForClassSession } from '../lib/livekitSession';
+import { controlLiveKitClassSession, getLiveKitTokenForClassSession } from '../lib/livekitSession';
 
 const formatSessionDateTime = (value) =>
   new Date(value).toLocaleString('en-IN', {
@@ -188,6 +188,7 @@ const LiveClass = () => {
   const [sessionEnded, setSessionEnded] = useState(false);
   const [liveKitConnection, setLiveKitConnection] = useState(null);
   const [joiningMeeting, setJoiningMeeting] = useState(false);
+  const [waitingForHostApproval, setWaitingForHostApproval] = useState(false);
   const [participantsPanelOpen, setParticipantsPanelOpen] = useState(true);
   const [selectedParticipant, setSelectedParticipant] = useState(null);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
@@ -197,6 +198,15 @@ const LiveClass = () => {
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
   const isTeacherOwner = profile?.role === 'teacher' && session?.teacher_id === profile?.id;
   const canJoinStartedMeeting = profile?.role === 'student' || profile?.role === 'admin' || isTeacherOwner;
+  const jitsiTeacherWarmupEndsAt = session?.meeting_type === 'jitsi' && session?.started_at
+    ? new Date(new Date(session.started_at).getTime() + 60 * 1000)
+    : null;
+  const isJitsiWarmupActive = Boolean(
+    jitsiTeacherWarmupEndsAt &&
+    new Date() < jitsiTeacherWarmupEndsAt &&
+    !isTeacherOwner &&
+    profile?.role !== 'admin'
+  );
   const sessionStartTime = session ? new Date(session.scheduled_for) : null;
   const isSessionStartReached = sessionStartTime ? new Date() >= sessionStartTime : false;
   const getJitsiRoomName = (sessionRow) => `SkillPro_Session_${sessionRow.id}_${sessionRow.title?.replace(/\s+/g, '_') || 'Class'}`;
@@ -280,7 +290,22 @@ const LiveClass = () => {
     setFeedbackOpen(true);
   };
 
-  const handleLeaveClassroom = () => {
+  const clearOneTimeLiveKitAdmission = async () => {
+    if (profile?.role !== 'student' || session?.meeting_type !== 'livekit' || !profile?.id) return;
+    try {
+      await controlLiveKitClassSession({
+        sessionId,
+        requesterId: profile.id,
+        action: 'leave_class',
+        targetUserId: profile.id,
+      });
+    } catch {
+      // Best effort. If this fails, the host can still remove/relock from controls.
+    }
+  };
+
+  const handleLeaveClassroom = async () => {
+    await clearOneTimeLiveKitAdmission();
     cleanupMeetingState();
     openFeedbackPrompt();
   };
@@ -369,7 +394,7 @@ const LiveClass = () => {
       return undefined;
     }
 
-    if (isTeacherOwner || session?.status === 'live' || session?.status === 'ended') {
+    if (isTeacherOwner || (session?.status === 'live' && !isJitsiWarmupActive) || session?.status === 'ended') {
       return undefined;
     }
 
@@ -378,7 +403,7 @@ const LiveClass = () => {
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [profile, meetingStarted, session?.meeting_type, session?.status, isTeacherOwner]);
+  }, [profile, meetingStarted, session?.meeting_type, session?.status, isTeacherOwner, isJitsiWarmupActive]);
 
   useEffect(() => {
     if (!sessionId) return undefined;
@@ -448,6 +473,14 @@ const LiveClass = () => {
     };
   }, [meetingStarted, session?.meeting_type, session?.livekit_controls, sessionId, profile?.id]);
 
+  useEffect(() => {
+    if (!waitingForHostApproval || meetingStarted || session?.meeting_type !== 'livekit') return undefined;
+    const interval = setInterval(() => {
+      startLiveKitMeeting({ silentWaitingRoom: true });
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [waitingForHostApproval, meetingStarted, session?.meeting_type, session?.livekit_controls, profile?.id]);
+
   const loadSession = async ({ silent = false } = {}) => {
     console.log('loadSession called');
     
@@ -506,6 +539,18 @@ const LiveClass = () => {
         navigate('/app/class-schedule');
         return;
       }
+      if (
+        isStudent &&
+        data.meeting_type === 'jitsi' &&
+        data.status === 'live' &&
+        data.started_at &&
+        new Date() < new Date(new Date(data.started_at).getTime() + 60 * 1000)
+      ) {
+        openPopup('Teacher Joining', 'The teacher has started the room. Students can join automatically after 1 minute.', 'info');
+        setSession(data);
+        setLoading(false);
+        return;
+      }
 
       if (data.status === 'ended') {
         setSession(data);
@@ -559,7 +604,7 @@ const LiveClass = () => {
     if (isTeacherOwner) {
       const { error } = await supabase
         .from('class_sessions')
-        .update({ status: 'live' })
+        .update({ status: 'live', started_at: new Date().toISOString() })
         .eq('id', sessionId);
 
       if (error) {
@@ -568,7 +613,7 @@ const LiveClass = () => {
         return;
       }
 
-      setSession((prev) => (prev ? { ...prev, status: 'live' } : prev));
+      setSession((prev) => (prev ? { ...prev, status: 'live', started_at: prev.started_at || new Date().toISOString() } : prev));
     } else if (session.status !== 'live') {
       openPopup('Please Wait', 'Only the teacher can start this SkillPro class. You can join after the teacher starts it.', 'info');
       setJoiningMeeting(false);
@@ -583,7 +628,8 @@ const LiveClass = () => {
     setJoiningMeeting(false);
   };
 
-  const startLiveKitMeeting = async () => {
+  const startLiveKitMeeting = async (options = {}) => {
+    const { silentWaitingRoom = false } = options;
     if (!session || !profile?.id) {
       return;
     }
@@ -602,7 +648,18 @@ const LiveClass = () => {
     if (isTeacherOwner) {
       const { error } = await supabase
         .from('class_sessions')
-        .update({ status: 'live' })
+        .update({
+          status: 'live',
+          started_at: new Date().toISOString(),
+          livekit_controls: {
+            ...(session.livekit_controls || {}),
+            waiting_room_enabled: session.livekit_controls?.waiting_room_enabled !== false,
+            private_participants_enabled: session.livekit_controls?.private_participants_enabled !== false,
+            admitted_user_ids: session.livekit_controls?.admitted_user_ids || [],
+            waiting_user_ids: session.livekit_controls?.waiting_user_ids || [],
+            cohost_user_ids: session.livekit_controls?.cohost_user_ids || [],
+          },
+        })
         .eq('id', sessionId);
 
       if (error) {
@@ -611,7 +668,7 @@ const LiveClass = () => {
         return;
       }
 
-      setSession((prev) => (prev ? { ...prev, status: 'live' } : prev));
+      setSession((prev) => (prev ? { ...prev, status: 'live', started_at: prev.started_at || new Date().toISOString() } : prev));
     } else if (session.status !== 'live') {
       openPopup('Please Wait', 'Only the teacher can start this SkillPro class. You can join after the teacher starts it.', 'info');
       setJoiningMeeting(false);
@@ -630,9 +687,14 @@ const LiveClass = () => {
         serverUrl: tokenData.url,
         roomName: tokenData.roomName,
       });
+      setWaitingForHostApproval(false);
       setMeetingStarted(true);
     } catch (error) {
-      openPopup('Join failed', error.message || 'Failed to connect LiveKit room.', 'error');
+      if (String(error.message || '').toLowerCase().includes('waiting room')) {
+        setWaitingForHostApproval(true);
+      } else {
+        openPopup('Join failed', error.message || 'Failed to connect LiveKit room.', 'error');
+      }
     } finally {
       setJoiningMeeting(false);
     }
@@ -1002,7 +1064,41 @@ const LiveClass = () => {
                     {joiningMeeting ? 'Joining...' : isSessionStartReached ? 'Start Class Now' : 'Available at Scheduled Time'}
                   </button>
                 </>
-              ) : session.status === 'live' && canJoinStartedMeeting ? (
+              ) : waitingForHostApproval ? (
+                <div className="max-w-2xl">
+                  <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-amber-300/25 bg-amber-300/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-amber-100">
+                    <span className="h-2.5 w-2.5 rounded-full bg-amber-300 animate-pulse" />
+                    Waitlisted
+                  </div>
+                  <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
+                    You are in the waiting hall
+                  </h2>
+                  <p className="mt-4 max-w-2xl text-base leading-7 text-slate-300">
+                    You are on the waitlist for <span className="font-semibold text-white">{session.title}</span>. The host or co-host will allow you in soon.
+                  </p>
+                  <div className="mt-6 rounded-2xl border border-amber-300/20 bg-amber-300/10 px-5 py-4">
+                    <p className="text-sm font-semibold text-amber-100">No need to refresh.</p>
+                    <p className="mt-1 text-sm text-amber-50/80">
+                      This page checks automatically and will move you into the meeting as soon as approval is given.
+                    </p>
+                  </div>
+                  <div className="mt-6 flex flex-wrap gap-3">
+                    <button
+                      onClick={() => startLiveKitMeeting({ silentWaitingRoom: false })}
+                      disabled={joiningMeeting}
+                      className="rounded-2xl bg-amber-300 px-6 py-4 text-base font-semibold text-slate-950 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-300"
+                    >
+                      {joiningMeeting ? 'Checking Approval...' : 'Check Again'}
+                    </button>
+                    <button
+                      onClick={handleLeaveClassroom}
+                      className="rounded-2xl border border-white/10 px-6 py-4 text-base font-semibold text-slate-200 transition hover:bg-white/[0.08]"
+                    >
+                      Leave Waiting Hall
+                    </button>
+                  </div>
+                </div>
+              ) : session.status === 'live' && canJoinStartedMeeting && !isJitsiWarmupActive ? (
                 <>
                   <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">Everything is ready to join</h2>
                   <p className="mb-8 mt-4 max-w-2xl text-base leading-7 text-slate-300">
@@ -1020,9 +1116,13 @@ const LiveClass = () => {
                 </>
               ) : (
                 <>
-                  <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">Waiting for the teacher to begin</h2>
+                  <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
+                    {isJitsiWarmupActive ? 'Teacher is entering the room' : 'Waiting for the teacher to begin'}
+                  </h2>
                   <p className="mb-3 mt-4 max-w-2xl text-base leading-7 text-slate-300">
-                    Only the teacher can start this {getMeetingProviderLabel(session)} meeting.
+                    {isJitsiWarmupActive
+                      ? 'Students can join 1 minute after the teacher starts the Jitsi room.'
+                      : `Only the teacher can start this ${getMeetingProviderLabel(session)} meeting.`}
                   </p>
                   <p className="mb-8 text-slate-500">
                     This page will refresh automatically and let you join once the class starts.

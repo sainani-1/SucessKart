@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { hasDevToolsSizeSignal } from '../utils/devtoolsDetection';
+import Toast from './Toast';
 
 const SETTING_KEYS = [
   'disable_right_click_global',
@@ -33,6 +34,7 @@ const parseBooleanSetting = (value, fallback) => {
 const GlobalInteractionGuards = () => {
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [blocked, setBlocked] = useState(false);
+  const [shortcutWarning, setShortcutWarning] = useState(false);
   const detectionStrikesRef = useRef(0);
   const lastResizeAtRef = useRef(0);
   const mountedAtRef = useRef(Date.now());
@@ -132,7 +134,7 @@ const GlobalInteractionGuards = () => {
         if (typeof event.stopImmediatePropagation === 'function') {
           event.stopImmediatePropagation();
         }
-        setBlocked(true);
+        setShortcutWarning(true);
       }
     };
 
@@ -191,7 +193,17 @@ const GlobalInteractionGuards = () => {
     };
   }, [settings]);
 
-  if (!blocked) return null;
+  if (!blocked) {
+    return (
+      <Toast
+        show={shortcutWarning}
+        message="You are not allowed to use developer tools."
+        type="warning"
+        duration={3000}
+        onClose={() => setShortcutWarning(false)}
+      />
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-[2147483647] flex min-h-screen items-center justify-center bg-slate-950 p-6 text-center text-white">

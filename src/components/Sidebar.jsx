@@ -662,6 +662,10 @@ const Sidebar = ({ isMobile = false, mobileOpen = false, onClose = () => {}, onR
               <Video size={28} />
               {shouldShowText && <span className="truncate text-sm font-medium">Live Classes</span>}
             </NavLink>
+            <NavLink to="/app/demo-sessions" className={navItemClass} title="Demo Sessions">
+              <Video size={28} />
+              {shouldShowText && <span className="truncate text-sm font-medium">Demo Sessions</span>}
+            </NavLink>
             <NavLink to="/app/premium-status" className={navItemClass} title="Premium Membership">
               <Award size={28} />
               {shouldShowText && <span className="truncate text-sm font-medium">Premium Membership</span>}
@@ -813,6 +817,10 @@ const Sidebar = ({ isMobile = false, mobileOpen = false, onClose = () => {}, onR
             <NavLink to="/app/class-schedule" className={navItemClass} title="Schedule Sessions">
               <Calendar size={28} />
               {shouldShowText && <span className="truncate text-sm font-medium">Schedule Sessions</span>}
+            </NavLink>
+            <NavLink to="/app/demo-sessions" className={navItemClass} title="Demo Sessions">
+              <Video size={28} />
+              {shouldShowText && <span className="truncate text-sm font-medium">Demo Sessions</span>}
             </NavLink>
             <NavLink to="/app/leaves" className={navItemClass} title="Apply Leave">
               <Calendar size={28} />
@@ -1056,6 +1064,10 @@ const Sidebar = ({ isMobile = false, mobileOpen = false, onClose = () => {}, onR
             <NavLink to="/app/admin/choose-meet" className={navItemClass} title="Choose Meet">
               <Video size={28} />
               {shouldShowText && <span className="truncate text-sm font-medium">Choose Meet</span>}
+            </NavLink>
+            <NavLink to="/app/admin/demo-sessions" className={navItemClass} title="Demo Sessions">
+              <Video size={28} />
+              {shouldShowText && <span className="truncate text-sm font-medium">Demo Sessions</span>}
             </NavLink>
             <NavLink to="/app/admin/allow-failed-to-book-slot" className={navItemClass} title="Allow Failed To Book Slot">
               <KeyRound size={28} />

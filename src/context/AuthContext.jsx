@@ -105,8 +105,8 @@ export const AuthProvider = ({ children }) => {
     await forceClientLogout(userId, {
       title: 'Session Moved To Another Device',
       type: 'warning',
-      inlineMessage: 'This account was opened on another device. Please log in again here if needed.',
-      message: `This account is now active on another device.\n\nActive device: ${oldDevice}\nThis device: Current device\n\nYou have been logged out on this device for security.`,
+      inlineMessage: 'This account was opened somewhere else, so this device was logged out.',
+      message: `This account is now active on another device.\n\nActive device: ${oldDevice}\nThis device: Current device\n\nYou have been logged out here automatically. Next time your account may be disabled if the same account is used in multiple places.`,
     });
   };
 

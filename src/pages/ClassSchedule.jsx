@@ -21,7 +21,13 @@ import {
 
 const CLASS_MEETING_PROVIDER_KEY = 'class_meeting_provider';
 
-const ClassSchedule = () => {
+const ClassSchedule = ({
+  sessionKind = 'class',
+  pageTitle = 'Class Schedule',
+  pageDescription = 'Manage daily live sessions (9-10 AM, 5-6 PM)',
+  scheduleButtonLabel = 'Schedule Session',
+  formTitle = 'Schedule New Session',
+}) => {
   const { profile, isPremium } = useAuth();
   const navigate = useNavigate();
   const [sessions, setSessions] = useState([]);
@@ -40,6 +46,7 @@ const ClassSchedule = () => {
   const [deleteModal, setDeleteModal] = useState({ show: false, sessionId: null, sessionTitle: '' });
   const [endModal, setEndModal] = useState({ show: false, sessionId: null, sessionTitle: '' });
   const [joiningSessionId, setJoiningSessionId] = useState(null);
+  const [creatingSession, setCreatingSession] = useState(false);
   const [nowTick, setNowTick] = useState(Date.now());
   const [pickerState, setPickerState] = useState({
     open: false,
@@ -176,7 +183,7 @@ const ClassSchedule = () => {
     if (profile.role === 'admin') {
       loadTeachers();
     }
-  }, [profile?.id, profile?.role]);
+  }, [profile?.id, profile?.role, sessionKind]);
 
   // Auto refresh every 1 minute:
   // - refresh sessions so newly scheduled classes appear automatically
@@ -187,7 +194,7 @@ const ClassSchedule = () => {
       loadSessions();
     }, 60000);
     return () => clearInterval(interval);
-  }, [profile?.id, profile?.role]);
+  }, [profile?.id, profile?.role, sessionKind]);
 
   const loadTeachers = async () => {
     const { data } = await supabase
@@ -224,25 +231,46 @@ const ClassSchedule = () => {
     setStudents(data || []);
   };
 
-  const loadSessions = async () => {
-    let query;
+  const buildSessionsQuery = () => {
     if (profile?.role === 'admin') {
-      query = supabase
+      return supabase
         .from('class_sessions')
         .select('*, class_session_participants(student_id, profiles(full_name))');
-    } else if (profile?.role === 'teacher') {
-      query = supabase
+    }
+
+    if (profile?.role === 'teacher') {
+      return supabase
         .from('class_sessions')
         .select('*, class_session_participants(student_id, profiles(full_name))')
         .eq('teacher_id', profile.id);
-    } else {
-      query = supabase
-        .from('class_sessions')
-        .select('*, class_session_participants!inner(student_id)')
-        .eq('class_session_participants.student_id', profile.id);
     }
-    
-    const { data } = await query.order('scheduled_for', { ascending: false });
+
+    return supabase
+      .from('class_sessions')
+      .select('*, class_session_participants!inner(student_id)')
+      .eq('class_session_participants.student_id', profile.id);
+  };
+
+  const loadSessions = async () => {
+    if (!profile?.id) return;
+
+    const kindFilter = sessionKind === 'class' ? `session_kind.eq.class,session_kind.is.null` : `session_kind.eq.${sessionKind}`;
+    let usedKindFilter = true;
+    let result = await buildSessionsQuery()
+      .or(kindFilter)
+      .order('scheduled_for', { ascending: false });
+
+    if (result.error && String(result.error.message || '').includes('session_kind')) {
+      usedKindFilter = false;
+      result = await buildSessionsQuery().order('scheduled_for', { ascending: false });
+    }
+
+    const data = !usedKindFilter
+      ? (result.data || [])
+      : sessionKind === 'class'
+      ? (result.data || []).filter((row) => !row.session_kind || row.session_kind === 'class')
+      : (result.data || []).filter((row) => row.session_kind === sessionKind);
+
     setSessions(data || []);
   };
 
@@ -334,6 +362,7 @@ const ClassSchedule = () => {
   };
 
   const createSession = async () => {
+    if (creatingSession) return;
     if (!title || !scheduledAt || !endsAt) {
       setAlertModal({
         show: true,
@@ -353,6 +382,7 @@ const ClassSchedule = () => {
       });
       return;
     }
+    setCreatingSession(true);
 
     const selectedMeetingType = configuredMeetingProvider === 'livekit' ? 'livekit' : 'jitsi';
     const link = null;
@@ -399,14 +429,33 @@ const ClassSchedule = () => {
     
     const teacherId = profile.role === 'admin' ? selectedTeacher : profile.id;
 
-    const { data: sessionData, error: sessionError } = await supabase.from('class_sessions').insert({
+    const sessionPayload = {
       teacher_id: teacherId,
       title,
       scheduled_for: isoDateString,
       ends_at: endsAtIso,
       meeting_link: link,
-      meeting_type: selectedMeetingType
-    }).select().single();
+      meeting_type: selectedMeetingType,
+      session_kind: sessionKind,
+      livekit_controls: {
+        waiting_room_enabled: true,
+        private_participants_enabled: true,
+        cohost_user_ids: [],
+        admitted_user_ids: [],
+        waiting_user_ids: [],
+        room_locked: false,
+      },
+    };
+
+    let { data: sessionData, error: sessionError } = await supabase.from('class_sessions').insert(sessionPayload).select().single();
+    if (sessionError && (String(sessionError.message || '').includes('session_kind') || String(sessionError.message || '').includes('livekit_controls'))) {
+      const fallbackPayload = { ...sessionPayload };
+      delete fallbackPayload.session_kind;
+      delete fallbackPayload.livekit_controls;
+      const fallbackResult = await supabase.from('class_sessions').insert(fallbackPayload).select().single();
+      sessionData = fallbackResult.data;
+      sessionError = fallbackResult.error;
+    }
 
     if (sessionError) {
       setAlertModal({
@@ -415,6 +464,7 @@ const ClassSchedule = () => {
         message: 'Failed to create session',
         type: 'error'
       });
+      setCreatingSession(false);
       return;
     }
 
@@ -528,6 +578,7 @@ const ClassSchedule = () => {
       type: 'success'
     });
     loadSessions();
+    setCreatingSession(false);
   };
 
   const isFreeStudent = profile?.role === 'student' && !isPremium(profile);
@@ -539,8 +590,8 @@ const ClassSchedule = () => {
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Class Schedule</h1>
-            <p className="text-slate-500">Manage daily live sessions (9-10 AM, 5-6 PM)</p>
+            <h1 className="text-2xl font-bold text-slate-900">{pageTitle}</h1>
+            <p className="text-slate-500">{pageDescription}</p>
           </div>
         </div>
 
@@ -564,8 +615,8 @@ const ClassSchedule = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Class Schedule</h1>
-          <p className="text-slate-500">Manage daily live sessions (9-10 AM, 5-6 PM)</p>
+          <h1 className="text-2xl font-bold text-slate-900">{pageTitle}</h1>
+          <p className="text-slate-500">{pageDescription}</p>
         </div>
         {(profile.role === 'teacher' || profile.role === 'admin') && (
           <button 
@@ -573,7 +624,7 @@ const ClassSchedule = () => {
             className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
           >
             <Plus size={20} />
-            Schedule Session
+            {scheduleButtonLabel}
           </button>
         )}
       </div>
@@ -581,7 +632,7 @@ const ClassSchedule = () => {
       {showForm && (
         <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
           <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-blue-800 px-6 py-5 text-white">
-            <h2 className="text-xl font-bold">Schedule New Session</h2>
+            <h2 className="text-xl font-bold">{formTitle}</h2>
             <p className="mt-1 text-sm text-slate-200">Choose a future slot, assign students, and publish the class in one step.</p>
           </div>
           <div className="space-y-4 p-6">
@@ -736,9 +787,10 @@ const ClassSchedule = () => {
             <div className="flex gap-2">
               <button 
                 onClick={createSession}
-                className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-3 rounded-2xl hover:from-blue-700 hover:to-indigo-700 shadow-lg shadow-blue-100 font-semibold"
+                disabled={creatingSession}
+                className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-3 rounded-2xl hover:from-blue-700 hover:to-indigo-700 shadow-lg shadow-blue-100 font-semibold disabled:cursor-not-allowed disabled:from-slate-400 disabled:to-slate-500"
               >
-                Create Session
+                {creatingSession ? 'Creating Session...' : 'Create Session'}
               </button>
               <button 
                 onClick={() => setShowForm(false)}

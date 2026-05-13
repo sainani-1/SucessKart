@@ -6,6 +6,7 @@ import usePopup from '../hooks/usePopup.jsx';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { buildWhatsAppShareUrl, trackPremiumEvent } from '../utils/growth';
 import { getCertificateDisplayName, hasApprovedIdentity } from '../utils/identityVerification';
+import { buildCertificateDataUrl } from '../utils/certificateCanvas';
 
 /**
  * MyCertificates Component
@@ -23,7 +24,6 @@ import { getCertificateDisplayName, hasApprovedIdentity } from '../utils/identit
  */
 
 let jsPdfLoader;
-const FOUNDER_SIGNATURE_URL = '/nani-signature-cropped.png';
 
 /**
  * Dynamically loads jsPDF library from local dependency
@@ -111,251 +111,6 @@ const MyCertificates = () => {
   const idVerifiedForCertificates = hasApprovedIdentity(profile);
 
   /**
-   * buildCertificateDataUrl()
-   * ==========================
-   * ASYNC function - generates certificate as HTML5 Canvas
-   * 
-   * Canvas Layout (1200x900px):
-   * 1. Background: Cream color (#f5f1e8)
-   * 2. Outer Gold Border: 20px thick (#d4a574)
-   * 3. Inner Gold Border: 10px thick (spacing)
-   * 4. White Interior: Main certificate content area
-   * 5. Logo: Centered at top (520, 60) - 160x120px
-  *    - Loads from: import.meta.env.VITE_CERTIFICATE_LOGO (/skillpro-logo.png)
-   *    - Uses Promise wrapper for async image loading
-   * 6. Heading: "THIS CERTIFICATE IS PROUDLY PRESENTED TO" (32px bold)
-   * 7. Student Name Box: White box with gray border, underline
-   * 8. Course Name Box: White box with gray border, underline
-   * 9. Footer: Completion date, Verification ID, Nani signature
-   * 
-   * Returns: Promise<DataURL> for PDF generation
-   */
-  const buildCertificateDataUrl = async (cert, formattedId) => {
-    const canvas = document.createElement('canvas');
-    canvas.width = 2400;
-    canvas.height = 1800;
-    const ctx = canvas.getContext('2d');
-    const scale = 2; // 2x resolution for clarity
-    ctx.scale(scale, scale);
-
-    // ===== CERTIFICATE BACKGROUND & BORDERS =====
-    // Premium background with subtle pattern
-    ctx.fillStyle = '#faf8f3';
-    ctx.fillRect(0, 0, 1200, 900);
-
-    // Outermost gold border (premium - 30px)
-    ctx.fillStyle = '#d4af37';
-    ctx.fillRect(10, 10, 1180, 880);
-
-    // Inner spacing line (decorative gold - 2px)
-    ctx.fillStyle = '#d4af37';
-    ctx.fillRect(40, 40, 1120, 820);
-
-    // White premium background (glossy effect)
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(45, 45, 1110, 810);
-
-    // Decorative corner ornaments (top-left and top-right)
-    ctx.strokeStyle = '#d4af37';
-    ctx.lineWidth = 3;
-    // Top-left corner ornament
-    ctx.beginPath();
-    ctx.moveTo(70, 70);
-    ctx.lineTo(100, 70);
-    ctx.moveTo(70, 70);
-    ctx.lineTo(70, 100);
-    ctx.stroke();
-    // Top-right corner ornament
-    ctx.beginPath();
-    ctx.moveTo(1130, 70);
-    ctx.lineTo(1100, 70);
-    ctx.moveTo(1130, 70);
-    ctx.lineTo(1130, 100);
-    ctx.stroke();
-    // Bottom-left corner ornament
-    ctx.beginPath();
-    ctx.moveTo(70, 830);
-    ctx.lineTo(100, 830);
-    ctx.moveTo(70, 830);
-    ctx.lineTo(70, 800);
-    ctx.stroke();
-    // Bottom-right corner ornament
-    ctx.beginPath();
-    ctx.moveTo(1130, 830);
-    ctx.lineTo(1100, 830);
-    ctx.moveTo(1130, 830);
-    ctx.lineTo(1130, 800);
-    ctx.stroke();
-
-    // ===== LOGO LOADING (ASYNC) =====
-    // Loads SkillPro logo from public folder
-    // Uses Promise wrapper to ensure logo loads before canvas is complete
-    // If logo fails to load, certificate renders without logo
-    let logoLoaded = false;
-    try {
-      const logoUrl = import.meta.env.VITE_CERTIFICATE_LOGO || '/skillpro-logo.png';
-      const logoImg = new Image();
-      logoImg.crossOrigin = 'anonymous';
-      await new Promise((resolve) => {
-        logoImg.onload = () => {
-          // Render logo inside a circular badge instead of a square box.
-          const centerX = 600;
-          const centerY = 120;
-          const radius = 60;
-          ctx.save();
-          ctx.beginPath();
-          ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
-          ctx.closePath();
-          ctx.clip();
-          ctx.drawImage(logoImg, centerX - radius, centerY - radius, radius * 2, radius * 2);
-          ctx.restore();
-          ctx.strokeStyle = '#d4af37';
-          ctx.lineWidth = 3;
-          ctx.beginPath();
-          ctx.arc(centerX, centerY, radius + 4, 0, Math.PI * 2);
-          ctx.stroke();
-          logoLoaded = true;
-          resolve();
-        };
-        logoImg.onerror = () => resolve();
-        logoImg.src = logoUrl;
-      });
-    } catch (err) {
-      console.warn('Failed to load certificate logo:', err);
-    }
-
-    // ===== SIGNATURE IMAGE LOADING (ASYNC) =====
-    // Loads founder signature from public folder
-    // Uses Promise wrapper to ensure signature loads before canvas is complete
-    // If signature fails to load, falls back to text signature
-    const footerCenterX = 960;
-
-    try {
-      const signatureUrl = FOUNDER_SIGNATURE_URL;
-      const signatureImg = new Image();
-      signatureImg.crossOrigin = 'anonymous';
-      await new Promise((resolve) => {
-        signatureImg.onload = () => {
-          ctx.drawImage(signatureImg, footerCenterX - 58, 666, 116, 91);
-          resolve();
-        };
-        signatureImg.onerror = () => resolve(); // Continue without signature if image fails
-        signatureImg.src = signatureUrl;
-      });
-    } catch (err) {
-      console.warn('Failed to load certificate signature:', err);
-    }
-
-    // ===== CERTIFICATE CONTENT =====
-    // Main heading
-    ctx.fillStyle = '#1e293b';
-    ctx.font = 'bold 32px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText('WE PROUDLY PRESENT THIS CERTIFICATE TO', 600, 380);
-
-    // ===== STUDENT NAME SECTION =====
-    // Student name in elegant blue (centered)
-    ctx.fillStyle = '#1565c0';
-    ctx.font = 'bold 48px Georgia, serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(
-      getCertificateDisplayName(profile, { placeholder: '________________________' }),
-      600,
-      460
-    );
-
-    // Line below student name
-    ctx.strokeStyle = '#d4af37';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(250, 475);
-    ctx.lineTo(950, 475);
-    ctx.stroke();
-
-    // ===== COURSE SECTION =====
-    // Recognition text (closer to course)
-    ctx.fillStyle = '#1e293b';
-    ctx.font = '18px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText('In recognition of successfully completing the requirements of the course:', 600, 520);
-
-    // Course name in elegant styling (centered)
-    ctx.fillStyle = '#1e293b';
-    ctx.font = 'bold 32px Georgia, serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(resolveCertificateCourseTitle(cert), 600, 560);
-
-    // ===== LOGO & BRANDING SECTION =====
-    // Use the actual logo; fall back to text only if logo fails to load.
-    if (!logoLoaded) {
-      ctx.fillStyle = '#333333';
-      ctx.font = 'bold 20px Arial';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('SkillPro', 600, 130);
-      ctx.font = '12px Arial';
-      ctx.fillStyle = '#666666';
-      ctx.fillText('Empowering Every Learner', 600, 155);
-    }
-
-    // ===== CERTIFICATE OF COMPLETION SECTION =====
-    // Large "CERTIFICATE" text
-    ctx.fillStyle = '#1565c0';
-    ctx.font = 'bold 56px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText('CERTIFICATE', 600, 280);
-
-    // Line from left (before OF COMPLETION)
-    ctx.strokeStyle = '#1565c0';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(400, 305);
-    ctx.lineTo(520, 305);
-    ctx.stroke();
-
-    // "OF COMPLETION" text
-    ctx.fillStyle = '#1e293b';
-    ctx.font = '18px Arial';
-    ctx.fillText('OF COMPLETION', 600, 310);
-
-    // Line from right (after OF COMPLETION)
-    ctx.strokeStyle = '#1565c0';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(680, 305);
-    ctx.lineTo(800, 305);
-    ctx.stroke();
-
-    // ===== CERTIFICATE DETAILS SECTION (BOTTOM LEFT) =====
-    // Course Completion Date
-    ctx.fillStyle = '#1e293b';
-    ctx.font = '14px Arial';
-    ctx.textAlign = 'left';
-    const completionDate = new Date(cert.issued_at).toLocaleDateString();
-    ctx.fillText(`Date: ${completionDate}`, 70, 760);
-
-    // Verification ID
-    ctx.fillText(`Certificate ID: ${formattedId}`, 70, 790);
-
-    // ===== SIGNATURE SECTION (BOTTOM RIGHT) =====
-    // Founder footer block
-    ctx.textAlign = 'center';
-    ctx.strokeStyle = '#1e293b';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(footerCenterX - 78, 760);
-    ctx.lineTo(footerCenterX + 78, 760);
-    ctx.stroke();
-    ctx.font = '14px Arial';
-    ctx.fillStyle = '#1e293b';
-    ctx.fillText('Founder, SkillPro', footerCenterX, 790);
-    ctx.font = '13px Arial';
-    ctx.fillText('Issued by SkillPro', footerCenterX, 818);
-
-    return canvas.toDataURL('image/png');
-  };
-
-  /**
    * downloadCertificate()
    * =====================
    * Downloads certificate as PDF file
@@ -373,7 +128,7 @@ const MyCertificates = () => {
       setDownloading(cert.id);
       const { jsPDF } = await loadJsPDF();
       const formattedId = formatCertificateId(cert);
-      const dataUrl = await buildCertificateDataUrl(cert, formattedId);
+      const dataUrl = await buildCertificateDataUrl(cert, formattedId, { profile });
       const pdf = new jsPDF({ orientation: 'landscape', unit: 'pt', format: [2400, 1800] });
       pdf.addImage(dataUrl, 'PNG', 0, 0, 2400, 1800);
       const userName = toSafeFilePart(certificateDisplayName || 'User');

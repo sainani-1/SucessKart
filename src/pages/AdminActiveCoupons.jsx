@@ -42,6 +42,7 @@ const AdminActiveCoupons = () => {
               <div className="text-xs text-slate-400">Applies To: {offer.applies_to_all ? 'All Users' : 'Specific Users'}</div>
               <div className="text-xs text-slate-400">Plan Scope: {offer.applicable_plan === 'premium' ? 'Premium Only' : offer.applicable_plan === 'premium_plus' ? 'Premium Plus Only' : 'Premium + Premium Plus'}</div>
               <div className="text-xs text-slate-400">Visibility: {offer.is_listed === false ? 'Unlisted / Admin Only' : 'Listed Publicly'}</div>
+              <div className="text-xs text-slate-400">Redeem Limit: {offer.redeem_once_per_account === false ? 'Repeat use allowed' : 'Once per account'}</div>
               <button className="bg-red-500 text-white px-4 py-2 rounded font-semibold mt-2 w-max" onClick={async () => {
                 await supabase.from('offers').delete().eq('id', offer.id);
                 setCoupons(coupons.filter(o => o.id !== offer.id));

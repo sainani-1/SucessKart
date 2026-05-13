@@ -11,6 +11,7 @@ import { attachPendingReferral } from '../utils/referrals';
 import { useAuth } from '../context/AuthContext';
 import { clearAdminVerificationState } from '../utils/adminPasskey';
 import { getPendingAvatarKey } from '../utils/avatarUpload';
+import { reportMultiSessionViolation } from '../utils/sessionSecurity';
 
 const Login = () => {
   const { user, loading: authLoading } = useAuth();
@@ -272,6 +273,14 @@ const Login = () => {
   const ensureSingleActiveSession = async (userId, userProfile = null) => {
     const initial = await claimSingleSession(userId, { forceTakeover: false, deviceLabel: currentDeviceLabel });
     if (initial.status === 'requires_takeover') {
+      if (userProfile) {
+        await reportMultiSessionViolation(userProfile, {
+          existingDeviceLabel: initial.conflictingSession?.device_label,
+          existingDeviceId: initial.conflictingSession?.device_id,
+          existingUpdatedAt: initial.conflictingSession?.updated_at,
+          incomingDeviceLabel: currentDeviceLabel,
+        });
+      }
       const ok = await askTakeoverConfirmation();
       if (!ok) {
         return {
@@ -289,7 +298,7 @@ const Login = () => {
       }
       return {
         allowed: true,
-        message: 'Previous device was logged out. You are now logged in here.',
+        message: 'Previous device was logged out. Next time your account may be disabled if the same account is used in multiple places.',
       };
     }
 
@@ -943,7 +952,7 @@ const Login = () => {
                   Logout there and login here?
                 </p>
                 <p className="text-xs text-slate-600 mt-2">
-                  If you continue, the other device will be logged out immediately.
+                  If you continue, the other device will be logged out immediately. This multi-session attempt is reported to admin. Next time your account may be disabled.
                 </p>
               </div>
               <p className="text-xs text-slate-500">

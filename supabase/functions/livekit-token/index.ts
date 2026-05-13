@@ -92,6 +92,13 @@ Deno.serve(async (req: Request) => {
         ? controls.banned_user_ids.map((value) => String(value))
         : [];
       const roomLocked = Boolean(controls.room_locked);
+      const waitingRoomEnabled = controls.waiting_room_enabled !== false;
+      const admittedUserIds = Array.isArray(controls.admitted_user_ids)
+        ? controls.admitted_user_ids.map((value) => String(value))
+        : [];
+      const waitingUserIds = Array.isArray(controls.waiting_user_ids)
+        ? controls.waiting_user_ids.map((value) => String(value))
+        : [];
       const breakout = controls.breakout && typeof controls.breakout === "object"
         ? controls.breakout as Record<string, unknown>
         : {};
@@ -141,6 +148,62 @@ Deno.serve(async (req: Request) => {
         );
       }
 
+      if (callerRole === "student" && waitingRoomEnabled && !admittedUserIds.includes(requesterId)) {
+        const nextWaitingUserIds = Array.from(new Set([...waitingUserIds, requesterId]));
+        await adminClient
+          .from("class_sessions")
+          .update({
+            livekit_controls: {
+              ...controls,
+              waiting_room_enabled: waitingRoomEnabled,
+              admitted_user_ids: admittedUserIds,
+              waiting_user_ids: nextWaitingUserIds,
+            },
+          })
+          .eq("id", sessionId);
+
+        await adminClient.from("class_session_join_requests").upsert(
+          {
+            session_id: sessionId,
+            user_id: requesterId,
+            status: "waiting",
+            requested_at: new Date().toISOString(),
+          },
+          { onConflict: "session_id,user_id" },
+        );
+
+        return Response.json(
+          { error: "You are in the waiting room. The host will admit you shortly.", waitingRoom: true },
+          { status: 423, headers: corsHeaders },
+        );
+      }
+
+      if (callerRole === "student" && waitingRoomEnabled && admittedUserIds.includes(requesterId)) {
+        const nextAdmittedUserIds = admittedUserIds.filter((value) => value !== requesterId);
+        const nextWaitingUserIds = waitingUserIds.filter((value) => value !== requesterId);
+
+        await adminClient
+          .from("class_sessions")
+          .update({
+            livekit_controls: {
+              ...controls,
+              waiting_room_enabled: waitingRoomEnabled,
+              admitted_user_ids: nextAdmittedUserIds,
+              waiting_user_ids: nextWaitingUserIds,
+            },
+          })
+          .eq("id", sessionId);
+
+        await adminClient
+          .from("class_session_join_requests")
+          .update({
+            status: "joined",
+            decided_at: new Date().toISOString(),
+          })
+          .eq("session_id", sessionId)
+          .eq("user_id", requesterId);
+      }
+
       if (breakoutActive) {
         if (callerRole === "student") {
           if (!assignedBreakout?.id) {
@@ -158,7 +221,7 @@ Deno.serve(async (req: Request) => {
         roomName = roomNameForClassSession(sessionId);
       }
       identity = `${callerRole}:${requesterId}:class:${sessionId}`;
-      canPublish = callerRole === "admin" || isTeacherOwner || callerRole === "student";
+      canPublish = callerRole === "admin" || isTeacherOwner;
     } else {
       const { data: sessionRow, error: sessionError } = await adminClient
         .from("exam_live_sessions")
@@ -241,7 +304,7 @@ Deno.serve(async (req: Request) => {
       roomJoin: true,
       canPublish,
       canSubscribe: true,
-      canPublishData: canPublish,
+      canPublishData: kind === "class" ? true : canPublish,
     });
 
     return Response.json(

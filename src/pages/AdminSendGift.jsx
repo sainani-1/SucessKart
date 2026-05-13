@@ -13,6 +13,7 @@ const AdminSendGift = () => {
   const [discountValue, setDiscountValue] = useState('');
   const [applicablePlan, setApplicablePlan] = useState('both');
   const [isListed, setIsListed] = useState(true);
+  const [redeemOncePerAccount, setRedeemOncePerAccount] = useState(true);
   const [isLifetimeFree, setIsLifetimeFree] = useState(false);
   const [validUntil, setValidUntil] = useState('');
   const [showAnimation, setShowAnimation] = useState(false);
@@ -88,6 +89,7 @@ const AdminSendGift = () => {
           applicable_plan: applicablePlan,
           is_listed: isListed,
           applies_to_all: recipientType === 'all',
+          redeem_once_per_account: redeemOncePerAccount,
           valid_until: validUntilTimestamp,
           created_by: admin.id
         }
@@ -169,6 +171,13 @@ const AdminSendGift = () => {
         <input type="checkbox" checked={isListed} onChange={e => setIsListed(e.target.checked)} className="ml-3 accent-pink-500 scale-125" />
         <span className="ml-3 text-sm text-slate-500">
           {isListed ? 'Visible in Discounts & Offers pages' : 'Hidden coupon. Users must type the code manually.'}
+        </span>
+      </div>
+      <div className="mb-6 flex items-center">
+        <label className="font-semibold text-pink-600">Redeem Once Per Account:</label>
+        <input type="checkbox" checked={redeemOncePerAccount} onChange={e => setRedeemOncePerAccount(e.target.checked)} className="ml-3 accent-pink-500 scale-125" />
+        <span className="ml-3 text-sm text-slate-500">
+          {redeemOncePerAccount ? 'Each account can use this coupon only once.' : 'Allow repeat use by the same account.'}
         </span>
       </div>
       {!isLifetimeFree && (

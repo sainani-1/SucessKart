@@ -29,6 +29,7 @@ import {
   PhoneOff,
   ScreenShare,
   Send,
+  ShieldCheck,
   UserMinus,
   Users,
   Video,
@@ -77,6 +78,12 @@ const getBreakoutRoomLabel = (breakout, userId) => {
   if (activeRoom?.name) return activeRoom.name;
   const lastLabels = breakout?.last_room_labels && typeof breakout.last_room_labels === 'object' ? breakout.last_room_labels : {};
   return String(lastLabels?.[userId] || '');
+};
+
+const getClassParticipantRoleLabel = ({ participant, userId, teacherIdentity, cohostUserIds }) => {
+  if (participant?.identity === teacherIdentity) return 'Host';
+  if (cohostUserIds.includes(String(userId || ''))) return 'Co-host';
+  return participant?.isLocal ? 'You · Student/Participant' : 'Student/Participant';
 };
 
 const encodeData = (value) => new TextEncoder().encode(JSON.stringify(value));
@@ -306,13 +313,7 @@ const LiveKitControls = ({ onLeave, containerRef, audioRestricted, videoRestrict
 };
 
 const ChatPanel = ({
-  mode,
-  onModeChange,
   messages,
-  privateMessages,
-  participants,
-  privateTargetIdentity,
-  onPrivateTargetChange,
   draft,
   onDraftChange,
   onSend,
@@ -322,30 +323,12 @@ const ChatPanel = ({
     <div className="border-b border-white/10 px-4 py-3">
       <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-400">Public Chat</p>
       <div className="mt-2 flex items-center justify-between gap-2">
-        <h4 className="text-sm font-semibold text-white">{mode === 'public' ? 'Classroom conversation' : 'Private conversation'}</h4>
-        <div className="flex items-center gap-2">
-          <button type="button" onClick={() => onModeChange('public')} className={`rounded-full px-3 py-1 text-xs font-semibold ${mode === 'public' ? 'bg-amber-400 text-slate-950' : 'bg-white/8 text-white'}`}>Public</button>
-          <button type="button" onClick={() => onModeChange('private')} className={`rounded-full px-3 py-1 text-xs font-semibold ${mode === 'private' ? 'bg-amber-400 text-slate-950' : 'bg-white/8 text-white'}`}>Private</button>
-        </div>
+        <h4 className="text-sm font-semibold text-white">Live class conversation</h4>
       </div>
-      {mode === 'private' ? (
-        <select
-          value={privateTargetIdentity}
-          onChange={(event) => onPrivateTargetChange(event.target.value)}
-          className="mt-3 w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white outline-none"
-        >
-          <option value="">Select participant</option>
-          {participants.map((participant) => (
-            <option key={participant.identity} value={participant.identity}>
-              {participant.name}
-            </option>
-          ))}
-        </select>
-      ) : null}
     </div>
     <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
-      {(mode === 'public' ? messages : privateMessages).length ? (
-        (mode === 'public' ? messages : privateMessages).map((message) => (
+      {messages.length ? (
+        messages.map((message) => (
           <div key={message.id} className="rounded-2xl bg-white/[0.04] px-3 py-2">
             <div className="flex items-center justify-between gap-3">
               <p className="text-xs font-semibold text-amber-200">{message.name}</p>
@@ -355,9 +338,7 @@ const ChatPanel = ({
           </div>
         ))
       ) : (
-        <p className="text-sm text-slate-400">
-          {mode === 'public' ? 'No chat yet. Start the class conversation here.' : 'No private messages yet.'}
-        </p>
+        <p className="text-sm text-slate-400">No chat yet. Start the live class conversation here.</p>
       )}
     </div>
     <div className="border-t border-white/10 p-3">
@@ -365,22 +346,14 @@ const ChatPanel = ({
         <input
           value={draft}
           onChange={(event) => onDraftChange(event.target.value)}
-          placeholder={
-            mode === 'public'
-              ? canSend
-                ? 'Send a message to everyone'
-                : 'Chat is read-only right now'
-              : privateTargetIdentity
-                ? 'Send a private message'
-                : 'Choose a participant first'
-          }
-          disabled={!canSend || (mode === 'private' && !privateTargetIdentity)}
+          placeholder={canSend ? 'Send a message to everyone' : 'Chat is read-only right now'}
+          disabled={!canSend}
           className="flex-1 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500"
         />
         <button
           type="button"
           onClick={onSend}
-          disabled={!canSend || !draft.trim() || (mode === 'private' && !privateTargetIdentity)}
+          disabled={!canSend || !draft.trim()}
           className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-400 text-slate-950 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-500"
         >
           <Send size={16} />
@@ -941,7 +914,7 @@ const RecordingPanel = ({ canManageParticipants, recordings, onToggleRecording }
   );
 };
 
-const RaisedHandsPanel = ({ raisedHands, profilesByUserId, onQueueUpdate, speakerQueue, canManageParticipants }) => (
+const RaisedHandsPanel = ({ raisedHands, profilesByUserId, onQueueUpdate, onLowerHand, speakerQueue, canManageParticipants }) => (
   <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-3">
     <div className="flex items-center gap-2">
       <Hand size={15} className="text-amber-200" />
@@ -958,21 +931,30 @@ const RaisedHandsPanel = ({ raisedHands, profilesByUserId, onQueueUpdate, speake
                 {index + 1}. {profile?.full_name || profile?.email || 'Student'}
               </span>
               {canManageParticipants ? (
-                <button
-                  type="button"
-                  onClick={() =>
-                    onQueueUpdate(
-                      alreadyQueued
-                        ? speakerQueue.filter((entry) => entry !== raisedUserId)
-                        : [...speakerQueue.filter((entry) => entry !== raisedUserId), raisedUserId],
-                    )
-                  }
-                  className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-                    alreadyQueued ? 'bg-fuchsia-400 text-slate-950' : 'bg-amber-400 text-slate-950'
-                  }`}
-                >
-                  {alreadyQueued ? 'Remove From Queue' : 'Add To Queue'}
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onQueueUpdate(
+                        alreadyQueued
+                          ? speakerQueue.filter((entry) => entry !== raisedUserId)
+                          : [...speakerQueue.filter((entry) => entry !== raisedUserId), raisedUserId],
+                      )
+                    }
+                    className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                      alreadyQueued ? 'bg-fuchsia-400 text-slate-950' : 'bg-amber-400 text-slate-950'
+                    }`}
+                  >
+                    {alreadyQueued ? 'Remove From Queue' : 'Add To Queue'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onLowerHand(raisedUserId)}
+                    className="rounded-full bg-white/8 px-2.5 py-1 text-[11px] font-semibold text-white transition hover:bg-white/14"
+                  >
+                    Lower
+                  </button>
+                </div>
               ) : null}
             </div>
           );
@@ -1045,12 +1027,18 @@ const ParticipantsPopup = ({
   roomLocked,
   restrictedAudioUserIds,
   restrictedVideoUserIds,
+  waitingRoomEnabled,
+  privateParticipantsEnabled,
+  waitingUserIds,
+  cohostUserIds,
+  teacherIdentity,
   breakoutRooms,
   raisedHands,
   speakerQueue,
   allowedSpeakerUserIds,
   pinnedParticipantIds,
   canManageParticipants,
+  canManageCoHosts,
   onQueueUpdate,
   onAllowSpeaker,
   onPinToggle,
@@ -1088,6 +1076,18 @@ const ParticipantsPopup = ({
               onClick={() => runAction(roomLocked ? 'unlock_room' : 'lock_room')}
               disabled={pendingAction === `${roomLocked ? 'unlock_room' : 'lock_room'}:all`}
             />
+            <ControlButton
+              icon={Users}
+              label={waitingRoomEnabled ? 'Waiting On' : 'Waiting Off'}
+              onClick={() => runAction('toggle_waiting_room')}
+              disabled={pendingAction === 'toggle_waiting_room:all'}
+            />
+            <ControlButton
+              icon={Video}
+              label={privateParticipantsEnabled ? 'Private View On' : 'Private View Off'}
+              onClick={() => runAction('toggle_private_participants')}
+              disabled={pendingAction === 'toggle_private_participants:all'}
+            />
             <button
               type="button"
               onClick={onClose}
@@ -1097,6 +1097,31 @@ const ParticipantsPopup = ({
             </button>
           </div>
         </div>
+
+        {waitingUserIds.length > 0 ? (
+          <div className="border-b border-white/10 p-4">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Waiting Room</p>
+            <div className="grid gap-2 md:grid-cols-2">
+              {waitingUserIds.map((waitingUserId) => {
+                const waitingProfile = profilesByUserId[waitingUserId] || {};
+                return (
+                  <div key={waitingUserId} className="flex items-center justify-between gap-3 rounded-2xl bg-white/[0.04] px-4 py-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-white">{waitingProfile.full_name || waitingProfile.email || 'Waiting student'}</p>
+                      <p className="text-xs text-slate-400">Needs host approval</p>
+                    </div>
+                    <ControlButton
+                      icon={Users}
+                      label="Allow"
+                      onClick={() => runAction('admit_participant', { targetUserId: waitingUserId })}
+                      disabled={pendingAction === `admit_participant:all`}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
 
         <div className="border-b border-white/10 p-4">
           <div className="grid gap-2 md:grid-cols-3">
@@ -1142,6 +1167,13 @@ const ParticipantsPopup = ({
             const queued = speakerQueue.includes(userId);
             const speakingAllowed = allowedSpeakerUserIds.length === 0 || allowedSpeakerUserIds.includes(userId);
             const pinned = pinnedParticipantIds.includes(participant.identity);
+            const cohost = cohostUserIds.includes(userId);
+            const roleLabel = getClassParticipantRoleLabel({
+              participant,
+              userId,
+              teacherIdentity,
+              cohostUserIds,
+            });
             const roomLabel = getBreakoutRoomLabel({ rooms: breakoutRooms }, userId);
 
             return (
@@ -1153,11 +1185,21 @@ const ParticipantsPopup = ({
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold text-white">{displayName}</p>
-                      <p className="mt-1 text-xs text-slate-400">Student participant</p>
+                      <p className="mt-1 text-xs text-slate-400">{roleLabel}</p>
                     </div>
                     {spotlighted ? (
                       <span className="rounded-full bg-amber-400 px-2.5 py-1 text-[11px] font-semibold text-slate-950">
                         Spotlighted
+                      </span>
+                    ) : null}
+                    {cohost ? (
+                      <span className="rounded-full bg-cyan-400 px-2.5 py-1 text-[11px] font-semibold text-slate-950">
+                        Co-host
+                      </span>
+                    ) : null}
+                    {roleLabel === 'Host' ? (
+                      <span className="rounded-full bg-emerald-400 px-2.5 py-1 text-[11px] font-semibold text-slate-950">
+                        Host
                       </span>
                     ) : null}
                   </div>
@@ -1246,6 +1288,17 @@ const ParticipantsPopup = ({
                           onClick={() => onPinToggle(participant.identity)}
                           disabled={pendingAction.includes(participant.identity || '')}
                         />
+                        {canManageCoHosts ? (
+                          <ControlButton
+                            icon={ShieldCheck}
+                            label={cohost ? 'Remove Co-host' : 'Make Co-host'}
+                            onClick={() => runAction(cohost ? 'revoke_cohost' : 'grant_cohost', {
+                              targetIdentity: participant.identity,
+                              targetUserId: userId,
+                            })}
+                            disabled={pendingAction.includes(participant.identity || '')}
+                          />
+                        ) : null}
                         {breakoutRooms?.length ? (
                           <select
                             defaultValue=""
@@ -1343,9 +1396,6 @@ const ClassroomLayout = ({ sessionId, currentRole, currentUserProfile, classSess
   const [profilesByUserId, setProfilesByUserId] = useState({});
   const [chatDraft, setChatDraft] = useState('');
   const [chatMessages, setChatMessages] = useState([]);
-  const [privateMessages, setPrivateMessages] = useState([]);
-  const [chatMode, setChatMode] = useState('public');
-  const [privateTargetIdentity, setPrivateTargetIdentity] = useState('');
   const [reactionBursts, setReactionBursts] = useState([]);
   const [pollComposer, setPollComposer] = useState({
     type: 'poll',
@@ -1375,22 +1425,56 @@ const ClassroomLayout = ({ sessionId, currentRole, currentUserProfile, classSess
   const speakingStateRef = useRef({ active: false, startedAt: 0 });
   const screenShareStateRef = useRef({ active: false, startedAt: 0 });
   const focusLostRef = useRef(false);
+  const previousCohostStateRef = useRef(null);
 
-  const canManageParticipants = currentRole === 'teacher' || currentRole === 'admin';
   const controls = classSession?.livekit_controls || {};
+  const cohostUserIds = Array.isArray(controls?.cohost_user_ids) ? controls.cohost_user_ids.map(String) : [];
+  const waitingUserIds = Array.isArray(controls?.waiting_user_ids) ? controls.waiting_user_ids.map(String) : [];
+  const waitingRoomEnabled = controls?.waiting_room_enabled !== false;
+  const privateParticipantsEnabled = controls?.private_participants_enabled !== false;
+  const userId = currentUserProfile?.id || '';
+  const isCohost = cohostUserIds.includes(userId);
+  const canManageParticipants = currentRole === 'teacher' || currentRole === 'admin' || isCohost;
+  const canManageCoHosts = currentRole === 'admin' || classSession?.teacher_id === currentUserProfile?.id;
   const spotlightIdentity = String(controls?.spotlight_identity || '').trim();
+  const persistedRaisedHandUserIds = Array.isArray(controls?.raised_hand_user_ids) ? controls.raised_hand_user_ids.map(String) : [];
+  const persistedSpeakerQueueUserIds = Array.isArray(controls?.speaker_queue_user_ids) ? controls.speaker_queue_user_ids.map(String) : [];
+  const persistedAllowedSpeakerUserIds = Array.isArray(controls?.allowed_speaker_user_ids) ? controls.allowed_speaker_user_ids.map(String) : [];
   const roomLocked = Boolean(controls?.room_locked);
   const restrictedAudioUserIds = Array.isArray(controls?.restricted_audio_user_ids) ? controls.restricted_audio_user_ids.map(String) : [];
   const restrictedVideoUserIds = Array.isArray(controls?.restricted_video_user_ids) ? controls.restricted_video_user_ids.map(String) : [];
   const audioRestricted = restrictedAudioUserIds.includes(currentUserProfile?.id);
   const videoRestricted = restrictedVideoUserIds.includes(currentUserProfile?.id);
-  const userId = currentUserProfile?.id || '';
   const isSpeakingAllowed =
     canManageParticipants ||
     collabState.allowedSpeakerUserIds.length === 0 ||
     collabState.allowedSpeakerUserIds.includes(userId);
   const speakingLocked = audioRestricted || !isSpeakingAllowed;
   const breakout = controls?.breakout && typeof controls.breakout === 'object' ? controls.breakout : { active: false, rooms: [] };
+
+  useEffect(() => {
+    setCollabState((current) => ({
+      ...current,
+      raisedHands: persistedRaisedHandUserIds,
+      speakerQueue: persistedSpeakerQueueUserIds,
+      allowedSpeakerUserIds: persistedAllowedSpeakerUserIds,
+    }));
+  }, [controls?.raised_hand_user_ids, controls?.speaker_queue_user_ids, controls?.allowed_speaker_user_ids]);
+
+  useEffect(() => {
+    if (!currentUserProfile?.id) return;
+    if (previousCohostStateRef.current === null) {
+      previousCohostStateRef.current = isCohost;
+      return;
+    }
+    if (previousCohostStateRef.current === isCohost) return;
+    previousCohostStateRef.current = isCohost;
+    onToast?.(
+      isCohost
+        ? 'You are now a co-host. You can admit waiting students and help with basic class controls.'
+        : 'Your co-host access was removed by the host.'
+    );
+  }, [isCohost, currentUserProfile?.id, onToast]);
 
   const { send: sendCollabEvent } = useDataChannel('classroom-events', (message) => {
     const payload = decodeData(message.payload);
@@ -1462,21 +1546,6 @@ const ClassroomLayout = ({ sessionId, currentRole, currentUserProfile, classSess
     }, 3500);
   });
 
-  const { send: sendPrivateChatEvent } = useDataChannel('classroom-private', (message) => {
-    const payload = decodeData(message.payload);
-    if (!payload?.text) return;
-    setPrivateMessages((current) => [
-      ...current.slice(-49),
-      {
-        id: payload.id,
-        name: payload.name,
-        text: payload.text,
-        time: payload.time,
-        identity: payload.identity,
-      },
-    ]);
-  });
-
   const allTracks = useMemo(
     () =>
       [...shareTracks, ...cameraTracks].filter(
@@ -1484,6 +1553,7 @@ const ClassroomLayout = ({ sessionId, currentRole, currentUserProfile, classSess
       ),
     [cameraTracks, shareTracks],
   );
+  const teacherIdentity = classSession?.teacher_id ? `teacher:${classSession.teacher_id}:class:${sessionId}` : '';
 
   const sidebarTracks = useMemo(
     () =>
@@ -1496,9 +1566,34 @@ const ClassroomLayout = ({ sessionId, currentRole, currentUserProfile, classSess
     [allTracks],
   );
 
+  const isParticipantVisibleToAudience = (participant) => {
+    if (!privateParticipantsEnabled || canManageParticipants) return true;
+    const identity = String(participant?.identity || '');
+    const participantUserId = extractUserIdFromIdentity(identity);
+    return (
+      participant?.isLocal ||
+      identity === teacherIdentity ||
+      identity.startsWith('admin:') ||
+      cohostUserIds.includes(participantUserId)
+    );
+  };
+
+  const visibleAllTracks = useMemo(
+    () => allTracks.filter((trackRef) => isParticipantVisibleToAudience(trackRef.participant)),
+    [allTracks, privateParticipantsEnabled, canManageParticipants, teacherIdentity, cohostUserIds],
+  );
+  const visibleSidebarTracks = useMemo(
+    () => sidebarTracks.filter((trackRef) => isParticipantVisibleToAudience(trackRef.participant)),
+    [sidebarTracks, privateParticipantsEnabled, canManageParticipants, teacherIdentity, cohostUserIds],
+  );
+
   useEffect(() => {
     const userIds = Array.from(
-      new Set(sidebarTracks.map((trackRef) => extractUserIdFromIdentity(trackRef.participant?.identity)).filter(Boolean)),
+      new Set([
+        ...sidebarTracks.map((trackRef) => extractUserIdFromIdentity(trackRef.participant?.identity)).filter(Boolean),
+        ...waitingUserIds,
+        ...cohostUserIds,
+      ]),
     );
 
     if (!userIds.length) return;
@@ -1518,37 +1613,35 @@ const ClassroomLayout = ({ sessionId, currentRole, currentUserProfile, classSess
     return () => {
       active = false;
     };
-  }, [sidebarTracks]);
-
-  const teacherIdentity = classSession?.teacher_id ? `teacher:${classSession.teacher_id}:class:${sessionId}` : '';
+  }, [sidebarTracks, waitingUserIds, cohostUserIds]);
 
   const automaticFeaturedTrack = useMemo(() => {
-    const teacherTrack = allTracks.find((trackRef) => trackRef.participant?.identity === teacherIdentity);
+    const teacherTrack = visibleAllTracks.find((trackRef) => trackRef.participant?.identity === teacherIdentity);
     if (teacherTrack) return teacherTrack;
 
-    const remoteShare = shareTracks.find((trackRef) => !trackRef.participant?.isLocal);
+    const remoteShare = visibleAllTracks.find((trackRef) => trackRef.source === Track.Source.ScreenShare && !trackRef.participant?.isLocal);
     if (remoteShare) return remoteShare;
 
-    const remoteCamera = cameraTracks.find((trackRef) => !trackRef.participant?.isLocal && !trackRef.publication?.isMuted);
+    const remoteCamera = visibleAllTracks.find((trackRef) => trackRef.source === Track.Source.Camera && !trackRef.participant?.isLocal && !trackRef.publication?.isMuted);
     if (remoteCamera) return remoteCamera;
 
-    const localShare = shareTracks.find((trackRef) => trackRef.participant?.isLocal);
+    const localShare = visibleAllTracks.find((trackRef) => trackRef.source === Track.Source.ScreenShare && trackRef.participant?.isLocal);
     if (localShare) return localShare;
 
-    return cameraTracks[0] || shareTracks[0] || null;
-  }, [allTracks, cameraTracks, shareTracks, teacherIdentity]);
+    return visibleAllTracks[0] || null;
+  }, [visibleAllTracks, cameraTracks, shareTracks, teacherIdentity]);
 
   const featuredTrack = useMemo(() => {
-    const pinnedTrack = allTracks.find((trackRef) => collabState.pinnedParticipantIds.includes(trackRef.participant?.identity));
+    const pinnedTrack = visibleAllTracks.find((trackRef) => collabState.pinnedParticipantIds.includes(trackRef.participant?.identity));
     if (pinnedTrack) return pinnedTrack;
-    const spotlighted = allTracks.find((trackRef) => trackRef.participant?.identity === spotlightIdentity);
+    const spotlighted = visibleAllTracks.find((trackRef) => trackRef.participant?.identity === spotlightIdentity);
     return spotlighted || automaticFeaturedTrack;
-  }, [allTracks, automaticFeaturedTrack, spotlightIdentity, collabState.pinnedParticipantIds]);
+  }, [visibleAllTracks, automaticFeaturedTrack, spotlightIdentity, collabState.pinnedParticipantIds]);
 
   const audienceCount = useMemo(() => {
-    const participantIds = new Set(sidebarTracks.map((trackRef) => trackRef.participant?.identity).filter(Boolean));
+    const participantIds = new Set(visibleSidebarTracks.map((trackRef) => trackRef.participant?.identity).filter(Boolean));
     return participantIds.size || 1;
-  }, [sidebarTracks]);
+  }, [visibleSidebarTracks]);
 
   const getDisplayData = (participant) => {
     const userId = extractUserIdFromIdentity(participant?.identity);
@@ -1935,6 +2028,14 @@ const ClassroomLayout = ({ sessionId, currentRole, currentUserProfile, classSess
         disable_all_student_cameras: 'All student cameras were disabled.',
         lock_room: 'Room locked. New student joins are blocked.',
         unlock_room: 'Room unlocked. Students can join again.',
+        toggle_waiting_room: 'Waiting room setting updated.',
+        admit_participant: 'Student admitted from the waiting room.',
+        toggle_private_participants: 'Participant visibility setting updated.',
+        grant_cohost: 'Co-host permission granted.',
+        revoke_cohost: 'Co-host permission removed.',
+        lower_hand: 'Raised hand lowered.',
+        set_queue: 'Raised-hand queue updated live.',
+        set_allowed_speakers: 'Speaker permissions updated live.',
         start_breakouts_auto: 'Breakout rooms started.',
         assign_breakout_room: 'Student moved to breakout room.',
         set_teacher_breakout_room: 'Teacher breakout room changed.',
@@ -1961,23 +2062,45 @@ const ClassroomLayout = ({ sessionId, currentRole, currentUserProfile, classSess
           ? current.raisedHands
           : [...current.raisedHands, userId],
     }));
-    await broadcastCollabEvent({
-      type: raised ? 'lower_hand' : 'raise_hand',
-      userId,
-    });
-    await logActivityEvent(raised ? 'lower_hand' : 'raise_hand');
-    if (!raised) {
-      await persistStatPatch((current) => ({
-        ...current,
-        hand_raise_count: Number(current.hand_raise_count || 0) + 1,
-      }));
+    try {
+      await controlLiveKitClassSession({
+        sessionId,
+        requesterId: currentUserProfile?.id,
+        action: raised ? 'lower_hand' : 'raise_hand',
+        targetUserId: userId,
+      });
+      await broadcastCollabEvent({
+        type: raised ? 'lower_hand' : 'raise_hand',
+        userId,
+      });
+      await logActivityEvent(raised ? 'lower_hand' : 'raise_hand');
+      if (!raised) {
+        await persistStatPatch((current) => ({
+          ...current,
+          hand_raise_count: Number(current.hand_raise_count || 0) + 1,
+        }));
+      }
+    } catch (error) {
+      onToast?.(error.message || 'Could not update raised hand.');
     }
   };
 
   const handleQueueUpdate = async (nextQueue) => {
+    if (canManageParticipants) {
+      await handleAction('set_queue', { payload: { queue: nextQueue } });
+    }
     await broadcastCollabEvent({
       type: 'set_queue',
       queue: nextQueue,
+    });
+  };
+
+  const handleLowerHandForUser = async (targetUserId) => {
+    if (!canManageParticipants || !targetUserId) return;
+    await handleAction('lower_hand', { targetUserId });
+    await broadcastCollabEvent({
+      type: 'lower_hand',
+      userId: targetUserId,
     });
   };
 
@@ -1985,6 +2108,9 @@ const ClassroomLayout = ({ sessionId, currentRole, currentUserProfile, classSess
     const nextAllowed = collabState.allowedSpeakerUserIds.includes(targetUserId)
       ? collabState.allowedSpeakerUserIds.filter((entry) => entry !== targetUserId)
       : [...collabState.allowedSpeakerUserIds, targetUserId];
+    if (canManageParticipants) {
+      await handleAction('set_allowed_speakers', { payload: { allowedSpeakerUserIds: nextAllowed } });
+    }
     await broadcastCollabEvent({
       type: 'set_allowed_speakers',
       allowedSpeakerUserIds: nextAllowed,
@@ -2010,26 +2136,13 @@ const ClassroomLayout = ({ sessionId, currentRole, currentUserProfile, classSess
       text,
       time: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
     };
-    if (chatMode === 'private' && privateTargetIdentity) {
-      await sendPrivateChatEvent(encodeData(payload), {
-        reliable: true,
-        destinationIdentities: [privateTargetIdentity],
-      });
-      setPrivateMessages((current) => [...current.slice(-49), payload]);
-      await logActivityEvent('private_message', { targetIdentity: privateTargetIdentity });
-      await persistStatPatch((current) => ({
-        ...current,
-        private_messages_count: Number(current.private_messages_count || 0) + 1,
-      }));
-    } else {
-      await sendChatEvent(encodeData(payload), { reliable: true });
-      setChatMessages((current) => [...current.slice(-49), payload]);
-      await logActivityEvent('chat_message');
-      await persistStatPatch((current) => ({
-        ...current,
-        chat_messages_count: Number(current.chat_messages_count || 0) + 1,
-      }));
-    }
+    await sendChatEvent(encodeData(payload), { reliable: true });
+    setChatMessages((current) => [...current.slice(-49), payload]);
+    await logActivityEvent('chat_message');
+    await persistStatPatch((current) => ({
+      ...current,
+      chat_messages_count: Number(current.chat_messages_count || 0) + 1,
+    }));
     setChatDraft('');
   };
 
@@ -2333,12 +2446,18 @@ const ClassroomLayout = ({ sessionId, currentRole, currentUserProfile, classSess
         roomLocked={roomLocked}
         restrictedAudioUserIds={restrictedAudioUserIds}
         restrictedVideoUserIds={restrictedVideoUserIds}
+        waitingRoomEnabled={waitingRoomEnabled}
+        privateParticipantsEnabled={privateParticipantsEnabled}
+        waitingUserIds={waitingUserIds}
+        cohostUserIds={cohostUserIds}
+        teacherIdentity={teacherIdentity}
         breakoutRooms={Array.isArray(breakout?.rooms) ? breakout.rooms : []}
         raisedHands={collabState.raisedHands}
         speakerQueue={collabState.speakerQueue}
         allowedSpeakerUserIds={collabState.allowedSpeakerUserIds}
         pinnedParticipantIds={collabState.pinnedParticipantIds}
         canManageParticipants={canManageParticipants}
+        canManageCoHosts={canManageCoHosts}
         onQueueUpdate={handleQueueUpdate}
         onAllowSpeaker={handleAllowSpeaker}
         onPinToggle={handlePinToggle}
@@ -2386,7 +2505,7 @@ const ClassroomLayout = ({ sessionId, currentRole, currentUserProfile, classSess
           <div className="h-full p-3 pt-28 sm:p-4 sm:pt-28">
             {collabState.teacherViewMode === 'grid' ? (
               <div className="grid h-full min-h-[260px] grid-cols-1 gap-3 overflow-auto rounded-[1.7rem] border border-white/10 bg-slate-900/40 p-3 md:grid-cols-2 xl:grid-cols-3">
-                {allTracks.map((trackRef) => {
+                {visibleAllTracks.map((trackRef) => {
                   const { displayName, avatarUrl } = getDisplayData(trackRef.participant);
                   return (
                     <div key={trackIdentity(trackRef)} className="min-h-[180px] overflow-hidden rounded-[1.2rem] border border-white/10 bg-slate-900/70">
@@ -2511,6 +2630,7 @@ const ClassroomLayout = ({ sessionId, currentRole, currentUserProfile, classSess
                 raisedHands={collabState.raisedHands}
                 profilesByUserId={profilesByUserId}
                 onQueueUpdate={handleQueueUpdate}
+                onLowerHand={handleLowerHandForUser}
                 speakerQueue={collabState.speakerQueue}
                 canManageParticipants={canManageParticipants}
               />
@@ -2549,12 +2669,19 @@ const ClassroomLayout = ({ sessionId, currentRole, currentUserProfile, classSess
           </div>
           <div className="flex flex-1 flex-col gap-3 px-3 py-3 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/10 scroll-smooth">
             <div className="rounded-[1.45rem]">
-            {sidebarTracks.length ? (
-                  sidebarTracks.map((trackRef) => {
+            {visibleSidebarTracks.length ? (
+                  visibleSidebarTracks.map((trackRef) => {
                     const { displayName, avatarUrl } = getDisplayData(trackRef.participant);
+                    const railUserId = extractUserIdFromIdentity(trackRef.participant?.identity);
+                    const roleLabel = getClassParticipantRoleLabel({
+                      participant: trackRef.participant,
+                      userId: railUserId,
+                      teacherIdentity,
+                      cohostUserIds,
+                    });
                     const micOn = isMicEnabled(trackRef.participant);
                     const cameraPublication = getCameraPublication(trackRef.participant);
-                    const roomLabel = getBreakoutRoomLabel(breakout, extractUserIdFromIdentity(trackRef.participant?.identity));
+                    const roomLabel = getBreakoutRoomLabel(breakout, railUserId);
 
                     return (
                   <div key={trackIdentity(trackRef)} className="mb-3 overflow-hidden rounded-[1.45rem] border border-white/10 bg-slate-900/72 shadow-[0_16px_40px_rgba(15,23,42,0.22)]">
@@ -2565,11 +2692,15 @@ const ClassroomLayout = ({ sessionId, currentRole, currentUserProfile, classSess
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold text-white">{displayName}</p>
-                          <p className="mt-1 text-xs text-slate-400">
-                            {trackRef.participant?.identity === teacherIdentity ? 'Teacher' : trackRef.participant?.isLocal ? 'You' : 'Participant'}
-                          </p>
+                          <p className="mt-1 text-xs text-slate-400">{roleLabel}</p>
                         </div>
                             <div className="flex flex-wrap justify-end gap-2">
+                              {roleLabel === 'Host' ? (
+                                <span className="rounded-full bg-emerald-400 px-2.5 py-1 text-[11px] font-semibold text-slate-950">Host</span>
+                              ) : null}
+                              {roleLabel === 'Co-host' ? (
+                                <span className="rounded-full bg-cyan-400 px-2.5 py-1 text-[11px] font-semibold text-slate-950">Co-host</span>
+                              ) : null}
                               {roomLabel ? (
                                 <span className="rounded-full bg-sky-400/15 px-2.5 py-1 text-[11px] font-semibold text-sky-200">{roomLabel}</span>
                               ) : null}
@@ -2661,28 +2792,9 @@ const ClassroomLayout = ({ sessionId, currentRole, currentUserProfile, classSess
                 onDismissQuestion={handleDismissQuestion}
               />
             </CollapsibleSection>
-            <CollapsibleSection title="Chat" subtitle="Public chat plus teacher-approved private messages." badge={`${chatMessages.length + privateMessages.length}`} icon={MessageSquare} defaultOpen>
+            <CollapsibleSection title="Chat" subtitle="Live public conversation for everyone in class." badge={`${chatMessages.length}`} icon={MessageSquare} defaultOpen>
               <ChatPanel
-                mode={chatMode}
-                onModeChange={setChatMode}
                 messages={chatMessages}
-                privateMessages={privateMessages.filter((message) =>
-                  !privateTargetIdentity ||
-                  message.identity === privateTargetIdentity ||
-                  message.identity === localParticipant?.identity
-                )}
-                participants={sidebarTracks
-                  .filter((trackRef) => {
-                    if (trackRef.participant?.identity === localParticipant?.identity) return false;
-                    if (canManageParticipants) return true;
-                    return trackRef.participant?.identity === teacherIdentity || String(trackRef.participant?.identity || '').startsWith('admin:');
-                  })
-                  .map((trackRef) => ({
-                    identity: trackRef.participant?.identity,
-                    name: getDisplayData(trackRef.participant).displayName,
-                  }))}
-                privateTargetIdentity={privateTargetIdentity}
-                onPrivateTargetChange={setPrivateTargetIdentity}
                 draft={chatDraft}
                 onDraftChange={setChatDraft}
                 onSend={handleSendChat}

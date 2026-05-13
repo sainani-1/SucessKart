@@ -20,6 +20,16 @@ type ControlAction =
   | "disable_all_student_cameras"
   | "lock_room"
   | "unlock_room"
+  | "toggle_waiting_room"
+  | "admit_participant"
+  | "toggle_private_participants"
+  | "grant_cohost"
+  | "revoke_cohost"
+  | "leave_class"
+  | "raise_hand"
+  | "lower_hand"
+  | "set_queue"
+  | "set_allowed_speakers"
   | "start_breakouts_auto"
   | "assign_breakout_room"
   | "set_teacher_breakout_room"
@@ -84,7 +94,7 @@ Deno.serve(async (req: Request) => {
       .eq("id", requesterId)
       .maybeSingle();
 
-    if (!profile || !["teacher", "admin"].includes(String(profile.role))) {
+    if (!profile || !["teacher", "admin", "student"].includes(String(profile.role))) {
       return Response.json({ error: "Only teacher or admin can control the class." }, { status: 403, headers: corsHeaders });
     }
 
@@ -98,12 +108,35 @@ Deno.serve(async (req: Request) => {
       return Response.json({ error: "Class session not found." }, { status: 404, headers: corsHeaders });
     }
 
-    if (profile.role === "teacher" && sessionRow.teacher_id !== requesterId) {
-      return Response.json({ error: "Only the assigned teacher can control this class." }, { status: 403, headers: corsHeaders });
+    const controls = readControls(sessionRow.livekit_controls);
+    const cohostUserIds = Array.isArray(controls.cohost_user_ids) ? controls.cohost_user_ids.map((value) => String(value)) : [];
+    const isAssignedTeacher = sessionRow.teacher_id === requesterId;
+    const isCohost = cohostUserIds.includes(requesterId);
+    const cohostActions = new Set<ControlAction>([
+      "set_queue",
+      "set_allowed_speakers",
+      "admit_participant",
+      "mute_participant",
+      "unmute_participant",
+      "disable_camera_participant",
+      "enable_camera_participant",
+      "set_spotlight",
+      "clear_spotlight",
+    ]);
+
+    if (profile.role === "teacher" && !isAssignedTeacher && !isCohost) {
+      return Response.json({ error: "Only the assigned teacher or co-host can control this class." }, { status: 403, headers: corsHeaders });
+    }
+    if (profile.role === "student" && ["leave_class", "raise_hand", "lower_hand"].includes(action)) {
+      // Students may clear only their own admission and raise/lower only their own hand.
+    } else if (profile.role === "student" && !isCohost) {
+      return Response.json({ error: "Only co-hosts can use this class control." }, { status: 403, headers: corsHeaders });
+    }
+    if (isCohost && !isAssignedTeacher && profile.role !== "admin" && !cohostActions.has(action)) {
+      return Response.json({ error: "Co-hosts can only admit users and manage basic audio/video controls." }, { status: 403, headers: corsHeaders });
     }
 
     const roomName = roomNameForClassSession(sessionId);
-    const controls = readControls(sessionRow.livekit_controls);
     let nextControls = { ...controls };
 
     const saveControls = async () => {
@@ -250,6 +283,101 @@ Deno.serve(async (req: Request) => {
         nextControls.room_locked = false;
         await saveControls();
         break;
+      case "toggle_waiting_room":
+        nextControls.waiting_room_enabled = !(nextControls.waiting_room_enabled !== false);
+        await saveControls();
+        break;
+      case "toggle_private_participants":
+        nextControls.private_participants_enabled = !(nextControls.private_participants_enabled !== false);
+        await saveControls();
+        break;
+      case "admit_participant": {
+        if (!targetUserId) throw new Error("targetUserId is required.");
+        const admitted = Array.isArray(nextControls.admitted_user_ids) ? nextControls.admitted_user_ids.map((value) => String(value)) : [];
+        const waiting = Array.isArray(nextControls.waiting_user_ids) ? nextControls.waiting_user_ids.map((value) => String(value)) : [];
+        nextControls.admitted_user_ids = mergeUniqueStrings([...admitted, targetUserId]);
+        nextControls.waiting_user_ids = removeString(waiting, targetUserId);
+        await saveControls();
+        await adminClient
+          .from("class_session_join_requests")
+          .update({ status: "admitted", decided_at: new Date().toISOString(), decided_by: requesterId })
+          .eq("session_id", sessionId)
+          .eq("user_id", targetUserId);
+        break;
+      }
+      case "grant_cohost": {
+        if (!targetUserId) throw new Error("targetUserId is required.");
+        nextControls.cohost_user_ids = mergeUniqueStrings([
+          ...(Array.isArray(nextControls.cohost_user_ids) ? nextControls.cohost_user_ids.map((value) => String(value)) : []),
+          targetUserId,
+        ]);
+        await saveControls();
+        break;
+      }
+      case "revoke_cohost": {
+        if (!targetUserId) throw new Error("targetUserId is required.");
+        nextControls.cohost_user_ids = removeString(
+          Array.isArray(nextControls.cohost_user_ids) ? nextControls.cohost_user_ids.map((value) => String(value)) : [],
+          targetUserId,
+        );
+        await saveControls();
+        break;
+      }
+      case "leave_class": {
+        const leavingUserId = profile.role === "student" ? requesterId : targetUserId;
+        if (!leavingUserId) throw new Error("targetUserId is required.");
+        nextControls.admitted_user_ids = removeString(
+          Array.isArray(nextControls.admitted_user_ids) ? nextControls.admitted_user_ids.map((value) => String(value)) : [],
+          leavingUserId,
+        );
+        nextControls.waiting_user_ids = removeString(
+          Array.isArray(nextControls.waiting_user_ids) ? nextControls.waiting_user_ids.map((value) => String(value)) : [],
+          leavingUserId,
+        );
+        await saveControls();
+        await adminClient
+          .from("class_session_join_requests")
+          .update({ status: "left", decided_at: new Date().toISOString(), decided_by: requesterId })
+          .eq("session_id", sessionId)
+          .eq("user_id", leavingUserId);
+        break;
+      }
+      case "raise_hand": {
+        const raisedHandUserIds = Array.isArray(nextControls.raised_hand_user_ids)
+          ? nextControls.raised_hand_user_ids.map((value) => String(value))
+          : [];
+        nextControls.raised_hand_user_ids = mergeUniqueStrings([...raisedHandUserIds, requesterId]);
+        await saveControls();
+        break;
+      }
+      case "lower_hand": {
+        const handUserId = profile.role === "student" ? requesterId : targetUserId;
+        if (!handUserId) throw new Error("targetUserId is required.");
+        nextControls.raised_hand_user_ids = removeString(
+          Array.isArray(nextControls.raised_hand_user_ids) ? nextControls.raised_hand_user_ids.map((value) => String(value)) : [],
+          handUserId,
+        );
+        nextControls.speaker_queue_user_ids = removeString(
+          Array.isArray(nextControls.speaker_queue_user_ids) ? nextControls.speaker_queue_user_ids.map((value) => String(value)) : [],
+          handUserId,
+        );
+        await saveControls();
+        break;
+      }
+      case "set_queue": {
+        const queue = Array.isArray(payload.queue) ? payload.queue.map((value) => String(value)) : [];
+        nextControls.speaker_queue_user_ids = mergeUniqueStrings(queue);
+        await saveControls();
+        break;
+      }
+      case "set_allowed_speakers": {
+        const allowedSpeakerUserIds = Array.isArray(payload.allowedSpeakerUserIds)
+          ? payload.allowedSpeakerUserIds.map((value) => String(value))
+          : [];
+        nextControls.allowed_speaker_user_ids = mergeUniqueStrings(allowedSpeakerUserIds);
+        await saveControls();
+        break;
+      }
       case "start_breakouts_auto": {
         const roomCount = Math.max(2, Math.min(6, Number(payload.roomCount || 2)));
         const { data: participants } = await adminClient

@@ -5,6 +5,7 @@ import { ShieldCheck, Search, CheckCircle, XCircle, ArrowLeft } from 'lucide-rea
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../context/AuthContext';
 import { getCertificateDisplayName } from '../utils/identityVerification';
+import { buildCertificateDataUrl } from '../utils/certificateCanvas';
 
 const generateDeterministicCode = (seed) => {
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -39,10 +40,6 @@ const formatFallbackCertificateId = (submission) => {
   return `SkillPro-${y}-${m}-${d}-${random}`;
 };
 
-const resolveCourseTitle = (cert) =>
-  cert?.generated?.course_name || cert?.generated?.award_name || cert?.course?.title || 'General Achievement';
-const FOUNDER_SIGNATURE_URL = '/nani-signature-cropped.png';
-
 const isPermissionError = (error) => {
   const message = String(error?.message || '').toLowerCase();
   const details = String(error?.details || '').toLowerCase();
@@ -66,176 +63,6 @@ const VerifyCertificate = () => {
   const [previewUrl, setPreviewUrl] = useState('');
   const shouldShowPublicActions = !user?.id && location.state?.fromHome === true;
   const shouldShowAboutBack = location.state?.fromAbout === true;
-
-  const buildCertificateDataUrl = async (cert, formattedId) => {
-    const canvas = document.createElement('canvas');
-    canvas.width = 2400;
-    canvas.height = 1800;
-    const ctx = canvas.getContext('2d');
-    const scale = 2;
-    ctx.scale(scale, scale);
-
-    ctx.fillStyle = '#faf8f3';
-    ctx.fillRect(0, 0, 1200, 900);
-    ctx.fillStyle = '#d4af37';
-    ctx.fillRect(10, 10, 1180, 880);
-    ctx.fillRect(40, 40, 1120, 820);
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(45, 45, 1110, 810);
-
-    ctx.strokeStyle = '#d4af37';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(70, 70);
-    ctx.lineTo(100, 70);
-    ctx.moveTo(70, 70);
-    ctx.lineTo(70, 100);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(1130, 70);
-    ctx.lineTo(1100, 70);
-    ctx.moveTo(1130, 70);
-    ctx.lineTo(1130, 100);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(70, 830);
-    ctx.lineTo(100, 830);
-    ctx.moveTo(70, 830);
-    ctx.lineTo(70, 800);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(1130, 830);
-    ctx.lineTo(1100, 830);
-    ctx.moveTo(1130, 830);
-    ctx.lineTo(1130, 800);
-    ctx.stroke();
-
-    let logoLoaded = false;
-    try {
-      const logoUrl = import.meta.env.VITE_CERTIFICATE_LOGO || '/skillpro-logo.png';
-      const logoImg = new Image();
-      logoImg.crossOrigin = 'anonymous';
-      await new Promise((resolve) => {
-        logoImg.onload = () => {
-          // Render logo in a circular badge for consistency with certificate design.
-          const centerX = 600;
-          const centerY = 120;
-          const radius = 60;
-          ctx.save();
-          ctx.beginPath();
-          ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
-          ctx.closePath();
-          ctx.clip();
-          ctx.drawImage(logoImg, centerX - radius, centerY - radius, radius * 2, radius * 2);
-          ctx.restore();
-          ctx.strokeStyle = '#d4af37';
-          ctx.lineWidth = 3;
-          ctx.beginPath();
-          ctx.arc(centerX, centerY, radius + 4, 0, Math.PI * 2);
-          ctx.stroke();
-          logoLoaded = true;
-          resolve();
-        };
-        logoImg.onerror = () => resolve();
-        logoImg.src = logoUrl;
-      });
-    } catch (err) {
-      console.warn('Failed to load certificate logo:', err);
-    }
-
-    const footerCenterX = 960;
-
-    try {
-      const signatureImg = new Image();
-      signatureImg.crossOrigin = 'anonymous';
-      await new Promise((resolve) => {
-        signatureImg.onload = () => {
-          ctx.drawImage(signatureImg, footerCenterX - 58, 666, 116, 91);
-          resolve();
-        };
-        signatureImg.onerror = () => resolve();
-        signatureImg.src = FOUNDER_SIGNATURE_URL;
-      });
-    } catch (err) {
-      console.warn('Failed to load certificate signature:', err);
-    }
-
-    if (!logoLoaded) {
-      ctx.fillStyle = '#333333';
-      ctx.font = 'bold 20px Arial';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('SkillPro', 600, 130);
-      ctx.font = '12px Arial';
-      ctx.fillStyle = '#666666';
-      ctx.fillText('Empowering Every Learner', 600, 155);
-    }
-
-    ctx.fillStyle = '#1565c0';
-    ctx.font = 'bold 56px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText('CERTIFICATE', 600, 280);
-
-    ctx.strokeStyle = '#1565c0';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(400, 305);
-    ctx.lineTo(520, 305);
-    ctx.stroke();
-    ctx.fillStyle = '#1e293b';
-    ctx.font = '18px Arial';
-    ctx.fillText('OF COMPLETION', 600, 310);
-    ctx.beginPath();
-    ctx.moveTo(680, 305);
-    ctx.lineTo(800, 305);
-    ctx.stroke();
-
-    ctx.fillStyle = '#1e293b';
-    ctx.font = 'bold 32px Arial';
-    ctx.fillText('WE PROUDLY PRESENT THIS CERTIFICATE TO', 600, 380);
-
-    ctx.fillStyle = '#1565c0';
-    ctx.font = 'bold 48px Georgia, serif';
-    ctx.fillText(
-      getCertificateDisplayName(cert.user, { placeholder: '________________________' }),
-      600,
-      460
-    );
-    ctx.strokeStyle = '#d4af37';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(250, 475);
-    ctx.lineTo(950, 475);
-    ctx.stroke();
-
-    ctx.fillStyle = '#1e293b';
-    ctx.font = '18px Arial';
-    ctx.fillText('In recognition of successfully completing the requirements of the course:', 600, 520);
-    ctx.font = 'bold 32px Georgia, serif';
-    ctx.fillText(resolveCourseTitle(cert), 600, 560);
-
-    const completionDate = new Date(cert.issued_at).toLocaleDateString();
-    ctx.font = '14px Arial';
-    ctx.textAlign = 'left';
-    ctx.fillStyle = '#1e293b';
-    ctx.fillText(`Date: ${completionDate}`, 70, 760);
-    ctx.fillText(`Certificate ID: ${formattedId}`, 70, 790);
-
-    ctx.textAlign = 'center';
-    ctx.strokeStyle = '#1e293b';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(footerCenterX - 78, 760);
-    ctx.lineTo(footerCenterX + 78, 760);
-    ctx.stroke();
-    ctx.font = '14px Arial';
-    ctx.fillStyle = '#1e293b';
-    ctx.fillText('Founder, SkillPro', footerCenterX, 790);
-    ctx.font = '13px Arial';
-    ctx.fillText('Issued by SkillPro', footerCenterX, 818);
-
-    return canvas.toDataURL('image/png');
-  };
 
   const runVerify = async (rawCertId) => {
     const trimmedSource = rawCertId || certId;
@@ -506,7 +333,7 @@ const VerifyCertificate = () => {
         {previewUrl && result?.valid && (
           <div className="bg-white border border-slate-200 rounded-xl p-4">
             <p className="text-sm font-semibold text-slate-700 mb-3">Certificate Preview</p>
-            <img src={previewUrl} alt="Certificate preview" className="w-full h-auto border rounded-lg" />
+            <img src={previewUrl} alt="Certificate preview" className="w-full h-auto border" />
           </div>
         )}
       </div>
