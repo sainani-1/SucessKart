@@ -104,7 +104,7 @@ const formatDurationMinutes = (minutes) => {
 };
 
 const SessionBadge = ({ icon: Icon, label, value, accent = 'text-amber-200' }) => (
-  <div className="rounded-2xl border border-white/10 bg-white/6 px-4 py-3 backdrop-blur">
+  <div className="rounded-xl border border-white/10 bg-white/[0.05] px-4 py-3 backdrop-blur">
     <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-400">
       <Icon size={14} className={accent} />
       <span>{label}</span>
@@ -189,16 +189,21 @@ const AvatarFallback = ({ name, avatarUrl, large = false }) => (
 
 const VideoSurface = ({ trackRef, displayName, avatarUrl, large = false }) => {
   const participant = trackRef?.participant;
+  const isScreenShare = trackRef?.source === Track.Source.ScreenShare;
   const cameraPublication = getCameraPublication(participant);
   const hasVisibleVideo =
-    trackRef?.source === Track.Source.ScreenShare ||
+    isScreenShare ||
     Boolean(cameraPublication && !cameraPublication.isMuted && cameraPublication.isSubscribed !== false);
 
   return (
     <div className="relative h-full w-full overflow-hidden">
       <ParticipantTile
         trackRef={trackRef}
-        className="h-full w-full overflow-hidden bg-slate-900/70 [&_.lk-participant-name]:hidden [&_.lk-participant-placeholder]:opacity-0 [&_.lk-video-container]:h-full [&_.lk-video-container]:w-full"
+        className={`h-full w-full overflow-hidden bg-slate-900/70 [&_.lk-participant-media-video]:h-full [&_.lk-participant-media-video]:w-full [&_.lk-participant-media-video]:object-center [&_.lk-participant-name]:hidden [&_.lk-participant-placeholder]:opacity-0 [&_.lk-video-container]:h-full [&_.lk-video-container]:w-full [&_video]:h-full [&_video]:w-full [&_video]:object-center ${
+          isScreenShare
+            ? '[&_.lk-participant-media-video]:object-contain [&_video]:object-contain'
+            : '[&_.lk-participant-media-video]:object-cover [&_video]:object-cover'
+        }`}
       />
       {!hasVisibleVideo ? <AvatarFallback name={displayName} avatarUrl={avatarUrl} large={large} /> : null}
     </div>
@@ -226,7 +231,7 @@ const FullscreenButton = ({ containerRef }) => {
     <button
       type="button"
       onClick={toggleFullscreen}
-      className="inline-flex min-w-[148px] items-center justify-center gap-2 rounded-2xl bg-white/8 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/14"
+      className="inline-flex min-w-[128px] items-center justify-center gap-2 rounded-xl bg-white/8 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/14"
     >
       {isFullscreen ? <Minimize size={18} /> : <Expand size={18} />}
       <span>{isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}</span>
@@ -234,7 +239,7 @@ const FullscreenButton = ({ containerRef }) => {
   );
 };
 
-const LiveKitControls = ({ onLeave, containerRef, audioRestricted, videoRestricted }) => {
+const LiveKitControls = ({ onLeave, onEndSession, canEndSession, containerRef, audioRestricted, videoRestricted }) => {
   const room = useRoomContext();
   const { localParticipant, isMicrophoneEnabled, isCameraEnabled, isScreenShareEnabled } = useLocalParticipant();
   const [actionLoading, setActionLoading] = useState('');
@@ -278,8 +283,18 @@ const LiveKitControls = ({ onLeave, containerRef, audioRestricted, videoRestrict
     }
   };
 
+  const endSessionForAll = async () => {
+    if (!canEndSession || !onEndSession) return;
+    setActionLoading('end');
+    try {
+      await onEndSession();
+    } finally {
+      setActionLoading('');
+    }
+  };
+
   const controlClass = (active, danger = false) =>
-    `inline-flex min-w-[148px] items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold transition ${
+    `inline-flex min-w-[128px] items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition ${
       danger
         ? 'bg-rose-500 text-white hover:bg-rose-600'
         : active
@@ -289,7 +304,7 @@ const LiveKitControls = ({ onLeave, containerRef, audioRestricted, videoRestrict
 
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-2 z-30 px-3 pb-3 sm:bottom-3 sm:px-5 sm:pb-5">
-      <div className="pointer-events-auto mx-auto flex w-full max-w-4xl flex-wrap items-center justify-center gap-3 rounded-[2rem] border border-white/10 bg-slate-950/82 px-4 py-3 shadow-[0_24px_80px_rgba(15,23,42,0.55)] backdrop-blur-xl">
+      <div className="pointer-events-auto mx-auto flex w-full max-w-5xl flex-wrap items-center justify-center gap-2 rounded-2xl border border-white/10 bg-slate-950/88 px-3 py-3 shadow-[0_20px_70px_rgba(2,8,23,0.48)] backdrop-blur-xl sm:gap-3 sm:px-4">
         <button type="button" onClick={toggleMicrophone} disabled={actionLoading === 'mic'} className={controlClass(isMicrophoneEnabled)}>
           {isMicrophoneEnabled ? <Mic size={18} /> : <MicOff size={18} />}
           <span>{audioRestricted ? 'Mic Locked' : isMicrophoneEnabled ? 'Mute' : 'Unmute'}</span>
@@ -303,6 +318,12 @@ const LiveKitControls = ({ onLeave, containerRef, audioRestricted, videoRestrict
           <span>{isScreenShareEnabled ? 'Stop Share' : 'Share Screen'}</span>
         </button>
         <FullscreenButton containerRef={containerRef} />
+        {canEndSession ? (
+          <button type="button" onClick={endSessionForAll} disabled={actionLoading === 'end'} className={controlClass(false, true)}>
+            <PhoneOff size={18} />
+            <span>End Session for All</span>
+          </button>
+        ) : null}
         <button type="button" onClick={leaveRoom} disabled={actionLoading === 'leave'} className={controlClass(false, true)}>
           <PhoneOff size={18} />
           <span>Leave Class</span>
@@ -1078,7 +1099,7 @@ const ParticipantsPopup = ({
             />
             <ControlButton
               icon={Users}
-              label={waitingRoomEnabled ? 'Waiting On' : 'Waiting Off'}
+              label={waitingRoomEnabled ? 'Waiting Required' : 'Direct Join On'}
               onClick={() => runAction('toggle_waiting_room')}
               disabled={pendingAction === 'toggle_waiting_room:all'}
             />
@@ -1413,6 +1434,7 @@ const ClassroomLayout = ({ sessionId, currentRole, currentUserProfile, classSess
   const [attendanceEntries, setAttendanceEntries] = useState([]);
   const [participantStats, setParticipantStats] = useState([]);
   const [recordings, setRecordings] = useState([]);
+  const [railTab, setRailTab] = useState('people');
   const [collabState, setCollabState] = useState({
     raisedHands: [],
     speakerQueue: [],
@@ -2434,8 +2456,14 @@ const ClassroomLayout = ({ sessionId, currentRole, currentUserProfile, classSess
     onToast?.('Recording log started.');
   };
 
+  const railTabs = [
+    { id: 'people', label: 'People', count: audienceCount },
+    { id: 'engage', label: 'Engage', count: collabState.raisedHands.length + polls.length + questions.length + chatMessages.length },
+    { id: 'tools', label: 'Tools', count: recordings.length + (breakout?.active ? 1 : 0) },
+  ];
+
   return (
-    <div className="flex h-full flex-col bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.22),_transparent_26%),radial-gradient(circle_at_bottom_right,_rgba(45,212,191,0.18),_transparent_24%),linear-gradient(145deg,_#020617,_#0f172a_45%,_#111827)] text-white">
+    <div className="flex h-full flex-col bg-[linear-gradient(145deg,_#020617,_#0f172a_52%,_#111827)] text-white">
       <ReactionBurst reactions={reactionBursts} />
       <ParticipantsPopup
         open={participantsPopupOpen}
@@ -2465,9 +2493,9 @@ const ClassroomLayout = ({ sessionId, currentRole, currentUserProfile, classSess
         onAction={handleAction}
       />
 
-      <div className="flex flex-1 flex-col gap-4 p-3 pb-24 sm:p-4 sm:pb-28 lg:min-h-0 lg:flex-row lg:gap-5 lg:p-5 lg:pb-28">
-        <div className="relative min-h-[340px] flex-1 overflow-hidden rounded-[2rem] border border-white/10 bg-slate-950/70 shadow-[0_30px_90px_rgba(15,23,42,0.48)] lg:min-h-0">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.15),_transparent_34%)]" />
+      <div className="flex flex-1 flex-col gap-4 p-3 pb-24 sm:p-4 sm:pb-28 lg:min-h-0 lg:flex-row lg:gap-4 lg:p-4 lg:pb-28">
+        <div className="relative min-h-[340px] flex-1 overflow-hidden rounded-2xl border border-white/10 bg-slate-950/72 shadow-[0_24px_80px_rgba(2,8,23,0.42)] lg:min-h-0">
+          <div className="absolute inset-0 bg-slate-900/20" />
           <div className="absolute inset-x-0 top-0 z-10 flex flex-wrap items-center justify-between gap-3 p-4 sm:p-5">
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-amber-200">Main Stage</p>
@@ -2504,22 +2532,22 @@ const ClassroomLayout = ({ sessionId, currentRole, currentUserProfile, classSess
 
           <div className="h-full p-3 pt-28 sm:p-4 sm:pt-28">
             {collabState.teacherViewMode === 'grid' ? (
-              <div className="grid h-full min-h-[260px] grid-cols-1 gap-3 overflow-auto rounded-[1.7rem] border border-white/10 bg-slate-900/40 p-3 md:grid-cols-2 xl:grid-cols-3">
+              <div className="grid h-full min-h-[260px] grid-cols-1 gap-3 overflow-auto rounded-2xl border border-white/10 bg-slate-900/45 p-3 md:grid-cols-2 xl:grid-cols-3">
                 {visibleAllTracks.map((trackRef) => {
                   const { displayName, avatarUrl } = getDisplayData(trackRef.participant);
                   return (
-                    <div key={trackIdentity(trackRef)} className="min-h-[180px] overflow-hidden rounded-[1.2rem] border border-white/10 bg-slate-900/70">
+                    <div key={trackIdentity(trackRef)} className="min-h-[180px] overflow-hidden rounded-xl border border-white/10 bg-slate-900/70">
                       <VideoSurface trackRef={trackRef} displayName={displayName} avatarUrl={avatarUrl} />
                     </div>
                   );
                 })}
               </div>
             ) : featuredTrack ? (
-              <div className="h-full min-h-[260px] overflow-hidden rounded-[1.7rem] border border-white/10 bg-slate-900/70">
+              <div className="h-full min-h-[260px] overflow-hidden rounded-2xl border border-white/10 bg-slate-900/70">
                 <VideoSurface trackRef={featuredTrack} displayName={featuredName} avatarUrl={featuredAvatar} large />
               </div>
             ) : (
-              <div className="flex h-full min-h-[260px] items-center justify-center rounded-[1.7rem] border border-dashed border-white/15 bg-slate-900/40 text-center">
+              <div className="flex h-full min-h-[260px] items-center justify-center rounded-2xl border border-dashed border-white/15 bg-slate-900/40 text-center">
                 <div>
                   <Video className="mx-auto mb-4 text-amber-200" size={44} />
                   <p className="text-lg font-semibold text-white">Waiting for camera streams</p>
@@ -2543,7 +2571,7 @@ const ClassroomLayout = ({ sessionId, currentRole, currentUserProfile, classSess
           </div>
         </div>
 
-        <aside ref={participantRailRef} className="flex h-[58vh] min-h-[360px] w-full flex-col overflow-y-auto rounded-[2rem] border border-white/10 bg-slate-950/72 shadow-[0_24px_80px_rgba(15,23,42,0.42)] lg:h-auto lg:min-h-0 lg:min-w-[460px] lg:max-w-[560px] lg:flex-[0_0_34rem]">
+        <aside ref={participantRailRef} className="flex h-[58vh] min-h-[360px] w-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-slate-950/78 shadow-[0_22px_70px_rgba(2,8,23,0.38)] lg:h-auto lg:min-h-0 lg:min-w-[400px] lg:max-w-[480px] lg:flex-[0_0_30rem]">
           <div className="border-b border-white/10 px-5 py-4">
             <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-400">Classroom Rail</p>
             <div className="mt-2 flex items-center justify-between gap-3">
@@ -2565,7 +2593,27 @@ const ClassroomLayout = ({ sessionId, currentRole, currentUserProfile, classSess
                 ) : null}
               </div>
             </div>
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="mt-4 grid grid-cols-3 gap-2 rounded-xl border border-white/10 bg-white/[0.04] p-1">
+              {railTabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setRailTab(tab.id)}
+                  className={`rounded-lg px-2 py-2 text-xs font-semibold transition ${
+                    railTab === tab.id
+                      ? 'bg-white text-slate-950 shadow-sm'
+                      : 'text-slate-300 hover:bg-white/[0.08] hover:text-white'
+                  }`}
+                >
+                  <span>{tab.label}</span>
+                  <span className={`ml-2 rounded-full px-1.5 py-0.5 text-[10px] ${railTab === tab.id ? 'bg-slate-950/10' : 'bg-white/10'}`}>
+                    {tab.count}
+                  </span>
+                </button>
+              ))}
+            </div>
+            <div className={railTab === 'engage' ? 'mt-3 space-y-3' : 'hidden'}>
+            <div className="flex flex-wrap gap-2">
               {[
                 { emoji: '👍', label: 'Like' },
                 { emoji: '👏', label: 'Clap' },
@@ -2584,47 +2632,7 @@ const ClassroomLayout = ({ sessionId, currentRole, currentUserProfile, classSess
                 </button>
               ))}
             </div>
-            <div className="mt-3 rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-3">
-              <div className="flex items-center gap-2">
-                <Hand size={15} className="text-amber-200" />
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Speaking Queue</p>
-              </div>
-              <p className="mt-2 text-xs text-slate-400">Teacher-controlled order for who speaks next.</p>
-              <div className="mt-3 space-y-2">
-                {collabState.speakerQueue.length ? (
-                  collabState.speakerQueue.map((queuedUserId, index) => {
-                    const queuedProfile = profilesByUserId[queuedUserId];
-                    return (
-                      <div key={queuedUserId} className="flex items-center justify-between gap-2 rounded-xl bg-white/[0.04] px-3 py-2 text-sm">
-                        <span className="text-white">{index + 1}. {queuedProfile?.full_name || queuedProfile?.email || 'Student'}</span>
-                        {canManageParticipants ? (
-                          <div className="flex items-center gap-2">
-                            {index === 0 ? (
-                              <button
-                                type="button"
-                                onClick={() => handleQueueUpdate(collabState.speakerQueue.slice(1))}
-                                className="rounded-full bg-amber-400 px-2.5 py-1 text-[11px] font-semibold text-slate-950"
-                              >
-                                Done
-                              </button>
-                            ) : null}
-                            <button
-                              type="button"
-                              onClick={() => handleQueueUpdate(collabState.speakerQueue.filter((entry) => entry !== queuedUserId))}
-                              className="rounded-full bg-white/8 px-2.5 py-1 text-[11px] font-semibold text-white transition hover:bg-white/14"
-                            >
-                              Remove
-                            </button>
-                          </div>
-                        ) : null}
-                      </div>
-                    );
-                  })
-                ) : (
-                  <p className="text-sm text-slate-400">No one is in the speaking queue yet.</p>
-                )}
-              </div>
-            </div>
+            {canManageParticipants && collabState.raisedHands.length ? (
             <div className="mt-3">
               <RaisedHandsPanel
                 raisedHands={collabState.raisedHands}
@@ -2635,7 +2643,10 @@ const ClassroomLayout = ({ sessionId, currentRole, currentUserProfile, classSess
                 canManageParticipants={canManageParticipants}
               />
             </div>
-            <div className="mt-3">
+            ) : null}
+            </div>
+            <div className={railTab === 'tools' ? 'mt-3 space-y-3' : 'hidden'}>
+            <div>
               <BreakoutPanel
                 breakout={breakout}
                 profilesByUserId={profilesByUserId}
@@ -2646,7 +2657,8 @@ const ClassroomLayout = ({ sessionId, currentRole, currentUserProfile, classSess
                 onBroadcast={handleBroadcastBreakout}
               />
             </div>
-            <div className="mt-3 rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-3">
+            </div>
+            <div className={railTab === 'people' ? 'mt-3 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-3' : 'hidden'}>
               <div className="flex items-center gap-2">
                 <BarChart3 size={15} className="text-sky-200" />
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Attendance Snapshot</p>
@@ -2667,8 +2679,8 @@ const ClassroomLayout = ({ sessionId, currentRole, currentUserProfile, classSess
               </div>
             </div>
           </div>
-          <div className="flex flex-1 flex-col gap-3 px-3 py-3 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/10 scroll-smooth">
-            <div className="rounded-[1.45rem]">
+          <div className="flex flex-1 flex-col gap-3 overflow-y-auto px-3 py-3 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/10 scroll-smooth">
+            <div className={railTab === 'people' ? 'rounded-xl' : 'hidden'}>
             {visibleSidebarTracks.length ? (
                   visibleSidebarTracks.map((trackRef) => {
                     const { displayName, avatarUrl } = getDisplayData(trackRef.participant);
@@ -2684,8 +2696,8 @@ const ClassroomLayout = ({ sessionId, currentRole, currentUserProfile, classSess
                     const roomLabel = getBreakoutRoomLabel(breakout, railUserId);
 
                     return (
-                  <div key={trackIdentity(trackRef)} className="mb-3 overflow-hidden rounded-[1.45rem] border border-white/10 bg-slate-900/72 shadow-[0_16px_40px_rgba(15,23,42,0.22)]">
-                    <div className="relative h-40">
+                  <div key={trackIdentity(trackRef)} className="mb-3 overflow-hidden rounded-xl border border-white/10 bg-slate-900/72 shadow-[0_14px_34px_rgba(2,8,23,0.2)]">
+                    <div className="relative h-36">
                       <VideoSurface trackRef={trackRef} displayName={displayName} avatarUrl={avatarUrl} />
                     </div>
                     <div className="space-y-3 px-4 py-3">
@@ -2744,11 +2756,12 @@ const ClassroomLayout = ({ sessionId, currentRole, currentUserProfile, classSess
                 );
               })
             ) : (
-              <div className="flex h-full items-center justify-center rounded-[1.45rem] border border-dashed border-white/10 bg-white/[0.03] text-center text-sm text-slate-400">
+              <div className="flex h-56 items-center justify-center rounded-xl border border-dashed border-white/10 bg-white/[0.03] text-center text-sm text-slate-400">
                 No video tiles yet.
               </div>
             )}
             </div>
+            <div className={railTab === 'tools' ? 'space-y-3' : 'hidden'}>
             <CollapsibleSection title="Recording" subtitle="Session recording state and recent log." badge={recordings.length ? `${recordings.length}` : 'Idle'} icon={VideoOff}>
               <RecordingPanel
                 canManageParticipants={canManageParticipants}
@@ -2763,7 +2776,8 @@ const ClassroomLayout = ({ sessionId, currentRole, currentUserProfile, classSess
                 currentUserId={currentUserProfile?.id}
               />
             </CollapsibleSection>
-            <CollapsibleSection title="Polls And Quiz" subtitle="Create, vote, and close live polls without losing the stage." badge={`${polls.length}`} icon={BarChart3} defaultOpen>
+            </div>
+            <div className={railTab === 'engage' ? 'space-y-3' : 'hidden'}>
               <PollPanel
                 canManageParticipants={canManageParticipants}
                 polls={polls}
@@ -2775,8 +2789,6 @@ const ClassroomLayout = ({ sessionId, currentRole, currentUserProfile, classSess
                 onVotePoll={handleVotePoll}
                 onClosePoll={handleClosePoll}
               />
-            </CollapsibleSection>
-            <CollapsibleSection title="Q&A" subtitle="Questions, answers, and upvotes stay organized here." badge={`${questions.length}`} icon={MessageSquare}>
               <QAPanel
                 canManageParticipants={canManageParticipants}
                 questions={questions}
@@ -2791,8 +2803,6 @@ const ClassroomLayout = ({ sessionId, currentRole, currentUserProfile, classSess
                 onAnswerQuestion={handleAnswerQuestion}
                 onDismissQuestion={handleDismissQuestion}
               />
-            </CollapsibleSection>
-            <CollapsibleSection title="Chat" subtitle="Live public conversation for everyone in class." badge={`${chatMessages.length}`} icon={MessageSquare} defaultOpen>
               <ChatPanel
                 messages={chatMessages}
                 draft={chatDraft}
@@ -2800,7 +2810,7 @@ const ClassroomLayout = ({ sessionId, currentRole, currentUserProfile, classSess
                 onSend={handleSendChat}
                 canSend
               />
-            </CollapsibleSection>
+            </div>
           </div>
         </aside>
       </div>
@@ -2808,7 +2818,7 @@ const ClassroomLayout = ({ sessionId, currentRole, currentUserProfile, classSess
   );
 };
 
-const LiveKitClassSession = ({ token, serverUrl, sessionId, currentRole, currentUserProfile, classSession, onLeave, onToast }) => {
+const LiveKitClassSession = ({ token, serverUrl, sessionId, currentRole, currentUserProfile, classSession, onLeave, onEndSession, onToast }) => {
   const containerRef = useRef(null);
   const controls = classSession?.livekit_controls || {};
   const restrictedAudioUserIds = Array.isArray(controls?.restricted_audio_user_ids) ? controls.restricted_audio_user_ids.map(String) : [];
@@ -2842,6 +2852,8 @@ const LiveKitClassSession = ({ token, serverUrl, sessionId, currentRole, current
         />
         <LiveKitControls
           onLeave={onLeave}
+          onEndSession={onEndSession}
+          canEndSession={currentRole === 'teacher' || currentRole === 'admin'}
           containerRef={containerRef}
           audioRestricted={audioRestricted}
           videoRestricted={videoRestricted}

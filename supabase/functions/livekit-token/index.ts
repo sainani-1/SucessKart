@@ -118,6 +118,13 @@ Deno.serve(async (req: Request) => {
         .maybeSingle();
 
       const isParticipant = Boolean(participantRow?.session_id);
+      const { data: joinRequestRow } = await adminClient
+        .from("class_session_join_requests")
+        .select("status")
+        .eq("session_id", sessionId)
+        .eq("user_id", requesterId)
+        .maybeSingle();
+      const hasJoinedThisSession = joinRequestRow?.status === "joined";
       const allowed =
         callerRole === "admin" ||
         isTeacherOwner ||
@@ -148,7 +155,7 @@ Deno.serve(async (req: Request) => {
         );
       }
 
-      if (callerRole === "student" && waitingRoomEnabled && !admittedUserIds.includes(requesterId)) {
+      if (callerRole === "student" && waitingRoomEnabled && !admittedUserIds.includes(requesterId) && !hasJoinedThisSession) {
         const nextWaitingUserIds = Array.from(new Set([...waitingUserIds, requesterId]));
         await adminClient
           .from("class_sessions")

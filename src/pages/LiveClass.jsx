@@ -179,6 +179,7 @@ const LiveClass = () => {
   const meetingWindowRef = useRef(null);
   const meetingWindowPollRef = useRef(null);
   const suppressNextLeaveRef = useRef(false);
+  const leavingClassroomRef = useRef(false);
   const { openPopup, popupNode } = usePopup();
   const { confirm, dialogNode } = useDialog();
   const [session, setSession] = useState(null);
@@ -305,6 +306,8 @@ const LiveClass = () => {
   };
 
   const handleLeaveClassroom = async () => {
+    if (leavingClassroomRef.current) return;
+    leavingClassroomRef.current = true;
     await clearOneTimeLiveKitAdmission();
     cleanupMeetingState();
     openFeedbackPrompt();
@@ -429,6 +432,32 @@ const LiveClass = () => {
   }, [sessionId]);
 
   useEffect(() => {
+    if (!waitingForHostApproval || meetingStarted || session?.meeting_type !== 'livekit' || !profile?.id) return undefined;
+
+    const channel = supabase
+      .channel(`class-session-admission-${sessionId}-${profile.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'class_session_join_requests',
+          filter: `session_id=eq.${sessionId}`,
+        },
+        (payload) => {
+          const nextRow = payload?.new || {};
+          if (nextRow.user_id !== profile.id || !['admitted', 'joined'].includes(nextRow.status)) return;
+          startLiveKitMeeting({ silentWaitingRoom: true });
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [waitingForHostApproval, meetingStarted, session?.meeting_type, sessionId, profile?.id]);
+
+  useEffect(() => {
     if (!meetingStarted || session?.meeting_type !== 'livekit' || !profile?.id) return;
 
     let active = true;
@@ -463,6 +492,10 @@ const LiveClass = () => {
         });
       } catch (error) {
         if (!active) return;
+        if (String(error.message || '').toLowerCase().includes('waiting room')) {
+          setWaitingForHostApproval(false);
+          return;
+        }
         openPopup('Class control', error.message || 'Could not switch LiveKit room.', 'warning');
       }
     };
@@ -1066,20 +1099,39 @@ const LiveClass = () => {
                 </>
               ) : waitingForHostApproval ? (
                 <div className="max-w-2xl">
-                  <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-amber-300/25 bg-amber-300/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-amber-100">
-                    <span className="h-2.5 w-2.5 rounded-full bg-amber-300 animate-pulse" />
-                    Waitlisted
+                  <div className="mb-6 flex flex-wrap items-center gap-3">
+                    <div className="inline-flex items-center gap-2 rounded-full border border-amber-300/25 bg-amber-300/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-amber-100">
+                      <span className="h-2.5 w-2.5 rounded-full bg-amber-300 animate-pulse" />
+                      Waiting Hall
+                    </div>
+                    <div className="inline-flex items-center gap-2 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-4 py-2 text-xs font-semibold text-cyan-100">
+                      Host approval required every time
+                    </div>
                   </div>
                   <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
-                    You are in the waiting hall
+                    You are on the class waitlist
                   </h2>
                   <p className="mt-4 max-w-2xl text-base leading-7 text-slate-300">
-                    You are on the waitlist for <span className="font-semibold text-white">{session.title}</span>. The host or co-host will allow you in soon.
+                    You are waiting to enter <span className="font-semibold text-white">{session.title}</span>. For security, every join attempt needs host or co-host approval.
                   </p>
-                  <div className="mt-6 rounded-2xl border border-amber-300/20 bg-amber-300/10 px-5 py-4">
-                    <p className="text-sm font-semibold text-amber-100">No need to refresh.</p>
-                    <p className="mt-1 text-sm text-amber-50/80">
-                      This page checks automatically and will move you into the meeting as soon as approval is given.
+                  <div className="mt-7 grid gap-3 sm:grid-cols-3">
+                    <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Status</p>
+                      <p className="mt-2 text-sm font-semibold text-amber-100">Waiting for allow</p>
+                    </div>
+                    <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Action</p>
+                      <p className="mt-2 text-sm font-semibold text-cyan-100">Auto-checking</p>
+                    </div>
+                    <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Access</p>
+                      <p className="mt-2 text-sm font-semibold text-emerald-100">One-time entry</p>
+                    </div>
+                  </div>
+                  <div className="mt-6 rounded-2xl border border-amber-300/20 bg-[linear-gradient(135deg,rgba(251,191,36,0.14),rgba(14,165,233,0.08))] px-5 py-4">
+                    <p className="text-sm font-semibold text-amber-100">Stay on this page.</p>
+                    <p className="mt-1 text-sm leading-6 text-amber-50/80">
+                      The meeting will open automatically the moment the host allows you. If you leave and come back, you will return to this waiting hall again.
                     </p>
                   </div>
                   <div className="mt-6 flex flex-wrap gap-3">
@@ -1271,6 +1323,7 @@ const LiveClass = () => {
             currentUserProfile={profile}
             classSession={session}
             onToast={(message) => openPopup('Class control', message, 'info')}
+            onEndSession={endSession}
             onLeave={() => {
               if (suppressNextLeaveRef.current) {
                 suppressNextLeaveRef.current = false;
@@ -1355,31 +1408,6 @@ const LiveClass = () => {
         ) : null}
       </div>
 
-      <div className="border-t border-white/10 bg-slate-950/55 px-4 py-4 backdrop-blur-xl sm:px-6">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <p className="text-sm text-slate-400">
-            Powered by {getMeetingProviderLabel(session)}. Use the participant rail for quick profile and sharing actions.
-          </p>
-          <div className="flex flex-wrap items-center gap-3">
-            {(profile.role === 'teacher' || profile.role === 'admin') && meetingStarted && (
-              <button
-                onClick={endSession}
-                className="inline-flex items-center gap-2 rounded-2xl bg-red-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-red-700"
-              >
-                <PhoneOff size={18} />
-                End Session for All
-              </button>
-            )}
-            <button
-              onClick={handleLeaveClassroom}
-              className="inline-flex items-center gap-2 rounded-2xl border border-red-400/20 bg-red-400/10 px-4 py-3 text-sm font-semibold text-red-100 transition hover:bg-red-400/15"
-            >
-              <PhoneOff size={18} />
-              Leave Class
-            </button>
-          </div>
-        </div>
-      </div>
       </div>
     </div>
   );

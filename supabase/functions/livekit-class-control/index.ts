@@ -326,6 +326,7 @@ Deno.serve(async (req: Request) => {
       case "leave_class": {
         const leavingUserId = profile.role === "student" ? requesterId : targetUserId;
         if (!leavingUserId) throw new Error("targetUserId is required.");
+        const leaveAt = new Date().toISOString();
         nextControls.admitted_user_ids = removeString(
           Array.isArray(nextControls.admitted_user_ids) ? nextControls.admitted_user_ids.map((value) => String(value)) : [],
           leavingUserId,
@@ -334,12 +335,52 @@ Deno.serve(async (req: Request) => {
           Array.isArray(nextControls.waiting_user_ids) ? nextControls.waiting_user_ids.map((value) => String(value)) : [],
           leavingUserId,
         );
+        nextControls.raised_hand_user_ids = removeString(
+          Array.isArray(nextControls.raised_hand_user_ids) ? nextControls.raised_hand_user_ids.map((value) => String(value)) : [],
+          leavingUserId,
+        );
+        nextControls.speaker_queue_user_ids = removeString(
+          Array.isArray(nextControls.speaker_queue_user_ids) ? nextControls.speaker_queue_user_ids.map((value) => String(value)) : [],
+          leavingUserId,
+        );
+        nextControls.allowed_speaker_user_ids = removeString(
+          Array.isArray(nextControls.allowed_speaker_user_ids) ? nextControls.allowed_speaker_user_ids.map((value) => String(value)) : [],
+          leavingUserId,
+        );
         await saveControls();
         await adminClient
           .from("class_session_join_requests")
-          .update({ status: "left", decided_at: new Date().toISOString(), decided_by: requesterId })
+          .update({ status: "left", decided_at: leaveAt, decided_by: requesterId })
           .eq("session_id", sessionId)
           .eq("user_id", leavingUserId);
+        const { data: attendanceRow } = await adminClient
+          .from("class_attendance")
+          .select("id, join_time, live_minutes")
+          .eq("session_id", sessionId)
+          .eq("student_id", leavingUserId)
+          .maybeSingle();
+        if (attendanceRow?.id) {
+          const joinTime = attendanceRow.join_time ? new Date(attendanceRow.join_time).getTime() : new Date(leaveAt).getTime();
+          const sessionMinutes = Math.max(1, Math.round((new Date(leaveAt).getTime() - joinTime) / 60000));
+          await adminClient
+            .from("class_attendance")
+            .update({
+              leave_time: leaveAt,
+              live_minutes: Math.max(Number(attendanceRow.live_minutes || 0), sessionMinutes),
+              marked_at: leaveAt,
+            })
+            .eq("id", attendanceRow.id);
+        }
+        await adminClient
+          .from("class_session_live_participant_stats")
+          .update({ left_at: leaveAt, last_seen_at: leaveAt, updated_at: leaveAt })
+          .eq("session_id", sessionId)
+          .eq("user_id", leavingUserId);
+        try {
+          await roomService.removeParticipant(roomName, `student:${leavingUserId}:class:${sessionId}`);
+        } catch {
+          // The participant may already have disconnected locally.
+        }
         break;
       }
       case "raise_hand": {
