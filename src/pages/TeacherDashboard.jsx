@@ -3,9 +3,11 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabaseClient';
 import { Link } from 'react-router-dom';
 import { Users, Calendar, Clock, MessageCircle, CheckSquare, Award } from 'lucide-react';
+import { useChatOverlay } from '../context/ChatOverlayContext';
 
 const TeacherDashboard = () => {
   const { profile } = useAuth();
+  const { openChat } = useChatOverlay();
   const [students, setStudents] = useState([]);
   const [upcomingSessions, setUpcomingSessions] = useState([]);
   const [pendingLeaves, setPendingLeaves] = useState([]);
@@ -238,16 +240,21 @@ const TeacherDashboard = () => {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {students.slice(0, 6).map(student => (
-            <div key={student.id} className="flex items-center gap-3 p-3 border rounded-lg">
+            <div
+              key={student.id}
+              onClick={() => openChat(student.id, student.full_name, student.avatar_url)}
+              className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:border-blue-300 hover:shadow-sm transition-all group"
+            >
               <img 
                 src={student.avatar_url || 'https://via.placeholder.com/40'} 
                 alt={student.full_name}
                 className="w-10 h-10 rounded-full object-cover"
               />
-              <div className="flex-1">
-                <p className="font-semibold text-sm">{student.full_name}</p>
-                <p className="text-xs text-slate-500">{student.email}</p>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-sm group-hover:text-blue-600 transition-colors">{student.full_name}</p>
+                <p className="text-xs text-slate-500 truncate">{student.email}</p>
               </div>
+              <MessageCircle size={16} className="text-slate-300 group-hover:text-blue-500 transition-colors shrink-0" />
             </div>
           ))}
         </div>

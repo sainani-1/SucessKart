@@ -5,6 +5,8 @@ import "./index.css";
 import { AuthProvider } from "./context/AuthContext";
 import { ChatProvider } from "./context/ChatContext";
 import { NotificationProvider } from "./context/NotificationContext";
+import { ChatOverlayProvider } from "./context/ChatOverlayContext";
+import { PresenceProvider } from "./context/PresenceContext";
 import GlobalInteractionGuards from "./components/GlobalInteractionGuards";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
@@ -12,8 +14,12 @@ ReactDOM.createRoot(document.getElementById("root")).render(
     <AuthProvider>
       <NotificationProvider>
         <ChatProvider>
-          <GlobalInteractionGuards />
-          <App />
+          <ChatOverlayProvider>
+            <PresenceProvider>
+            <GlobalInteractionGuards />
+            <App />
+          </PresenceProvider>
+          </ChatOverlayProvider>
         </ChatProvider>
       </NotificationProvider>
     </AuthProvider>

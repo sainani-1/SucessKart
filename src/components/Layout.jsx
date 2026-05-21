@@ -10,6 +10,8 @@ import { logAdminNavigation } from '../utils/adminActivityLogger';
 import { useNotifications } from '../context/NotificationContext';
 import { readBrowserState, writeBrowserState } from '../utils/browserState';
 import NotificationPermissionPopup from './NotificationPermissionPopup';
+import ZoomDetector from './ZoomDetector';
+import ChatOverlay from './ChatOverlay';
 
 const SIDEBAR_COLLAPSED_KEY = 'layout_sidebar_collapsed';
 const LAST_OPENED_PAGE_KEY = 'layout_last_opened_page';
@@ -750,12 +752,14 @@ const Layout = () => {
           </div>
         </div>
       ) : null}
+      <ZoomDetector />
       <Sidebar
         isMobile={isMobileViewport}
         mobileOpen={mobileSidebarOpen}
         onClose={() => setMobileSidebarOpen(false)}
         onRequestNavigation={requestPageSwitch}
       />
+      <ChatOverlay />
       <div
         className="flex flex-col transition-all duration-300"
         style={{ marginLeft: isMobileViewport ? 0 : sidebarWidth, minHeight: '100vh' }}
@@ -835,7 +839,7 @@ const Layout = () => {
           </div>
         </header>
         {/* Main Content */}
-        <main className="p-3 md:p-8 flex-1 overflow-y-auto" style={{ height: 'calc(100vh - 64px - 48px)', maxHeight: 'calc(100vh - 64px - 48px)' }}>
+        <main className="p-2 md:p-4 flex-1 overflow-hidden h-[calc(100vh-128px)] md:h-[calc(100vh-144px)]">
           <Outlet />
         </main>
         {/* Footer */}

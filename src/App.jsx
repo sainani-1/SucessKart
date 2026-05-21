@@ -92,6 +92,7 @@ import TermsAndConditions from './pages/TermsAndConditions';
 import CompleteGoogleProfile from './pages/CompleteGoogleProfile';
 import AdminSupportContact from './pages/AdminSupportContact';
 import AdminActivityLogs from './pages/AdminActivityLogs';
+import AdminOnline from './pages/AdminOnline';
 import StudentWriteTest from './pages/StudentWriteTest';
 import ResumeBuilder from './pages/ResumeBuilder';
 import ReportIssue from './pages/ReportIssue';
@@ -472,6 +473,7 @@ function App() {
           <Route path="admin/website-protection" element={<AdminRoute><AdminWebsiteProtection /></AdminRoute>} />
           <Route path="admin/support-contact" element={<AdminRoute><AdminSupportContact /></AdminRoute>} />
           <Route path="admin/activity-logs" element={<AdminRoute><AdminActivityLogs /></AdminRoute>} />
+          <Route path="admin/online" element={<AdminRoute><AdminOnline /></AdminRoute>} />
           <Route path="admin/growth-analytics" element={<AdminRoute><AdminGrowthAnalytics /></AdminRoute>} />
           <Route path="admin/lead-inbox" element={<AdminRoute><AdminLeadInbox /></AdminRoute>} />
           <Route path="admin/payment-attempts" element={<AdminRoute><AdminPaymentAttempts /></AdminRoute>} />

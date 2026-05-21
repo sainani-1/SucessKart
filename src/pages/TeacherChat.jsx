@@ -2,508 +2,468 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../context/AuthContext';
 import { useChat } from '../context/ChatContext';
-import { Send, MessageCircle, Users } from 'lucide-react';
-import LoadingSpinner from '../components/LoadingSpinner';
+import { usePresenceContext } from '../context/PresenceContext';
+import { Send, MessageCircle, Users, Search, ChevronDown } from 'lucide-react';
 import { markChatAsRead } from '../utils/chatReadState';
 
 const TeacherChat = () => {
   const { profile } = useAuth();
   const { clearUnreadCount } = useChat();
   const [chatGroups, setChatGroups] = useState([]);
+  const [groupsLoaded, setGroupsLoaded] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [groupMembers, setGroupMembers] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [unreadCounts, setUnreadCounts] = useState({});
-  const [lastSeenGroupId, setLastSeenGroupId] = useState(null);
-  const [deleteConfirm, setDeleteConfirm] = useState(false);
-  const [statusMessage, setStatusMessage] = useState('');
-  const [statusError, setStatusError] = useState('');
   const [receiverReadAt, setReceiverReadAt] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
   const selectedGroupRef = useRef(null);
+  const [showScrollBtn, setShowScrollBtn] = useState(false);
+  const [hasMoreOldMessages, setHasMoreOldMessages] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const [isAtBottom, setIsAtBottom] = useState(true);
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const scrollPositionsRef = useRef({});
+  const savePosTimeoutRef = useRef(null);
+  const autoLoadRef = useRef(0);
 
-  useEffect(() => {
-    selectedGroupRef.current = selectedGroup;
-  }, [selectedGroup]);
+  selectedGroupRef.current = selectedGroup;
 
-  // Clear global unread count when opening chat
-  useEffect(() => {
-    clearUnreadCount();
-  }, [clearUnreadCount]);
+  try {
+    scrollPositionsRef.current = JSON.parse(localStorage.getItem('tc_sp') || '{}');
+  } catch {}
+
+  useEffect(() => { clearUnreadCount(); }, [clearUnreadCount]);
 
   useEffect(() => {
     if (!profile?.id) return;
-
     loadChatGroups();
-    
-    // Listen for new messages in all groups to show unread badge
-    const allMessagesSubscription = supabase
+    const sub = supabase
       .channel('all_messages')
       .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'chat_messages'
+        event: 'INSERT', schema: 'public', table: 'chat_messages'
       }, payload => {
-        loadChatGroups(false);
-        // Only increment unread if message is NOT in currently selected group
-        if (payload.new.sender_id !== profile.id && payload.new.group_id !== selectedGroupRef.current) {
-          setUnreadCounts(prev => ({
-            ...prev,
-            [payload.new.group_id]: (prev[payload.new.group_id] || 0) + 1
-          }));
+        if (payload.new.group_id === selectedGroupRef.current && payload.new.sender_id !== profile.id) {
+          loadNewMessagesOnly();
+        }
+        loadChatGroups();
+        if (payload.new.sender_id !== profile.id) {
+          setUnreadCounts(prev => prev[payload.new.group_id] ? prev : { ...prev, [payload.new.group_id]: 1 });
         }
       })
       .subscribe();
-    
-    return () => {
-      allMessagesSubscription.unsubscribe();
-    };
+    return () => sub.unsubscribe();
   }, [profile?.id]);
 
   useEffect(() => {
-    setChatGroups([]);
-    setSelectedGroup(null);
-    setMessages([]);
-    setGroupMembers([]);
-    setUnreadCounts({});
-    setDeleteConfirm(false);
-    setStatusMessage('');
-    setStatusError('');
-    setLoading(true);
-  }, [profile?.id]);
-
-  const getChatClearedAt = (gid) => {
-    if (!profile?.id || !gid) return null;
-    const key = `chatClearedAt_teacher_${profile.id}_${gid}`;
-    try {
-      return localStorage.getItem(key);
-    } catch {
-      return null;
-    }
-  };
-
-  const setChatClearedAt = (gid, isoTime) => {
-    if (!profile?.id || !gid) return;
-    const key = `chatClearedAt_teacher_${profile.id}_${gid}`;
-    try {
-      localStorage.setItem(key, isoTime || new Date().toISOString());
-    } catch {
-      // ignore storage errors
-    }
-  };
-
-  useEffect(() => {
-    if (selectedGroup) {
-      loadMessages();
-      loadMembers();
-      loadReceiverReadState(selectedGroup);
-      // Mark this group as seen - clear unread only for newly viewed messages
-      setLastSeenGroupId(selectedGroup);
-      setUnreadCounts(prev => ({
-        ...prev,
-        [selectedGroup]: 0
-      }));
-      const subscription = supabase
-        .channel(`chat:${selectedGroup}`)
-        .on('postgres_changes', {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'chat_messages',
-          filter: `group_id=eq.${selectedGroup}`
-        }, async payload => {
-          if (payload.new.sender_id === profile?.id) return;
-          const clearedAt = getChatClearedAt(selectedGroup);
-          if (!clearedAt || new Date(payload.new.created_at) > new Date(clearedAt)) {
-            const { data } = await supabase
-              .from('chat_messages')
-              .select('*, profiles(full_name, avatar_url)')
-              .eq('id', payload.new.id)
-              .maybeSingle();
-            setMessages(prev => prev.some((msg) => msg.id === payload.new.id) ? prev : [...prev, data || payload.new]);
-            void markChatAsRead(profile?.id, selectedGroup);
-          }
-        })
-        .subscribe();
-
-      return () => subscription.unsubscribe();
-    }
+    if (!selectedGroup) return;
+    autoLoadRef.current = 0;
+    loadMessages();
+    loadMembers();
+    setUnreadCounts(prev => ({ ...prev, [selectedGroup]: 0 }));
   }, [selectedGroup]);
 
   useEffect(() => {
-    if (!selectedGroup || !profile?.id) return undefined;
-    const interval = window.setInterval(() => {
-      loadMessages(true);
-      loadReceiverReadState(selectedGroup);
-      loadChatGroups(false);
-    }, 2000);
-    return () => window.clearInterval(interval);
+    if (!selectedGroup || !profile?.id) return;
+    const interval = setInterval(() => { loadNewMessagesOnly(); loadChatGroups(); }, 3000);
+    return () => clearInterval(interval);
   }, [selectedGroup, profile?.id]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (!messagesContainerRef.current) return;
+    const savedPos = scrollPositionsRef.current[selectedGroup];
+    if (savedPos !== undefined) {
+      requestAnimationFrame(() => {
+        if (messagesContainerRef.current) messagesContainerRef.current.scrollTop = savedPos;
+      });
+    } else if (isAtBottom) {
+      scrollToBottom();
+    }
   }, [messages]);
 
-  const loadChatGroups = async (showSpinner = true) => {
-    if (!profile?.id) return;
-    try {
-      if (showSpinner) setLoading(true);
-      console.log('Loading chat groups for teacher:', profile.id);
-      
-      // Get all groups where teacher is a member
-      const { data: memberGroups, error: memberError } = await supabase
-        .from('chat_members')
-        .select('group_id')
-        .eq('user_id', profile.id);
+  useEffect(() => {
+    if (!messagesContainerRef.current || !hasMoreOldMessages || loadingOlder || autoLoadRef.current >= 3) return;
+    if (messagesContainerRef.current.scrollHeight <= messagesContainerRef.current.clientHeight + 1) {
+      autoLoadRef.current++;
+      loadOlderMessages();
+    }
+  }, [messages, hasMoreOldMessages, loadingOlder]);
 
-      console.log('Member groups:', memberGroups, 'Error:', memberError);
+  useEffect(() => {
+    const goOnline = () => setIsOffline(false);
+    const goOffline = () => setIsOffline(true);
+    window.addEventListener('online', goOnline);
+    window.addEventListener('offline', goOffline);
+    return () => { window.removeEventListener('online', goOnline); window.removeEventListener('offline', goOffline); };
+  }, []);
 
-      if (!memberGroups || memberGroups.length === 0) {
-        console.log('No chat groups found for teacher');
-        setLoading(false);
-        return;
-      }
+  const scrollToBottom = () => {
+    requestAnimationFrame(() => messagesEndRef.current?.scrollIntoView({ behavior: 'auto' }));
+  };
 
-      const groupIds = memberGroups.map(m => m.group_id);
-      console.log('Group IDs:', groupIds);
-
-      // Get group details
-      const { data: groups, error: groupError } = await supabase
-        .from('chat_groups')
-        .select('*')
-        .in('id', groupIds)
-        .order('created_at', { ascending: false });
-
-      console.log('Groups:', groups, 'Error:', groupError);
-
-      setChatGroups(groups || []);
-      
-      // Initialize unread counts to 0 - they'll increment only when new messages arrive
-      if (groups && groups.length > 0) {
-        const unreadCounts = {};
-        for (const group of groups) {
-          unreadCounts[group.id] = 0; // Start at 0, only show badge for NEW messages
-        }
-        setUnreadCounts(unreadCounts);
-        console.log('Setting selected group to:', groups[0].id);
-        setSelectedGroup((current) => current || groups[0].id);
-      }
-    } catch (error) {
-      console.error('Error loading chat groups:', error);
-    } finally {
-      if (showSpinner) setLoading(false);
+  const handleScroll = () => {
+    if (!messagesContainerRef.current) return;
+    const el = messagesContainerRef.current;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    setIsAtBottom(atBottom);
+    setShowScrollBtn(!atBottom && messages.length > 0);
+    if (selectedGroup) {
+      scrollPositionsRef.current[selectedGroup] = el.scrollTop;
+      clearTimeout(savePosTimeoutRef.current);
+      savePosTimeoutRef.current = setTimeout(() => {
+        try { localStorage.setItem('tc_sp', JSON.stringify(scrollPositionsRef.current)); } catch {}
+      }, 500);
+    }
+    if (el.scrollTop < 50 && hasMoreOldMessages && !loadingOlder) {
+      loadOlderMessages();
     }
   };
 
-  const loadReceiverReadState = async (groupId = selectedGroup) => {
-    if (!groupId || !profile?.id) return;
+  const saveScrollPositions = () => {
+    clearTimeout(savePosTimeoutRef.current);
+    try { localStorage.setItem('tc_sp', JSON.stringify(scrollPositionsRef.current)); } catch {}
+  };
+
+  const scrollToBottomBtn = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    setShowScrollBtn(false);
+  };
+
+  const loadChatGroups = async () => {
+    if (!profile?.id) return;
+    try {
+      const { data: memberGroups } = await supabase
+        .from('chat_members').select('group_id').eq('user_id', profile.id);
+      if (!memberGroups?.length) { setChatGroups([]); return; }
+
+      const gids = memberGroups.map(m => m.group_id);
+      const { data: groups } = await supabase
+        .from('chat_groups').select('*').in('id', gids).order('created_at', { ascending: false });
+
+      const { data: allMsgs } = await supabase
+        .from('chat_messages')
+        .select('id, content, created_at, sender_id, group_id, sender:profiles!sender_id(full_name, avatar_url)')
+        .in('group_id', gids)
+        .order('created_at', { ascending: false });
+
+      const { data: members } = await supabase
+        .from('chat_members')
+        .select('group_id, profiles!inner(full_name)')
+        .in('group_id', gids)
+        .neq('user_id', profile.id);
+
+      const lastByGroup = {};
+      (allMsgs || []).forEach(msg => { if (!lastByGroup[msg.group_id]) lastByGroup[msg.group_id] = msg; });
+
+      const nameByGroup = {};
+      (members || []).forEach(m => {
+        if (!nameByGroup[m.group_id]) nameByGroup[m.group_id] = [];
+        nameByGroup[m.group_id].push(m.profiles?.full_name || 'Student');
+      });
+
+      setChatGroups((groups || []).map(g => ({
+        ...g,
+        lastMessage: lastByGroup[g.id] || null,
+        studentNames: nameByGroup[g.id] || ['Student']
+      })));
+    } catch (err) { console.error('Error loading groups:', err); }
+    finally { setGroupsLoaded(true); }
+  };
+
+  const loadReceiverReadState = async () => {
+    if (!selectedGroup || !profile?.id) return;
     try {
       const { data } = await supabase
         .from('chat_read_states')
         .select('user_id, last_read_at')
-        .eq('group_id', groupId)
+        .eq('group_id', selectedGroup)
         .neq('user_id', profile.id)
-        .order('last_read_at', { ascending: false })
-        .limit(1);
+        .order('last_read_at', { ascending: false }).limit(1);
       setReceiverReadAt(data?.[0]?.last_read_at || null);
-    } catch {
-      setReceiverReadAt(null);
-    }
+    } catch { setReceiverReadAt(null); }
   };
 
-  const getOwnMessageStatus = (message) => {
-    if (String(message.id || '').startsWith('temp-')) {
-      return { label: 'Sending', symbol: '✓', className: 'text-slate-400' };
-    }
-    if (receiverReadAt && new Date(receiverReadAt) >= new Date(message.created_at)) {
-      return { label: 'Read', symbol: '✓✓', className: 'text-sky-300' };
-    }
-    return { label: 'Sent', symbol: '✓✓', className: 'text-slate-300' };
-  };
-
-  const loadMessages = async (markAsRead = true) => {
+  const loadMessages = async () => {
     if (!selectedGroup) return;
-
     try {
       const { data } = await supabase
         .from('chat_messages')
         .select('*, profiles(full_name, avatar_url)')
         .eq('group_id', selectedGroup)
+        .order('created_at', { ascending: false })
+        .limit(8);
+      setMessages((data || []).reverse());
+      setHasMoreOldMessages((data || []).length === 8);
+      await markChatAsRead(profile.id, selectedGroup);
+      await loadReceiverReadState();
+    } catch (err) { console.error('Error loading messages:', err); }
+  };
+
+  const loadNewMessagesOnly = async () => {
+    if (!selectedGroup || !messages.length) { await loadMessages(); return; }
+    const latest = messages[messages.length - 1];
+    if (String(latest.id).startsWith('temp-')) return;
+    try {
+      const { data } = await supabase
+        .from('chat_messages')
+        .select('*, profiles(full_name, avatar_url)')
+        .eq('group_id', selectedGroup)
+        .gt('id', latest.id)
         .order('created_at', { ascending: true });
-      const clearedAt = getChatClearedAt(selectedGroup);
-      const filtered = (data || []).filter((msg) => {
-        if (!clearedAt) return true;
-        return new Date(msg.created_at) > new Date(clearedAt);
-      });
-      setMessages(filtered);
-      if (markAsRead) {
-        await markChatAsRead(profile.id, selectedGroup);
+      if (data?.length) {
+        setMessages(prev => [...prev, ...data]);
       }
-      await loadReceiverReadState(selectedGroup);
-    } catch (error) {
-      console.error('Error loading messages:', error);
-    }
+      await markChatAsRead(profile.id, selectedGroup);
+    } catch (err) { console.error('Error refreshing messages:', err); }
+  };
+
+  const loadOlderMessages = async () => {
+    if (!selectedGroup || !messages.length || loadingOlder) return;
+    setLoadingOlder(true);
+    try {
+      const oldest = messages[0];
+      const { data } = await supabase
+        .from('chat_messages')
+        .select('*, profiles(full_name, avatar_url)')
+        .eq('group_id', selectedGroup)
+        .lt('id', oldest.id)
+        .order('created_at', { ascending: false })
+        .limit(20);
+      if (data?.length) {
+        setMessages(prev => [...data.reverse(), ...prev]);
+        if (data.length < 20) setHasMoreOldMessages(false);
+      } else {
+        setHasMoreOldMessages(false);
+      }
+    } catch (err) { console.error('Error loading older messages:', err); }
+    finally { setLoadingOlder(false); }
   };
 
   const loadMembers = async () => {
     if (!selectedGroup) return;
-
     try {
       const { data } = await supabase
         .from('chat_members')
         .select('*, profiles(full_name, avatar_url, email)')
         .eq('group_id', selectedGroup);
       setGroupMembers(data || []);
-    } catch (error) {
-      console.error('Error loading members:', error);
-    }
+    } catch (err) { console.error('Error loading members:', err); }
   };
 
   const sendMessage = async () => {
     if (!newMessage.trim() || !selectedGroup) return;
     const content = newMessage.trim();
     const tempId = `temp-${Date.now()}`;
-    const optimisticMsg = {
-      id: tempId,
-      group_id: selectedGroup,
-      sender_id: profile.id,
-      content,
+    setMessages(prev => [...prev, {
+      id: tempId, group_id: selectedGroup, sender_id: profile.id, content,
       created_at: new Date().toISOString(),
-      profiles: {
-        full_name: profile.full_name,
-        avatar_url: profile.avatar_url
-      }
-    };
-
-    setMessages(prev => [...prev, optimisticMsg]);
+      profiles: { full_name: profile.full_name, avatar_url: profile.avatar_url }
+    }]);
     setNewMessage('');
-    setStatusError('');
-
+    setHasMoreOldMessages(true);
+    if (selectedGroup) delete scrollPositionsRef.current[selectedGroup];
+    scrollToBottom();
     try {
-      const { data, error } = await supabase
-        .from('chat_messages')
-        .insert({
-          group_id: selectedGroup,
-          sender_id: profile.id,
-          content
-        })
-        .select('*, profiles(full_name, avatar_url)')
-        .single();
-      if (error) throw error;
-      setMessages(prev => prev.map(m => m.id === tempId ? data : m));
-      await markChatAsRead(profile.id, selectedGroup);
-    } catch (error) {
-      setMessages(prev => prev.filter(m => m.id !== tempId));
-      setNewMessage(content);
-      console.error('Error sending message:', error);
-      setStatusError('Failed to send message. Please try again.');
-    }
-  };
-
-  const clearCurrentChat = async () => {
-    if (!selectedGroup) return;
-    const currentGroupId = selectedGroup;
-    const nextGroupId = chatGroups.find((g) => g.id !== currentGroupId)?.id || null;
-    try {
-      const latestVisibleMsgTime = messages.reduce((max, msg) => {
-        const ts = new Date(msg.created_at).getTime();
-        return Number.isFinite(ts) ? Math.max(max, ts) : max;
-      }, 0);
-      const cutoffMs = Math.max(Date.now(), latestVisibleMsgTime) + 1000;
-      setChatClearedAt(currentGroupId, new Date(cutoffMs).toISOString());
-
-      const { error } = await supabase
-        .from('chat_messages')
-        .delete()
-        .eq('group_id', currentGroupId);
-
-      if (error) {
-        console.warn('Teacher chat server delete blocked/failed; applied local clear only:', error.message);
+      const { data } = await supabase.from('chat_messages').insert({ group_id: selectedGroup, sender_id: profile.id, content }).select();
+      if (data?.[0]) {
+        setMessages(prev => prev.map(m => m.id === tempId ? { ...data[0], profiles: m.profiles } : m));
       }
-
-      setMessages([]);
-      setGroupMembers([]);
-      setChatGroups((prev) => prev.filter((g) => g.id !== currentGroupId));
-      setUnreadCounts((prev) => {
-        const next = { ...prev };
-        delete next[currentGroupId];
-        return next;
-      });
-      setSelectedGroup(nextGroupId);
-      setDeleteConfirm(false);
-      setStatusError('');
-      setStatusMessage('Chat deleted successfully.');
-      setTimeout(() => setStatusMessage(''), 2500);
-    } catch (error) {
-      console.error('Error clearing chat:', error);
-      setStatusError('Failed to clear chat. Please try again.');
-      setDeleteConfirm(false);
-    }
+      await markChatAsRead(profile.id, selectedGroup);
+      loadChatGroups();
+    } catch (err) { console.error('Error sending:', err); }
   };
 
-  if (loading) {
-    return <LoadingSpinner message="Loading chats..." />;
-  }
+  const { isOnline } = usePresenceContext();
+  const otherMembers = groupMembers.filter(m => m.user_id !== profile?.id);
+  const currentGroup = chatGroups.find(g => g.id === selectedGroup);
 
-  if (chatGroups.length === 0) {
-    return (
-      <div className="bg-white rounded-xl p-8 text-center">
-        <MessageCircle className="mx-auto mb-4 text-slate-400" size={48} />
-        <h2 className="text-xl font-bold mb-2">No Student Messages Yet</h2>
-        <p className="text-slate-600">Students will send you messages here once assigned</p>
-      </div>
-    );
-  }
+  const filteredGroups = chatGroups.filter(g => {
+    if (!searchQuery) return true;
+    const nameMatch = g.studentNames?.some(n => n.toLowerCase().includes(searchQuery.toLowerCase()));
+    const msgMatch = g.lastMessage?.content?.toLowerCase().includes(searchQuery.toLowerCase());
+    return nameMatch || msgMatch;
+  });
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 h-[calc(100vh-200px)]">
-      {/* Chat List */}
-      <div className="bg-white rounded-xl border overflow-y-auto">
-        <div className="p-4 border-b sticky top-0 bg-white">
-          <h2 className="font-bold flex items-center gap-2">
-            <Users size={20} /> Student Chats
-          </h2>
+    <div className="flex h-[85vh] gap-0 bg-white rounded-xl border overflow-hidden shadow-sm relative box-border">
+      {isOffline && (
+        <div className="absolute top-0 left-0 right-0 z-50 bg-red-600 text-white text-center text-xs py-1.5 font-medium">
+          No internet connection
         </div>
-        <div className="divide-y">
-          {chatGroups.map(group => (
-            <button
-              key={group.id}
-              onClick={() => setSelectedGroup(group.id)}
-              className={`w-full p-4 text-left hover:bg-slate-50 transition flex items-center justify-between ${
-                selectedGroup === group.id ? 'bg-blue-50 border-l-4 border-blue-600' : ''
-              }`}
-            >
-              <div className="flex-1">
-                <p className="font-semibold text-sm">Chat Group {group.id}</p>
-                <p className="text-xs text-slate-500 mt-1">
-                  Created {new Date(group.created_at).toLocaleDateString()}
-                </p>
-              </div>
-              {unreadCounts[group.id] > 0 && (
-                <div className="ml-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold animate-pulse">
-                  {unreadCounts[group.id]}
+      )}
+      {/* Chat List */}
+      <div className="w-80 border-r bg-white flex flex-col shrink-0">
+        <div className="p-3 border-b shrink-0 bg-white">
+          <h2 className="font-bold flex items-center gap-2 text-sm mb-2 text-slate-800">
+            <Users size={16} className="text-blue-600" /> Messages
+          </h2>
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search conversations..."
+              className="w-full pl-9 pr-3 py-2 text-sm border-0 bg-slate-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+        </div>
+        <div className="divide-y overflow-y-auto flex-1">
+          {!groupsLoaded ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : filteredGroups.length === 0 ? (
+            <div className="p-8 text-center">
+              <MessageCircle size={32} className="mx-auto mb-2 text-slate-300" />
+              <p className="text-sm text-slate-400">No conversations yet</p>
+              <p className="text-xs text-slate-300 mt-1">Messages from students appear here</p>
+            </div>
+          ) : (
+            filteredGroups.map(group => (
+              <button
+                key={group.id}
+                onClick={() => { saveScrollPositions(); setSelectedGroup(group.id); }}
+                className={`w-full p-3 text-left hover:bg-slate-50 transition-all flex items-center gap-3 ${
+                  selectedGroup === group.id ? 'bg-blue-50' : ''
+                }`}
+              >
+                <div className="w-11 h-11 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white text-sm font-bold shrink-0 shadow-sm">
+                  {(group.studentNames?.[0] || 'S').charAt(0).toUpperCase()}
                 </div>
-              )}
-            </button>
-          ))}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <p className={`text-sm truncate ${selectedGroup === group.id ? 'font-bold' : 'font-semibold'} text-slate-800`}>
+                      {group.studentNames?.[0] || 'Student'}
+                    </p>
+                    {group.lastMessage && (
+                      <span className="text-[10px] text-slate-400 shrink-0 ml-2">
+                        {new Date(group.lastMessage.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-500 truncate mt-0.5">
+                    {group.lastMessage?.sender_id === profile.id ? 'You: ' : ''}
+                    {group.lastMessage?.content || 'No messages yet'}
+                  </p>
+                </div>
+                {unreadCounts[group.id] > 0 && (
+                  <div className="bg-blue-600 text-white rounded-full min-w-[20px] h-5 flex items-center justify-center text-[10px] font-bold shrink-0 px-1 shadow-sm">
+                    {unreadCounts[group.id]}
+                  </div>
+                )}
+              </button>
+            ))
+          )}
         </div>
       </div>
 
       {/* Chat Area */}
-      {selectedGroup && (
-        <div className="lg:col-span-3 bg-white rounded-xl border flex flex-col">
-          {/* Header */}
-          <div className="p-4 border-b">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-bold">Student Chat</h2>
-                <p className="text-xs text-slate-500">
-                  {groupMembers.length} member{groupMembers.length !== 1 ? 's' : ''}
-                </p>
+      {selectedGroup ? (
+        <div className="flex-1 flex flex-col min-w-0 h-full bg-white overflow-hidden">
+          <div className="p-3 border-b shrink-0 bg-white flex items-center justify-between px-5">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white text-sm font-bold shadow-sm">
+                {(currentGroup?.studentNames?.[0] || 'S').charAt(0).toUpperCase()}
               </div>
-              {!deleteConfirm ? (
-                <button
-                  onClick={() => setDeleteConfirm(true)}
-                  className="px-3 py-1 bg-red-100 text-red-700 text-xs rounded-lg hover:bg-red-200"
-                >
-                  Delete Chat
-                </button>
-              ) : (
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setDeleteConfirm(false)}
-                    className="px-3 py-1 bg-slate-100 text-slate-700 text-xs rounded-lg hover:bg-slate-200"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={clearCurrentChat}
-                    className="px-3 py-1 bg-red-600 text-white text-xs rounded-lg hover:bg-red-700"
-                  >
-                    Confirm Delete
-                  </button>
-                </div>
-              )}
+              <div>
+                <h3 className="font-semibold text-sm text-slate-800">{currentGroup?.studentNames?.[0] || 'Student'}</h3>
+                <p className="text-[10px] text-green-600 font-medium">
+                  {otherMembers.some(m => isOnline(m.user_id)) ? '● Online' : 'Offline'}
+                </p>
+                <p className="text-[10px] text-slate-400">{otherMembers.length} student{otherMembers.length !== 1 ? 's' : ''}</p>
+              </div>
             </div>
-            {statusMessage ? (
-              <p className="mt-2 text-xs text-emerald-600 font-medium">{statusMessage}</p>
-            ) : null}
-            {statusError ? (
-              <p className="mt-2 text-xs text-red-600 font-medium">{statusError}</p>
-            ) : null}
           </div>
 
-          {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          <div ref={messagesContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-3 space-y-1 min-h-0 bg-[#e8f4f8]">
+            {loadingOlder && (
+              <div className="flex justify-center py-3">
+                <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+              </div>
+            )}
             {messages.length === 0 ? (
-              <div className="text-center py-8 text-slate-500">
-                <MessageCircle className="mx-auto mb-2 text-slate-300" size={48} />
-                <p>No messages yet. Start the conversation!</p>
+              <div className="flex flex-col items-center justify-center h-full text-slate-400">
+                <MessageCircle size={40} className="mb-2 text-slate-300" />
+                <p className="text-sm font-medium text-slate-500">No messages yet</p>
+                <p className="text-xs text-slate-400">Send a message to start chatting</p>
               </div>
             ) : (
-              messages.map(msg => {
+              messages.map((msg, idx) => {
                 const isMe = msg.sender_id === profile.id;
+                const showDate = idx === 0 || new Date(msg.created_at).toDateString() !== new Date(messages[idx-1]?.created_at).toDateString();
+                const status = (() => {
+                  if (!isMe) return null;
+                  if (String(msg.id).startsWith('temp-')) return <span className="text-slate-400 text-[9px] ml-1">✓</span>;
+                  if (receiverReadAt && new Date(receiverReadAt) >= new Date(msg.created_at)) return <span className="text-blue-300 text-[9px] ml-1 font-bold">✓✓</span>;
+                  return <span className="text-slate-400 text-[9px] ml-1">✓✓</span>;
+                })();
                 return (
-                  <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`flex gap-2 max-w-[70%] ${isMe ? 'flex-row-reverse' : ''}`}>
-                      <img
-                        src={msg.profiles?.avatar_url || 'https://via.placeholder.com/32'}
-                        alt={msg.profiles?.full_name}
-                        className="w-8 h-8 rounded-full object-cover flex-shrink-0"
-                      />
-                      <div>
-                        <p className="text-[10px] text-slate-600 mb-1">
-                          {msg.profiles?.full_name}
-                        </p>
-                        <div
-                          className={`p-3 rounded-lg ${
-                            isMe ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-900'
-                          }`}
-                        >
-                          <p className="text-sm">{msg.content}</p>
+                  <React.Fragment key={msg.id}>
+                    {showDate && (
+                      <div className="flex justify-center my-3">
+                        <span className="text-[10px] bg-white/80 text-slate-500 px-3 py-1 rounded-full shadow-sm">
+                          {new Date(msg.created_at).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                        </span>
+                      </div>
+                    )}
+                    <div className={`flex ${isMe ? 'justify-end' : 'justify-start'} animate-in`}>
+                      <div className={`max-w-[75%] px-3.5 py-2.5 shadow-sm ${
+                        isMe ? 'bg-[#d9fdd3] text-slate-900 rounded-2xl rounded-br-md' : 'bg-white text-slate-900 rounded-2xl rounded-bl-md'
+                      }`}>
+                        <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{msg.content}</p>
+                        <div className={`flex items-center gap-1 mt-0.5 ${isMe ? 'justify-end' : 'justify-start'}`}>
+                          <span className="text-[9px] text-slate-400">
+                            {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                          {status}
                         </div>
-                        <p className="text-[10px] text-slate-500 mt-1">
-                          {new Date(msg.created_at).toLocaleTimeString([], {
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                          {isMe ? (
-                            <span className={`ml-2 font-bold ${getOwnMessageStatus(msg).className}`} title={getOwnMessageStatus(msg).label}>
-                              {getOwnMessageStatus(msg).symbol}
-                            </span>
-                          ) : null}
-                        </p>
                       </div>
                     </div>
-                  </div>
+                  </React.Fragment>
                 );
               })
+            )}
+            {showScrollBtn && messages.length > 0 && (
+              <button onClick={scrollToBottomBtn} className="sticky bottom-2 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-xs px-4 py-2 rounded-full shadow-lg hover:bg-blue-700 z-10 flex items-center gap-1.5">
+                <ChevronDown size={14} /> New
+              </button>
             )}
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Input */}
-          <div className="p-4 border-t">
-            <div className="flex gap-2">
+          <div className="p-2 border-t bg-white shrink-0 px-3">
+            <div className="flex gap-2 items-center">
               <input
-                type="text"
-                value={newMessage}
-                onChange={e => setNewMessage(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && sendMessage()}
-                placeholder="Type your message..."
-                className="flex-1 border rounded-lg p-2 text-sm"
+                type="text" value={newMessage} onChange={e => setNewMessage(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
+                placeholder="Type a message"
+                className="flex-1 border-0 rounded-lg px-3 py-2 text-sm bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              <button
-                onClick={sendMessage}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
-              >
-                <Send size={20} />
+              <button onClick={sendMessage} disabled={!newMessage.trim()}
+                className="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md">
+                <Send size={16} />
               </button>
             </div>
           </div>
         </div>
+      ) : (
+        <div className="flex-1 bg-[#e8f4f8] flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-24 h-24 rounded-full bg-white flex items-center justify-center mx-auto mb-5 shadow-md">
+              <MessageCircle size={44} className="text-blue-500" />
+            </div>
+            <p className="text-xl font-bold text-slate-700">SkillPro Messages</p>
+            <p className="text-sm text-slate-500 mt-2">Select a conversation from the left</p>
+          </div>
+        </div>
       )}
+
+      <style>{`
+        @keyframes in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-in { animation: in 0.15s ease-out; }
+      `}</style>
     </div>
   );
 };

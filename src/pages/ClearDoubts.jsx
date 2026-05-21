@@ -1,107 +1,97 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabaseClient';
-import { MessageCircle, Clock, User, CheckCircle, AlertCircle, Send } from 'lucide-react';
-import LoadingSpinner from '../components/LoadingSpinner';
-import usePopup from '../hooks/usePopup.jsx';
+import { usePresenceContext } from '../context/PresenceContext';
+import { MessageCircle, Send, Search } from 'lucide-react';
 import { getChatReadTimes, markChatAsRead } from '../utils/chatReadState';
 
 const ClearDoubts = () => {
-  const { openPopup, popupNode } = usePopup();
   const { profile } = useAuth();
   const [chats, setChats] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [initialLoadDone, setInitialLoadDone] = useState(false);
-  const [filter, setFilter] = useState('all'); // all, unread, read
+  const [chatsLoaded, setChatsLoaded] = useState(false);
+  const [filter, setFilter] = useState('all');
   const [selectedChat, setSelectedChat] = useState(null);
   const [reply, setReply] = useState('');
-  const [sending, setSending] = useState(false);
   const [chatMessages, setChatMessages] = useState([]);
+  const [receiverReadAt, setReceiverReadAt] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [hasMoreOldMessages, setHasMoreOldMessages] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const [isAtBottom, setIsAtBottom] = useState(true);
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const [otherUserId, setOtherUserId] = useState(null);
+  const scrollPositionsRef = useRef({});
+  const savePosTimeoutRef = useRef(null);
+  const autoLoadRef = useRef(0);
+
+  try { scrollPositionsRef.current = JSON.parse(localStorage.getItem('cd_sp') || '{}'); } catch {}
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
-  const [chatReadTimes, setChatReadTimes] = useState(new Map()); // Map of groupId -> lastReadAt timestamp
-  const [deleteConfirm, setDeleteConfirm] = useState(false); // First confirmation
-  const [deleteConfirmFinal, setDeleteConfirmFinal] = useState(false); // Second confirmation
-  const [successMessage, setSuccessMessage] = useState(''); // Success toast
-  const [receiverReadAt, setReceiverReadAt] = useState(null);
 
   const scrollToBottom = () => {
-    if (messagesEndRef.current) {
-      // Scroll the last message element into view - more reliable than scrollHeight
-      messagesEndRef.current.scrollIntoView({ behavior: 'auto', block: 'end' });
-    }
+    requestAnimationFrame(() => messagesEndRef.current?.scrollIntoView({ behavior: 'auto', block: 'end' }));
   };
 
-  // Scroll to latest message whenever chatMessages update (new messages arrived)
   useEffect(() => {
-    if (chatMessages.length > 0) {
-      // Scroll after DOM renders
-      setTimeout(() => scrollToBottom(), 100);
-      setTimeout(() => scrollToBottom(), 200);
+    if (!messagesContainerRef.current) return;
+    const savedPos = scrollPositionsRef.current[selectedChat?.id];
+    if (savedPos !== undefined) {
+      requestAnimationFrame(() => {
+        if (messagesContainerRef.current) messagesContainerRef.current.scrollTop = savedPos;
+      });
+    } else if (chatMessages.length > 0 && isAtBottom) {
+      scrollToBottom();
     }
   }, [chatMessages]);
 
-  // When chat is selected, scroll to latest message
   useEffect(() => {
-    if (selectedChat && selectedChat.id) {
-      setTimeout(() => scrollToBottom(), 100);
+    if (!messagesContainerRef.current || !hasMoreOldMessages || loadingOlder || autoLoadRef.current >= 3) return;
+    if (messagesContainerRef.current.scrollHeight <= messagesContainerRef.current.clientHeight + 1) {
+      autoLoadRef.current++;
+      loadOlderMessages();
     }
-  }, [selectedChat?.id]);
+  }, [chatMessages, hasMoreOldMessages, loadingOlder]);
+
+  useEffect(() => { if (selectedChat?.id) setTimeout(scrollToBottom, 100); }, [selectedChat?.id]);
 
   useEffect(() => {
-    if (!selectedChat?.id || !profile?.id) return undefined;
-    const interval = window.setInterval(() => {
-      loadChatMessages(selectedChat.id, true);
+    const goOnline = () => setIsOffline(false);
+    const goOffline = () => setIsOffline(true);
+    window.addEventListener('online', goOnline);
+    window.addEventListener('offline', goOffline);
+    return () => { window.removeEventListener('online', goOnline); window.removeEventListener('offline', goOffline); };
+  }, []);
+
+  useEffect(() => {
+    if (!selectedChat?.id || !profile?.id) return;
+    const interval = setInterval(() => {
+      loadNewChatMessagesOnly();
       loadReceiverReadState(selectedChat.id);
-      fetchStudentChats(false);
-    }, 2000);
-    return () => window.clearInterval(interval);
+      fetchStudentChats();
+    }, 3000);
+    return () => clearInterval(interval);
   }, [selectedChat?.id, profile?.id]);
 
   useEffect(() => {
     if (profile?.role === 'teacher') {
-      fetchStudentChats(true); // initial load shows spinner
-      // Refresh chats every 30 seconds without spinner
-      const interval = setInterval(() => fetchStudentChats(false), 30000);
+      fetchStudentChats();
+      const interval = setInterval(() => fetchStudentChats(), 30000);
       return () => clearInterval(interval);
     }
-  }, [profile]); // Only re-run when profile changes
+  }, [profile]);
 
   useEffect(() => {
-    if (profile?.role !== 'teacher' || !profile?.id) return undefined;
-
+    if (profile?.role !== 'teacher' || !profile?.id) return;
     const subscription = supabase
       .channel(`clear-doubts-live:${profile.id}`)
       .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'chat_messages'
+        event: 'INSERT', schema: 'public', table: 'chat_messages'
       }, async (payload) => {
-        fetchStudentChats(false);
-        if (selectedChat?.id !== payload.new.group_id) return;
-
-        const { data } = await supabase
-          .from('chat_messages')
-          .select('*, sender:profiles(id, full_name, avatar_url)')
-          .eq('id', payload.new.id)
-          .maybeSingle();
-
-        setChatMessages((prev) => {
-          if (prev.some((message) => message.id === payload.new.id)) return prev;
-          return [...prev, data || payload.new];
-        });
-
-        if (payload.new.sender_id !== profile.id) {
-          const now = await markChatAsRead(profile.id, payload.new.group_id);
-          setChatReadTimes((prev) => {
-            const next = new Map(prev);
-            next.set(payload.new.group_id, now);
-            return next;
-          });
-        }
+        fetchStudentChats();
+        if (selectedChat?.id !== payload.new.group_id || payload.new.sender_id === profile.id) return;
+        loadNewChatMessagesOnly();
       })
       .subscribe();
-
     return () => subscription.unsubscribe();
   }, [profile?.id, profile?.role, selectedChat?.id]);
 
@@ -109,140 +99,133 @@ const ClearDoubts = () => {
     setChats([]);
     setSelectedChat(null);
     setChatMessages([]);
-    setChatReadTimes(new Map());
-    setDeleteConfirm(false);
-    setDeleteConfirmFinal(false);
-    setSuccessMessage('');
-    setInitialLoadDone(false);
-    setLoading(true);
   }, [profile?.id]);
 
-  const fetchStudentChats = async (showSpinner = false) => {
+  const fetchStudentChats = async () => {
+    if (!profile?.id) return;
     try {
-      if (!profile?.id) return;
-      if (showSpinner || !initialLoadDone) setLoading(true);
-      
-      // Step 1: Get all chat groups where teacher is a member with their last message in ONE query
-      const { data: memberGroups, error: memberError } = await supabase
+      const { data: memberGroups } = await supabase
         .from('chat_members')
-        .select(`
-          group_id,
-          chat_groups (
-            id,
-            name,
-            created_at,
-            updated_at
-          )
-        `)
+        .select('group_id, chat_groups(id, name, created_at, updated_at)')
         .eq('user_id', profile.id);
-
-      if (memberError) throw memberError;
-
-      if (!memberGroups || memberGroups.length === 0) {
-        setChats([]);
-        setLoading(false);
-        setInitialLoadDone(true);
-        return;
-      }
+      if (!memberGroups?.length) { setChats([]); return; }
 
       const groups = memberGroups.map(mg => mg.chat_groups).filter(Boolean);
-      const groupIds = groups.map(g => g.id);
+      const gids = groups.map(g => g.id);
 
-      // Step 2: Get last message for all groups in ONE query
       const { data: allMessages } = await supabase
         .from('chat_messages')
-        .select('id, content, sender_id, created_at, group_id, sender:profiles(id, full_name, avatar_url)')
-        .in('group_id', groupIds)
+        .select('id, content, sender_id, created_at, group_id, sender:profiles!sender_id(full_name, avatar_url)')
+        .in('group_id', gids)
         .order('created_at', { ascending: false });
 
-      // Group messages by group_id and get the last one for each
-      const lastMessagesByGroup = {};
-      (allMessages || []).forEach(msg => {
-        if (!lastMessagesByGroup[msg.group_id]) {
-          lastMessagesByGroup[msg.group_id] = msg;
-        }
+      const { data: allMembers } = await supabase
+        .from('chat_members')
+        .select('group_id, profiles!inner(full_name)')
+        .in('group_id', gids)
+        .neq('user_id', profile.id);
+
+      const nameByGroup = {};
+      (allMembers || []).forEach(m => {
+        if (!nameByGroup[m.group_id]) nameByGroup[m.group_id] = [];
+        nameByGroup[m.group_id].push(m.profiles?.full_name || 'Student');
       });
 
-      const currentReadTimes = await getChatReadTimes(profile.id, groupIds);
-      setChatReadTimes(currentReadTimes);
+      const lastByGroup = {};
+      (allMessages || []).forEach(msg => { if (!lastByGroup[msg.group_id]) lastByGroup[msg.group_id] = msg; });
 
-      // Step 3: Calculate unread count for each group from the messages we already have
-      const groupsWithMessages = groups.map(group => {
+      const currentReadTimes = await getChatReadTimes(profile.id, gids);
+
+      const groupsWithMeta = groups.map(group => {
         const lastReadAt = currentReadTimes.get(group.id);
         const groupMessages = (allMessages || []).filter(m => m.group_id === group.id);
-        
         let unreadCount = 0;
         if (lastReadAt) {
-          unreadCount = groupMessages.filter(
-            m => m.sender_id !== profile.id && new Date(m.created_at) > new Date(lastReadAt)
-          ).length;
+          unreadCount = groupMessages.filter(m => m.sender_id !== profile.id && new Date(m.created_at) > new Date(lastReadAt)).length;
         } else {
           unreadCount = groupMessages.filter(m => m.sender_id !== profile.id).length;
         }
-
         return {
-          ...group,
-          lastMessage: lastMessagesByGroup[group.id] || null,
-          unreadCount,
-          is_read: unreadCount === 0
+          ...group, lastMessage: lastByGroup[group.id] || null, unreadCount,
+          is_read: unreadCount === 0, studentNames: nameByGroup[group.id] || ['Student']
         };
       });
-
-      // Sort by updated_at descending
-      groupsWithMessages.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
-
-      setChats(groupsWithMessages);
-      if (!initialLoadDone) setInitialLoadDone(true);
-    } catch (err) {
-      console.error('Error fetching chats:', err);
-    } finally {
-      if (showSpinner || !initialLoadDone) setLoading(false);
-    }
+      groupsWithMeta.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+      setChats(groupsWithMeta);
+    } catch (err) { console.error('Error fetching chats:', err); }
+    finally { setChatsLoaded(true); }
   };
 
-  const loadChatMessages = async (groupId, markAsRead = true) => {
+  const loadChatMessages = async (groupId, markAsReadFlag = true) => {
     try {
-      const { data: messages, error } = await supabase
+      const { data: messages } = await supabase
         .from('chat_messages')
-        .select('*, sender:profiles(id, full_name, avatar_url)')
+        .select('*, sender:profiles!sender_id(id, full_name, avatar_url)')
         .eq('group_id', groupId)
-        .order('created_at', { ascending: true });
-
-      if (error) throw error;
-      
-      // Set messages and scroll to bottom after render
-      setChatMessages(messages || []);
-      
-      // Multiple scroll attempts with longer delays to ensure DOM is fully rendered
-      setTimeout(() => scrollToBottom(), 150);
-      setTimeout(() => scrollToBottom(), 300);
-      setTimeout(() => scrollToBottom(), 500);
-
-      // Mark this chat as read with current timestamp
-      if (markAsRead) {
-        const now = await markChatAsRead(profile.id, groupId);
-        const updatedReadTimes = new Map(chatReadTimes);
-        updatedReadTimes.set(groupId, now);
-        setChatReadTimes(updatedReadTimes);
-      }
+        .order('created_at', { ascending: false })
+        .limit(8);
+      setChatMessages((messages || []).reverse());
+      setHasMoreOldMessages((messages || []).length === 8);
+      if (markAsReadFlag) await markChatAsRead(profile.id, groupId);
       await loadReceiverReadState(groupId);
+      setChats(prev => prev.map(c => c.id === groupId ? { ...c, is_read: true, unreadCount: 0 } : c));
+    } catch (err) { console.error('Error loading messages:', err); }
+  };
 
-      // Mark this specific chat as read in local state
-      const chatToSelect = chats.find(c => c.id === groupId);
-      if (chatToSelect) {
-        setSelectedChat({ ...chatToSelect, is_read: true, unreadCount: 0 });
+  const loadNewChatMessagesOnly = async () => {
+    if (!selectedChat?.id || !chatMessages.length) { await loadChatMessages(selectedChat?.id, true); return; }
+    const latest = chatMessages[chatMessages.length - 1];
+    if (String(latest.id).startsWith('temp-')) return;
+    try {
+      const { data: messages } = await supabase
+        .from('chat_messages')
+        .select('*, sender:profiles!sender_id(id, full_name, avatar_url)')
+        .eq('group_id', selectedChat.id)
+        .gt('id', latest.id)
+        .order('created_at', { ascending: true });
+      if (messages?.length) {
+        setChatMessages(prev => [...prev, ...messages]);
       }
+      await markChatAsRead(profile.id, selectedChat.id);
+    } catch (err) { console.error('Error refreshing messages:', err); }
+  };
 
-      // Update the chats list
-      setChats(prevChats =>
-        prevChats.map(c => 
-          c.id === groupId 
-            ? { ...c, is_read: true, unreadCount: 0 }
-            : c
-        )
-      );
-    } catch (err) {
-      console.error('Error loading messages:', err);
+  const loadOlderMessages = async () => {
+    if (!selectedChat?.id || !chatMessages.length || loadingOlder) return;
+    setLoadingOlder(true);
+    try {
+      const oldest = chatMessages[0];
+      const { data: messages } = await supabase
+        .from('chat_messages')
+        .select('*, sender:profiles!sender_id(id, full_name, avatar_url)')
+        .eq('group_id', selectedChat.id)
+        .lt('id', oldest.id)
+        .order('created_at', { ascending: false })
+        .limit(20);
+      if (messages?.length) {
+        setChatMessages(prev => [...messages.reverse(), ...prev]);
+        if (messages.length < 20) setHasMoreOldMessages(false);
+      } else {
+        setHasMoreOldMessages(false);
+      }
+    } catch (err) { console.error('Error loading older messages:', err); }
+    finally { setLoadingOlder(false); }
+  };
+
+  const handleScroll = () => {
+    if (!messagesContainerRef.current) return;
+    const el = messagesContainerRef.current;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    setIsAtBottom(atBottom);
+    if (selectedChat?.id) {
+      scrollPositionsRef.current[selectedChat.id] = el.scrollTop;
+      clearTimeout(savePosTimeoutRef.current);
+      savePosTimeoutRef.current = setTimeout(() => {
+        try { localStorage.setItem('cd_sp', JSON.stringify(scrollPositionsRef.current)); } catch {}
+      }, 500);
+    }
+    if (el.scrollTop < 50 && hasMoreOldMessages && !loadingOlder) {
+      loadOlderMessages();
     }
   };
 
@@ -252,128 +235,64 @@ const ClearDoubts = () => {
       const { data } = await supabase
         .from('chat_read_states')
         .select('user_id, last_read_at')
-        .eq('group_id', groupId)
-        .neq('user_id', profile.id)
-        .order('last_read_at', { ascending: false })
-        .limit(1);
+        .eq('group_id', groupId).neq('user_id', profile.id)
+        .order('last_read_at', { ascending: false }).limit(1);
       setReceiverReadAt(data?.[0]?.last_read_at || null);
-    } catch {
-      setReceiverReadAt(null);
-    }
+    } catch { setReceiverReadAt(null); }
   };
 
-  const getOwnMessageStatus = (message) => {
-    if (String(message.id || '').startsWith('temp-')) {
-      return { label: 'Sending', symbol: '✓', className: 'text-slate-400' };
-    }
-    if (receiverReadAt && new Date(receiverReadAt) >= new Date(message.created_at)) {
-      return { label: 'Read', symbol: '✓✓', className: 'text-sky-500' };
-    }
-    return { label: 'Sent', symbol: '✓✓', className: 'text-slate-400' };
-  };
-
-  const handleSelectChat = (chat) => {
+  const handleSelectChat = async (chat) => {
+    clearTimeout(savePosTimeoutRef.current);
+    try { localStorage.setItem('cd_sp', JSON.stringify(scrollPositionsRef.current)); } catch {}
+    autoLoadRef.current = 0;
+    setSelectedChat(chat);
+    setChatMessages([]);
+    setReceiverReadAt(null);
     loadChatMessages(chat.id);
-  };
-
-  const permanentlyDeleteChat = async () => {
-    if (!selectedChat) return;
-
     try {
-      const { error } = await supabase
-        .from('chat_messages')
-        .delete()
-        .eq('group_id', selectedChat.id);
-
-      if (error) {
-        console.warn('Clear doubts server delete blocked/failed; clearing local view only:', error.message);
-      }
-
-      // Close chat and show success
-      setSelectedChat(null);
-      setChatMessages([]);
-      setDeleteConfirm(false);
-      setDeleteConfirmFinal(false);
-      setSuccessMessage('Chat deleted successfully!');
-      
-      // Remove success message after 3 seconds
-      setTimeout(() => setSuccessMessage(''), 3000);
-      
-      // Refresh chat list
-      fetchStudentChats(false);
-    } catch (err) {
-      console.error('Error deleting chat:', err);
-      openPopup('Error', 'Failed to delete chat', 'error');
-      setDeleteConfirm(false);
-      setDeleteConfirmFinal(false);
-    }
-  };
-
-  const handleClearChatClick = () => {
-    if (!deleteConfirm) {
-      // First click - show first confirmation
-      setDeleteConfirm(true);
-    } else if (!deleteConfirmFinal) {
-      // Second click - show final confirmation
-      setDeleteConfirmFinal(true);
-    } else {
-      // Third click - actually delete
-      permanentlyDeleteChat();
-    }
-  };
-
-  const cancelDelete = () => {
-    setDeleteConfirm(false);
-    setDeleteConfirmFinal(false);
+      const { data: otherMembers } = await supabase
+        .from('chat_members')
+        .select('user_id')
+        .eq('group_id', chat.id)
+        .neq('user_id', profile.id);
+      setOtherUserId(otherMembers?.[0]?.user_id || null);
+    } catch { setOtherUserId(null); }
   };
 
   const sendReply = async () => {
     if (!selectedChat || !reply.trim()) return;
-
+    const content = reply.trim();
+    const tempId = `temp-${Date.now()}`;
+    setChatMessages(prev => [...prev, {
+      id: tempId, group_id: selectedChat.id, sender_id: profile.id, content,
+      created_at: new Date().toISOString(),
+      sender: { id: profile.id, full_name: profile.full_name, avatar_url: profile.avatar_url }
+    }]);
+    setReply('');
+    setHasMoreOldMessages(true);
+    if (selectedChat?.id) delete scrollPositionsRef.current[selectedChat.id];
+    scrollToBottom();
     try {
-      setSending(true);
-      const payload = {
-        group_id: selectedChat.id,
-        sender_id: profile.id,
-        content: reply.trim()
-      };
-      const tempId = `temp-${Date.now()}`;
-      setChatMessages((prev) => [...prev, {
-        ...payload,
-        id: tempId,
-        created_at: new Date().toISOString(),
-        sender: {
-          id: profile.id,
-          full_name: profile.full_name,
-          avatar_url: profile.avatar_url
-        }
-      }]);
-      setReply('');
-
-      const { data, error } = await supabase
-        .from('chat_messages')
-        .insert(payload)
-        .select('*, sender:profiles(id, full_name, avatar_url)')
-        .single();
-
-      if (error) throw error;
-
-      setChatMessages((prev) => prev.map((message) => message.id === tempId ? data : message));
+      const { data } = await supabase.from('chat_messages').insert({ group_id: selectedChat.id, sender_id: profile.id, content }).select();
+      if (data?.[0]) {
+        setChatMessages(prev => prev.map(m => m.id === tempId ? { ...data[0], sender: m.sender } : m));
+      }
       await markChatAsRead(profile.id, selectedChat.id);
-      fetchStudentChats(false);
-    } catch (err) {
-      console.error('Error sending reply:', err);
-      setChatMessages((prev) => prev.filter((message) => !String(message.id).startsWith('temp-')));
-      openPopup('Error', 'Failed to send message', 'error');
-    } finally {
-      setSending(false);
-    }
+      fetchStudentChats();
+    } catch (err) { console.error('Error sending reply:', err); }
   };
+
+  const { isOnline } = usePresenceContext();
 
   const filteredChats = chats.filter(c => {
     if (filter === 'unread') return c.unreadCount > 0;
     if (filter === 'read') return c.unreadCount === 0;
     return true;
+  }).filter(c => {
+    if (!searchQuery) return true;
+    const nameMatch = c.studentNames?.some(n => n.toLowerCase().includes(searchQuery.toLowerCase()));
+    const msgMatch = c.lastMessage?.content?.toLowerCase().includes(searchQuery.toLowerCase());
+    return nameMatch || msgMatch;
   });
 
   const unreadCount = chats.filter(c => c.unreadCount > 0).length;
@@ -388,235 +307,181 @@ const ClearDoubts = () => {
     );
   }
 
-  if (loading) return <LoadingSpinner message="Loading student chats..." />;
-
   return (
-    <div className="space-y-6">
-      {popupNode}
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">Student Chats</h1>
-        <p className="text-slate-500">View all messages from your students</p>
-      </div>
-
-      {/* Filter Tabs */}
-      <div className="flex gap-2 flex-wrap">
-        <button
-          onClick={() => setFilter('all')}
-          className={`px-4 py-2 rounded-lg font-medium transition-all ${
-            filter === 'all'
-              ? 'bg-nani-dark text-white'
-              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-          }`}
-        >
-          All ({chats.length})
-        </button>
-        <button
-          onClick={() => setFilter('unread')}
-          className={`px-4 py-2 rounded-lg font-medium transition-all relative ${
-            filter === 'unread'
-              ? 'bg-red-600 text-white'
-              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-          }`}
-        >
-          Unread ({unreadCount})
-          {unreadCount > 0 && <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">{unreadCount}</span>}
-        </button>
-        <button
-          onClick={() => setFilter('read')}
-          className={`px-4 py-2 rounded-lg font-medium transition-all ${
-            filter === 'read'
-              ? 'bg-nani-dark text-white'
-              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-          }`}
-        >
-          Read ({readCount})
-        </button>
-      </div>
-
-      {filteredChats.length === 0 ? (
-        <div className="bg-white p-8 rounded-xl border border-slate-100 shadow-sm text-center">
-          <MessageCircle className="mx-auto text-slate-300 mb-3" size={48} />
-          <p className="text-slate-600 font-medium">No chats</p>
-          <p className="text-slate-500 text-sm">Messages from students will appear here</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-          {/* Chats List */}
-          <div className="lg:col-span-2 space-y-3">
-            {filteredChats.map(chat => (
-              <div
-                key={chat.id}
-                onClick={() => handleSelectChat(chat)}
-                className={`bg-white p-4 rounded-xl border cursor-pointer transition-all relative ${
-                  selectedChat?.id === chat.id
-                    ? 'border-nani-dark shadow-lg'
-                    : 'border-slate-100 hover:border-slate-300'
-                } ${chat.unreadCount > 0 ? 'bg-blue-50' : ''}`}
-              >
-                {/* Unread Badge */}
-                {chat.unreadCount > 0 && (
-                  <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center font-bold">
-                    •
-                  </div>
-                )}
-                <div className="flex items-start gap-3">
-                  <img
-                    src={chat.lastMessage?.sender?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(chat.chat_members?.[0]?.user_id || 'Student')}`}
-                    alt="Student"
-                    className="w-10 h-10 rounded-full object-cover"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-1">
-                      <p className={`font-semibold ${chat.unreadCount > 0 ? 'text-slate-900 font-bold' : 'text-slate-900'}`}>
-                        {chat.name || 'Group Chat'}
-                        {chat.unreadCount > 0 && <span className="text-red-500 ml-1">●</span>}
-                      </p>
-                    </div>
-                    <p className={`text-sm font-medium mb-2 truncate ${chat.unreadCount > 0 ? 'text-slate-800 font-semibold' : 'text-slate-700'}`}>
-                      {chat.lastMessage?.content || 'No messages yet'}
-                    </p>
-                    <div className="flex items-center gap-4 text-xs text-slate-500">
-                      <span className="flex items-center gap-1">
-                        <Clock size={14} />
-                        {chat.lastMessage?.created_at ? new Date(chat.lastMessage.created_at).toLocaleDateString() : 'N/A'}
-                      </span>
-                      {chat.unreadCount > 0 && (
-                        <span className="flex items-center gap-1 text-red-600 font-medium">
-                          {chat.unreadCount} unread
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Messages Panel */}
-          {selectedChat && (
-            <div className="lg:col-span-3">
-              <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-lg sticky top-4 space-y-4 flex flex-col h-[80vh]">
-                {/* Success Message Toast */}
-                {successMessage && (
-                  <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg flex items-center gap-2">
-                    <CheckCircle size={18} />
-                    <span className="text-sm font-medium">{successMessage}</span>
-                  </div>
-                )}
-
-                <div className="flex items-center justify-between gap-3">
-                  <h3 className="font-bold text-slate-900 flex-1">{selectedChat.name || 'Chat'}</h3>
-                  
-                  {/* Delete Confirmation Dialogs */}
-                  {deleteConfirm && !deleteConfirmFinal && (
-                    <div className="flex gap-2">
-                      <button
-                        onClick={cancelDelete}
-                        className="px-2 py-1 bg-slate-100 text-slate-700 text-xs rounded hover:bg-slate-200 transition-all"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={handleClearChatClick}
-                        className="px-2 py-1 bg-red-100 text-red-600 text-xs rounded hover:bg-red-200 transition-all font-medium"
-                      >
-                        Confirm Delete?
-                      </button>
-                    </div>
-                  )}
-
-                  {deleteConfirmFinal && (
-                    <div className="flex gap-2">
-                      <button
-                        onClick={cancelDelete}
-                        className="px-2 py-1 bg-slate-100 text-slate-700 text-xs rounded hover:bg-slate-200 transition-all"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={handleClearChatClick}
-                        className="px-2 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 transition-all font-bold"
-                      >
-                        Confirm Final Delete
-                      </button>
-                    </div>
-                  )}
-
-                  {!deleteConfirm && !deleteConfirmFinal && (
-                    <button
-                      onClick={handleClearChatClick}
-                      className="px-3 py-1 bg-red-100 text-red-600 text-sm rounded-lg hover:bg-red-200 transition-all"
-                    >
-                      Delete Chat
-                    </button>
-                  )}
-
-                  <button
-                    onClick={() => {
-                      setSelectedChat(null);
-                      setChatMessages([]);
-                      cancelDelete();
-                    }}
-                    className="text-slate-400 hover:text-slate-600 text-xl"
-                  >
-                    ✕
-                  </button>
-                </div>
-
-                {/* Messages Display */}
-                <div ref={messagesContainerRef} className="flex-1 overflow-y-auto space-y-3 bg-slate-50 p-3 rounded-lg">
-                  {chatMessages.length === 0 ? (
-                    <p className="text-center text-slate-500 text-sm">No messages yet</p>
-                  ) : (
-                    chatMessages.map(msg => (
-                      <div key={msg.id} className={`flex ${msg.sender_id === profile.id ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`max-w-xs p-3 rounded-lg ${
-                          msg.sender_id === profile.id
-                            ? 'bg-nani-dark text-white'
-                            : 'bg-white text-slate-900 border border-slate-200'
-                        }`}>
-                          {msg.sender_id !== profile.id && (
-                            <p className="text-xs font-semibold mb-1">{msg.sender?.full_name}</p>
-                          )}
-                          <p className="text-sm break-words">{msg.content || '(no message)'}</p>
-                          <p className="text-xs opacity-70 mt-1">
-                            {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            {msg.sender_id === profile.id ? (
-                              <span className={`ml-2 font-bold ${getOwnMessageStatus(msg).className}`} title={getOwnMessageStatus(msg).label}>
-                                {getOwnMessageStatus(msg).symbol}
-                              </span>
-                            ) : null}
-                          </p>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                  <div ref={messagesEndRef} />
-                </div>
-
-                {/* Reply Input */}
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={reply}
-                    onChange={e => setReply(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && sendReply()}
-                    placeholder="Type your reply..."
-                    className="flex-1 p-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-nani-dark"
-                  />
-                  <button
-                    onClick={sendReply}
-                    disabled={!reply.trim() || sending}
-                    className="bg-nani-dark text-white px-3 py-2 rounded-lg hover:bg-nani-dark/90 disabled:opacity-50 transition-all"
-                  >
-                    <Send size={16} />
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
+    <div className="flex h-[85vh] gap-0 bg-white rounded-xl border overflow-hidden shadow-sm relative box-border">
+      {isOffline && (
+        <div className="absolute top-0 left-0 right-0 z-50 bg-red-600 text-white text-center text-xs py-1.5 font-medium">
+          No internet connection
         </div>
       )}
+      {/* Chat List */}
+      <div className="w-80 border-r bg-white flex flex-col shrink-0">
+        <div className="p-3 border-b shrink-0 bg-white space-y-2">
+          <h2 className="font-bold text-sm text-slate-800">Student Messages</h2>
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search..." className="w-full pl-9 pr-3 py-2 text-sm border-0 bg-slate-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div className="flex gap-1.5">
+            {['all', 'unread', 'read'].map(f => (
+              <button key={f} onClick={() => setFilter(f)}
+                className={`px-3 py-1 text-xs rounded-lg font-medium transition-all ${filter === f ? (f === 'unread' ? 'bg-red-600 text-white' : 'bg-blue-600 text-white') : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+              >
+                {f === 'all' ? `All (${chats.length})` : f === 'unread' ? `Unread (${unreadCount})` : `Read (${readCount})`}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="divide-y overflow-y-auto flex-1">
+          {!chatsLoaded ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : filteredChats.length === 0 ? (
+            <div className="p-8 text-center">
+              <MessageCircle size={32} className="mx-auto mb-2 text-slate-300" />
+              <p className="text-sm text-slate-400">No chats</p>
+            </div>
+          ) : (
+            filteredChats.map(chat => (
+              <button key={chat.id} onClick={() => handleSelectChat(chat)}
+                className={`w-full p-3 text-left hover:bg-slate-50 transition-all flex items-center gap-3 ${selectedChat?.id === chat.id ? 'bg-blue-50' : ''}`}
+              >
+                <div className="w-11 h-11 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white text-sm font-bold shrink-0 shadow-sm">
+                  {(chat.studentNames?.[0] || 'S').charAt(0).toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <p className={`text-sm truncate ${chat.unreadCount > 0 ? 'font-bold' : 'font-semibold'} text-slate-800`}>
+                      {chat.studentNames?.[0] || chat.name || 'Student'}
+                    </p>
+                    {chat.lastMessage && (
+                      <span className="text-[10px] text-slate-400 shrink-0 ml-2">
+                        {new Date(chat.lastMessage.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    )}
+                  </div>
+                  <p className={`text-xs truncate mt-0.5 ${chat.unreadCount > 0 ? 'text-slate-700 font-medium' : 'text-slate-500'}`}>
+                    {chat.lastMessage?.sender_id === profile.id ? 'You: ' : ''}{chat.lastMessage?.content || 'No messages yet'}
+                  </p>
+                </div>
+                {chat.unreadCount > 0 && (
+                  <div className="bg-blue-600 text-white rounded-full min-w-[20px] h-5 flex items-center justify-center text-[10px] font-bold shrink-0 px-1 shadow-sm">
+                    {chat.unreadCount}
+                  </div>
+                )}
+              </button>
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* Chat Area */}
+      {selectedChat ? (
+        <div className="flex-1 flex flex-col min-w-0 h-full bg-white overflow-hidden">
+          <div className="p-3 border-b shrink-0 bg-white flex items-center justify-between px-5">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white text-sm font-bold shadow-sm">
+                {(selectedChat.studentNames?.[0] || 'S').charAt(0).toUpperCase()}
+              </div>
+              <div>
+                <h3 className="font-semibold text-sm text-slate-800">{selectedChat.studentNames?.[0] || selectedChat.name || 'Chat'}</h3>
+                <p className="text-[10px] font-medium">
+                  {otherUserId && isOnline(otherUserId) ? (
+                    <span className="text-green-600">● Online</span>
+                  ) : (
+                    <span className="text-slate-400">Offline</span>
+                  )}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div ref={messagesContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-3 space-y-1 min-h-0 bg-[#e8f4f8]">
+            {loadingOlder && (
+              <div className="flex justify-center py-3">
+                <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+              </div>
+            )}
+            {chatMessages.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-slate-400">
+                <MessageCircle size={40} className="mb-2 text-slate-300" />
+                <p className="text-sm font-medium text-slate-500">No messages yet</p>
+                <p className="text-xs text-slate-400">Send a message to start chatting</p>
+              </div>
+            ) : (
+              chatMessages.map((msg, idx) => {
+                const isMe = msg.sender_id === profile.id;
+                const showDate = idx === 0 || new Date(msg.created_at).toDateString() !== new Date(chatMessages[idx-1]?.created_at).toDateString();
+                const status = (() => {
+                  if (!isMe) return null;
+                  if (String(msg.id).startsWith('temp-')) return <span className="text-slate-400 text-[9px] ml-1">✓</span>;
+                  if (receiverReadAt && new Date(receiverReadAt) >= new Date(msg.created_at)) return <span className="text-blue-300 text-[9px] ml-1 font-bold">✓✓</span>;
+                  return <span className="text-slate-400 text-[9px] ml-1">✓✓</span>;
+                })();
+                return (
+                  <React.Fragment key={msg.id}>
+                    {showDate && (
+                      <div className="flex justify-center my-3">
+                        <span className="text-[10px] bg-white/80 text-slate-500 px-3 py-1 rounded-full shadow-sm">
+                          {new Date(msg.created_at).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                        </span>
+                      </div>
+                    )}
+                    <div className={`flex ${isMe ? 'justify-end' : 'justify-start'} animate-in`}>
+                      <div className={`max-w-[75%] px-3.5 py-2.5 shadow-sm ${
+                        isMe ? 'bg-[#d9fdd3] text-slate-900 rounded-2xl rounded-br-md' : 'bg-white text-slate-900 rounded-2xl rounded-bl-md'
+                      }`}>
+                        <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{msg.content || msg.message || ''}</p>
+                        <div className={`flex items-center gap-1 mt-0.5 ${isMe ? 'justify-end' : 'justify-start'}`}>
+                          <span className="text-[9px] text-slate-400">
+                            {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                          {status}
+                        </div>
+                      </div>
+                    </div>
+                  </React.Fragment>
+                );
+              })
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+
+          <div className="p-2 border-t bg-white shrink-0 px-3">
+            <div className="flex gap-2 items-center">
+              <input
+                type="text" value={reply} onChange={e => setReply(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendReply(); } }}
+                placeholder="Type a message"
+                className="flex-1 border-0 rounded-lg px-3 py-2 text-sm bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button onClick={sendReply} disabled={!reply.trim()}
+                className="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md">
+                <Send size={16} />
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="flex-1 bg-[#e8f4f8] flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-24 h-24 rounded-full bg-white flex items-center justify-center mx-auto mb-5 shadow-md">
+              <MessageCircle size={44} className="text-blue-500" />
+            </div>
+            <p className="text-xl font-bold text-slate-700">Student Messages</p>
+            <p className="text-sm text-slate-500 mt-2">Select a conversation from the left</p>
+          </div>
+        </div>
+      )}
+
+      <style>{`
+        @keyframes in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-in { animation: in 0.15s ease-out; }
+      `}</style>
     </div>
   );
 };

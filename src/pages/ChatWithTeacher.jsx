@@ -2,9 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../context/AuthContext';
-import { Send, MessageCircle, CheckCircle } from 'lucide-react';
-import LoadingSpinner from '../components/LoadingSpinner';
-import { getChatReadTimes, markChatAsRead } from '../utils/chatReadState';
+import { Send, MessageCircle } from 'lucide-react';
+import { markChatAsRead } from '../utils/chatReadState';
+import { usePresenceContext } from '../context/PresenceContext';
 import { buildPlanCheckoutPath } from '../utils/planCheckout';
 
 const ChatWithTeacher = () => {
@@ -15,53 +15,57 @@ const ChatWithTeacher = () => {
   const [newMessage, setNewMessage] = useState('');
   const [groupId, setGroupId] = useState(null);
   const [teacher, setTeacher] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const messagesEndRef = useRef(null);
-  const messagesContainerRef = useRef(null);
-  const [deleteConfirm, setDeleteConfirm] = useState(false);
-  const [deleteConfirmFinal, setDeleteConfirmFinal] = useState(false);
-  const [successMessage, setSuccessMessage] = useState('');
   const [error, setError] = useState(null);
   const [receiverReadAt, setReceiverReadAt] = useState(null);
+  const [hasMoreOldMessages, setHasMoreOldMessages] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const [isAtBottom, setIsAtBottom] = useState(true);
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
+  const autoLoadRef = useRef(0);
 
-  const [initialLoad, setInitialLoad] = useState(true);
+  const { isOnline } = usePresenceContext();
   const premiumAccess = isPremiumPlus(profile);
 
-  const fetchMessageWithSender = async (messageId) => {
-    const { data } = await supabase
-      .from('chat_messages')
-      .select('id, group_id, content, sender_id, created_at, sender:profiles(full_name, avatar_url)')
-      .eq('id', messageId)
-      .maybeSingle();
-    return data;
+  const scrollToBottom = () => {
+    requestAnimationFrame(() => messagesEndRef.current?.scrollIntoView({ behavior: 'auto' }));
   };
 
-  const appendMessageOnce = (message) => {
-    if (!message?.id) return;
-    setMessages((prev) => {
-      if (prev.some((item) => item.id === message.id)) return prev;
-      return [...prev, message];
-    });
-  };
+  useEffect(() => { if (isAtBottom) scrollToBottom(); }, [messages]);
+
+  useEffect(() => {
+    if (!messagesContainerRef.current || !hasMoreOldMessages || loadingOlder || autoLoadRef.current >= 3) return;
+    if (messagesContainerRef.current.scrollHeight <= messagesContainerRef.current.clientHeight + 1) {
+      autoLoadRef.current++;
+      loadOlderMessages();
+    }
+  }, [messages, hasMoreOldMessages, loadingOlder]);
+
+  useEffect(() => {
+    const goOnline = () => setIsOffline(false);
+    const goOffline = () => setIsOffline(true);
+    window.addEventListener('online', goOnline);
+    window.addEventListener('offline', goOffline);
+    return () => { window.removeEventListener('online', goOnline); window.removeEventListener('offline', goOffline); };
+  }, []);
 
   const loadReceiverReadState = async (currentGroupId = groupId) => {
     if (!currentGroupId || !teacher?.id) return;
     try {
-      const readTimes = await getChatReadTimes(teacher.id, [currentGroupId]);
-      setReceiverReadAt(readTimes.get(currentGroupId) || null);
-    } catch {
-      setReceiverReadAt(null);
-    }
+      const { data } = await supabase
+        .from('chat_read_states')
+        .select('user_id, last_read_at')
+        .eq('group_id', currentGroupId).neq('user_id', profile.id)
+        .order('last_read_at', { ascending: false }).limit(1);
+      setReceiverReadAt(data?.[0]?.last_read_at || null);
+    } catch { setReceiverReadAt(null); }
   };
 
   const getOwnMessageStatus = (message) => {
-    if (String(message.id || '').startsWith('temp-')) {
-      return { label: 'Sending', symbol: '✓', className: 'text-slate-400' };
-    }
-    if (receiverReadAt && new Date(receiverReadAt) >= new Date(message.created_at)) {
-      return { label: 'Read', symbol: '✓✓', className: 'text-sky-300' };
-    }
-    return { label: 'Sent', symbol: '✓✓', className: 'text-slate-300' };
+    if (String(message.id || '').startsWith('temp-')) return <span className="text-slate-400 text-[9px] ml-1">✓</span>;
+    if (receiverReadAt && new Date(receiverReadAt) >= new Date(message.created_at)) return <span className="text-blue-300 text-[9px] ml-1 font-bold">✓✓</span>;
+    return <span className="text-slate-400 text-[9px] ml-1">✓✓</span>;
   };
 
   if (profile?.role === 'student' && !premiumAccess) {
@@ -71,361 +75,188 @@ const ChatWithTeacher = () => {
           <MessageCircle size={24} />
         </div>
         <h1 className="mt-4 text-2xl font-bold text-slate-900">Premium Plus Required</h1>
-        <p className="mt-3 text-sm text-slate-600">
-          Ask a Doubt is available only for Premium Plus students.
-        </p>
-        <button
-          type="button"
-          onClick={() => navigate(buildPlanCheckoutPath('premium_plus'))}
-          className="mt-5 rounded-xl bg-amber-500 px-5 py-3 text-sm font-semibold text-white hover:bg-amber-600"
-        >
+        <p className="mt-3 text-sm text-slate-600">Ask a Doubt is available only for Premium Plus students.</p>
+        <button type="button" onClick={() => navigate(buildPlanCheckoutPath('premium_plus'))}
+          className="mt-5 rounded-xl bg-amber-500 px-5 py-3 text-sm font-semibold text-white hover:bg-amber-600">
           Upgrade to Premium Plus
         </button>
       </div>
     );
   }
 
-  const setChatReadTime = async (currentGroupId, readAt = new Date().toISOString()) => {
-    await markChatAsRead(profile?.id, currentGroupId, readAt);
-  };
-
-  const getChatClearedAt = (gid) => {
-    if (!profile?.id || !gid) return null;
-    const key = `chatClearedAt_${profile.id}_${gid}`;
-    try {
-      return localStorage.getItem(key);
-    } catch {
-      return null;
-    }
-  };
-
-  const setChatClearedAt = (gid, isoTime) => {
-    if (!profile?.id || !gid) return;
-    const key = `chatClearedAt_${profile.id}_${gid}`;
-    try {
-      localStorage.setItem(key, isoTime || new Date().toISOString());
-    } catch {
-      // ignore storage errors
-    }
-  };
-
-  const scrollToBottom = (smooth = false) => {
-    const el = messagesContainerRef.current;
-    if (el) {
-      el.scrollTo({ top: el.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
-    } else if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto' });
-    }
-  };
-
   useEffect(() => {
-    // Only auto-scroll if not the initial load
-    if (!initialLoad && messages.length > 0) {
-      requestAnimationFrame(() => scrollToBottom(true));
-    }
-  }, [messages, initialLoad]);
-
-  useEffect(() => {
-    // Re-initialize chat only when relevant profile keys change.
+    if (!profile?.id) return;
     setMessages([]);
     setGroupId(null);
     setTeacher(null);
-    setLoading(true);
-    setDeleteConfirm(false);
-    setDeleteConfirmFinal(false);
-    setSuccessMessage('');
     setError(null);
-    setInitialLoad(true);
     initChat();
   }, [profile?.id, profile?.assigned_teacher_id]);
 
   useEffect(() => {
-    if (groupId) {
-      loadMessages();
-      loadReceiverReadState(groupId);
-      const subscription = supabase
-        .channel(`chat:${groupId}`)
-        .on('postgres_changes', {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'chat_messages',
-          filter: `group_id=eq.${groupId}`
-        }, async payload => {
-          if (payload.new.sender_id === profile?.id) {
-            // Own message is added optimistically in sendMessage().
-            return;
-          }
-          const clearedAt = getChatClearedAt(groupId);
-          if (!clearedAt || new Date(payload.new.created_at) > new Date(clearedAt)) {
-            appendMessageOnce((await fetchMessageWithSender(payload.new.id)) || payload.new);
-          }
-          // Mark chat as read when viewing the page and receiving new messages
-          void setChatReadTime(groupId);
-        })
-        .subscribe();
-
-      return () => subscription.unsubscribe();
-    }
+    if (!groupId) return;
+    autoLoadRef.current = 0;
+    loadMessages();
   }, [groupId]);
 
+  // Poll every 3s for live updates
   useEffect(() => {
-    if (!groupId || !profile?.id) return undefined;
-    const interval = window.setInterval(() => {
-      loadMessages(false);
-      loadReceiverReadState(groupId);
-    }, 2000);
-    return () => window.clearInterval(interval);
+    if (!groupId || !profile?.id) return;
+    loadMessages();
+    const interval = setInterval(() => loadNewMessagesOnly(), 3000);
+    return () => clearInterval(interval);
+  }, [groupId, profile?.id]);
+
+  useEffect(() => {
+    if (!groupId || !profile?.id) return;
+    const interval = setInterval(() => loadReceiverReadState(groupId), 30000);
+    return () => clearInterval(interval);
   }, [groupId, profile?.id, teacher?.id]);
 
-  // On unmount, persist latest read time to clear badges
   useEffect(() => {
-    return () => {
-      if (groupId) {
-        void setChatReadTime(groupId);
-      }
-    };
+    return () => { if (groupId) void markChatAsRead(profile?.id, groupId); };
   }, [groupId]);
 
-
   const initChat = async () => {
-    if (!profile) {
-      setLoading(false);
-      return;
-    }
-    
-    console.log('Profile:', profile);
-    console.log('Assigned Teacher ID:', profile.assigned_teacher_id);
-    
-    if (!profile.assigned_teacher_id) {
-      setLoading(false);
-      return;
-    }
-    
+    if (!profile?.assigned_teacher_id) return;
     try {
-      setLoading(true);
       setError(null);
-      
-      // Get assigned teacher and find existing group in parallel
       const [teacherResponse, myGroupsResponse] = await Promise.all([
-        supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', profile.assigned_teacher_id)
-          .single(),
-        supabase
-          .from('chat_members')
-          .select('group_id')
-          .eq('user_id', profile.id)
+        supabase.from('profiles').select('*').eq('id', profile.assigned_teacher_id).single(),
+        supabase.from('chat_members').select('group_id').eq('user_id', profile.id)
       ]);
-      
       if (teacherResponse.error) {
-        console.error('Teacher fetch error:', teacherResponse.error);
         setError('Unable to find your assigned teacher. Please contact support.');
-        setLoading(false);
         return;
       }
-      
-      console.log('Teacher Data:', teacherResponse.data);
       setTeacher(teacherResponse.data);
 
       let groupIdToUse = null;
-      
-      // Check if teacher is in any of my groups
-      if (myGroupsResponse.data && myGroupsResponse.data.length > 0) {
-        const myGroupIds = myGroupsResponse.data.map(g => g.group_id);
-        
-        // Find which of these groups also has the teacher - single query
+      if (myGroupsResponse.data?.length > 0) {
+        const myGids = myGroupsResponse.data.map(g => g.group_id);
         const { data: teacherInGroups } = await supabase
-          .from('chat_members')
-          .select('group_id')
-          .eq('user_id', profile.assigned_teacher_id)
-          .in('group_id', myGroupIds);
-        
-        if (teacherInGroups && teacherInGroups.length > 0) {
-          groupIdToUse = teacherInGroups[0].group_id;
-        }
+          .from('chat_members').select('group_id')
+          .eq('user_id', profile.assigned_teacher_id).in('group_id', myGids);
+        if (teacherInGroups?.length > 0) groupIdToUse = teacherInGroups[0].group_id;
       }
 
-      // Create new group if none exists
       if (!groupIdToUse) {
-        const { data: newGroup, error: createError } = await supabase
-          .from('chat_groups')
-          .insert({ 
-            group_type: 'student_teacher',
-            name: `${profile.full_name} - ${teacherResponse.data.full_name}`,
-            created_by: profile.id
-          })
-          .select()
-          .single();
-
-        if (createError) {
-          console.error('Error creating group:', createError);
-          setError('Unable to create chat. Please try again or contact support.');
-          setLoading(false);
-          return;
-        }
-
+        const { data: newGroup } = await supabase
+          .from('chat_groups').insert({
+            group_type: 'student_teacher', name: `${profile.full_name} - ${teacherResponse.data.full_name}`, created_by: profile.id
+          }).select().single();
         if (newGroup) {
-          const { error: memberError } = await supabase.from('chat_members').insert([
+          await supabase.from('chat_members').insert([
             { group_id: newGroup.id, user_id: profile.id },
             { group_id: newGroup.id, user_id: profile.assigned_teacher_id }
           ]);
-          
-          if (memberError) {
-            console.error('Error adding members:', memberError);
-            setLoading(false);
-            return;
-          }
-          
           groupIdToUse = newGroup.id;
         }
       }
-
-      if (groupIdToUse) {
-        setGroupId(groupIdToUse);
-      } else {
-        setLoading(false);
-      }
-    } catch (error) {
-      console.error('Error initializing chat:', error);
+      if (groupIdToUse) setGroupId(groupIdToUse);
+    } catch (err) {
+      console.error('Error initializing chat:', err);
       setError('Failed to load chat. Please refresh the page.');
-      setLoading(false);
     }
   };
 
-  const loadMessages = async (showLoadingState = true) => {
-    if (!groupId) {
-      if (showLoadingState) setLoading(false);
-      return;
-    }
-    
+  const loadMessages = async () => {
+    if (!groupId) return;
     try {
       const { data } = await supabase
         .from('chat_messages')
-        .select('id, content, sender_id, created_at, sender:profiles(full_name, avatar_url)')
+        .select('*, profiles(full_name, avatar_url)')
         .eq('group_id', groupId)
-        .order('created_at', { ascending: true });
-      const clearedAt = getChatClearedAt(groupId);
-      const filteredMessages = (data || []).filter((msg) => {
-        if (!clearedAt) return true;
-        return new Date(msg.created_at) > new Date(clearedAt);
-      });
-      setMessages(filteredMessages);
-      // Mark chat as read on load so sidebar badge clears
-      await setChatReadTime(groupId);
+        .order('created_at', { ascending: false })
+        .limit(8);
+      setMessages((data || []).reverse());
+      setHasMoreOldMessages((data || []).length === 8);
+      await markChatAsRead(profile.id, groupId);
       await loadReceiverReadState(groupId);
-      if (initialLoad) {
-        setInitialLoad(false);
-      }
-    } catch (error) {
-      console.error('Error loading messages:', error);
-    } finally {
-      if (showLoadingState) setLoading(false);
-    }
+    } catch (err) { console.error('Error loading messages:', err); }
   };
 
-  const permanentlyDeleteChat = async () => {
+  const loadNewMessagesOnly = async () => {
     if (!groupId) return;
-
+    if (!messages.length) { await loadMessages(); return; }
+    const latest = messages[messages.length - 1];
+    if (String(latest.id).startsWith('temp-')) return;
     try {
-      // Always clear locally for current student view, even if DB delete is blocked by RLS.
-      const clearedAt = new Date().toISOString();
-      setChatClearedAt(groupId, clearedAt);
-
-      const { error } = await supabase
+      const { data } = await supabase
         .from('chat_messages')
-        .delete()
-        .eq('group_id', groupId);
-
-      if (error) {
-        console.warn('Server delete blocked/failed; applied local clear only:', error.message);
+        .select('*, profiles(full_name, avatar_url)')
+        .eq('group_id', groupId)
+        .gt('id', latest.id)
+        .order('created_at', { ascending: true });
+      if (data?.length) {
+        setMessages(prev => [...prev, ...data]);
       }
-
-      setMessages([]);
-      setDeleteConfirm(false);
-      setDeleteConfirmFinal(false);
-      setSuccessMessage('Chat cleared successfully!');
-      setTimeout(() => setSuccessMessage(''), 3000);
-    } catch (err) {
-      console.error('Error deleting chat:', err);
-      setError('Failed to clear chat. Please try again.');
-      setDeleteConfirm(false);
-      setDeleteConfirmFinal(false);
-    }
+      await markChatAsRead(profile.id, groupId);
+    } catch (err) { console.error('Error refreshing messages:', err); }
   };
 
-  const handleClearChatClick = () => {
-    if (!deleteConfirm) {
-      setDeleteConfirm(true);
-    } else if (!deleteConfirmFinal) {
-      setDeleteConfirmFinal(true);
-    } else {
-      permanentlyDeleteChat();
-    }
+  const loadOlderMessages = async () => {
+    if (!groupId || !messages.length || loadingOlder) return;
+    setLoadingOlder(true);
+    try {
+      const oldest = messages[0];
+      const { data } = await supabase
+        .from('chat_messages')
+        .select('*, profiles(full_name, avatar_url)')
+        .eq('group_id', groupId)
+        .lt('id', oldest.id)
+        .order('created_at', { ascending: false })
+        .limit(20);
+      if (data?.length) {
+        setMessages(prev => [...data.reverse(), ...prev]);
+        if (data.length < 20) setHasMoreOldMessages(false);
+      } else {
+        setHasMoreOldMessages(false);
+      }
+    } catch (err) { console.error('Error loading older messages:', err); }
+    finally { setLoadingOlder(false); }
   };
 
-  const cancelDelete = () => {
-    setDeleteConfirm(false);
-    setDeleteConfirmFinal(false);
+  const handleScroll = () => {
+    if (!messagesContainerRef.current) return;
+    const el = messagesContainerRef.current;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    setIsAtBottom(atBottom);
+    if (el.scrollTop < 50 && hasMoreOldMessages && !loadingOlder) {
+      loadOlderMessages();
+    }
   };
 
   const sendMessage = async () => {
     if (!newMessage.trim() || !groupId) return;
     const content = newMessage.trim();
     const tempId = `temp-${Date.now()}`;
-    const optimisticMsg = {
-      id: tempId,
-      group_id: groupId,
-      sender_id: profile.id,
-      content,
+    setMessages(prev => [...prev, {
+      id: tempId, group_id: groupId, sender_id: profile.id, content,
       created_at: new Date().toISOString(),
-      sender: {
-        full_name: profile.full_name,
-        avatar_url: profile.avatar_url
-      }
-    };
-
-    setMessages(prev => [...prev, optimisticMsg]);
+      profiles: { full_name: profile.full_name, avatar_url: profile.avatar_url }
+    }]);
     setNewMessage('');
+    setHasMoreOldMessages(true);
+    scrollToBottom();
     setError(null);
-
-    const { data: savedMessage, error: sendError } = await supabase
-      .from('chat_messages')
-      .insert({
-        group_id: groupId,
-        sender_id: profile.id,
-        content
-      })
-      .select('id, group_id, content, sender_id, created_at, sender:profiles(full_name, avatar_url)')
-      .single();
-
-    if (sendError) {
-      setMessages(prev => prev.filter(m => m.id !== tempId));
-      setNewMessage(content);
-      console.error('Error sending message:', sendError);
+    try {
+      const { data } = await supabase.from('chat_messages').insert({ group_id: groupId, sender_id: profile.id, content }).select();
+      if (data?.[0]) {
+        setMessages(prev => prev.map(m => m.id === tempId ? { ...data[0], profiles: m.profiles } : m));
+      }
+      await markChatAsRead(profile.id, groupId);
+    } catch (err) {
       setError('Failed to send message. Please try again.');
-      return;
+      console.error('Error sending message:', err);
     }
-
-    setMessages((prev) => prev.map((message) => (message.id === tempId ? savedMessage : message)));
-    void setChatReadTime(groupId);
   };
 
-  if (!profile) {
-    return <LoadingSpinner message="Setting up your chat..." />;
-  }
-
   const openAdminChatMonitor = () => {
-    const targetUserId = profile?.id;
     try {
-      if (targetUserId) {
-        sessionStorage.setItem(ADMIN_USER_ACCESS_TARGET_KEY, targetUserId);
-      } else {
-        sessionStorage.removeItem(ADMIN_USER_ACCESS_TARGET_KEY);
-      }
-    } catch {
-      // Ignore storage failures and still navigate.
-    }
+      if (profile?.id) sessionStorage.setItem(ADMIN_USER_ACCESS_TARGET_KEY, profile.id);
+      else sessionStorage.removeItem(ADMIN_USER_ACCESS_TARGET_KEY);
+    } catch {}
     stopImpersonation();
     navigate('/app/admin/user-access');
   };
@@ -435,29 +266,19 @@ const ChatWithTeacher = () => {
       <div className="bg-white rounded-xl p-8 text-center">
         <MessageCircle className="mx-auto mb-4 text-amber-500" size={48} />
         <h2 className="text-xl font-bold mb-2">Student Chat Is Read-Only In Admin View</h2>
-        <p className="text-slate-600 mb-4">
-          Admin impersonation keeps the real admin login active, so this page cannot safely create a student chat session.
-        </p>
-        <button
-          type="button"
-          onClick={openAdminChatMonitor}
-          className="inline-flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-        >
-          Open Admin Chat Monitor
-        </button>
+        <p className="text-slate-600 mb-4">Admin impersonation keeps the real admin login active, so this page cannot safely create a student chat session.</p>
+        <button type="button" onClick={openAdminChatMonitor} className="inline-flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Open Admin Chat Monitor</button>
       </div>
     );
   }
 
-  if (!profile.assigned_teacher_id) {
+  if (!profile?.assigned_teacher_id) {
     return (
       <div className="bg-white rounded-xl p-8 text-center">
         <MessageCircle className="mx-auto mb-4 text-slate-400" size={48} />
         <h2 className="text-xl font-bold mb-2">No Teacher Assigned Yet</h2>
         <p className="text-slate-600 mb-4">A teacher will be assigned to you soon!</p>
-        <a href="/app/request-teacher" className="text-blue-600 hover:underline">
-          Request a teacher now →
-        </a>
+        <a href="/app/request-teacher" className="text-blue-600 hover:underline">Request a teacher now →</a>
       </div>
     );
   }
@@ -468,152 +289,105 @@ const ChatWithTeacher = () => {
         <MessageCircle className="mx-auto mb-4 text-red-400" size={48} />
         <h2 className="text-xl font-bold mb-2 text-red-600">Chat Error</h2>
         <p className="text-slate-600 mb-4">{error}</p>
-        <button 
-          onClick={() => window.location.reload()} 
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-        >
-          Refresh Page
-        </button>
+        <button onClick={() => window.location.reload()} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Refresh Page</button>
       </div>
     );
   }
 
-  if (loading) {
-    return <LoadingSpinner message="Loading chat..." />;
-  }
-
-  if (!teacher) {
-    return (
-      <div className="bg-white rounded-xl p-8 text-center">
-        <MessageCircle className="mx-auto mb-4 text-slate-400" size={48} />
-        <h2 className="text-xl font-bold mb-2">Unable to load chat</h2>
-        <p className="text-slate-600 mb-4">Please refresh or try again in a moment.</p>
-        <button
-          onClick={() => initChat()}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-        >
-          Retry
-        </button>
-      </div>
-    );
-  }
+  if (!groupId) return null;
 
   return (
-    <div className="bg-white rounded-xl border flex flex-col h-[calc(100vh-200px)]">
-      <div className="p-6 border-b space-y-2">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text-2xl font-bold">Chat with {teacher?.full_name || 'Teacher'}</h2>
-            <p className="text-sm text-slate-500">Ask your doubts and get instant help</p>
-          </div>
-          
-          {/* Delete Confirmation Dialogs */}
-          {deleteConfirm && !deleteConfirmFinal && (
-            <div className="flex gap-2">
-              <button
-                onClick={cancelDelete}
-                className="px-3 py-1 bg-slate-100 text-slate-700 text-sm rounded hover:bg-slate-200 transition-all"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleClearChatClick}
-                className="px-3 py-1 bg-red-100 text-red-600 text-sm rounded hover:bg-red-200 transition-all font-medium"
-              >
-                Confirm Delete?
-              </button>
-            </div>
-          )}
-
-          {deleteConfirmFinal && (
-            <div className="flex gap-2">
-              <button
-                onClick={cancelDelete}
-                className="px-3 py-1 bg-slate-100 text-slate-700 text-sm rounded hover:bg-slate-200 transition-all"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleClearChatClick}
-                className="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition-all font-bold"
-              >
-                Confirm Final Delete
-              </button>
-            </div>
-          )}
-
-          {!deleteConfirm && !deleteConfirmFinal && (
-            <button
-              onClick={handleClearChatClick}
-              className="px-3 py-1 bg-red-100 text-red-600 text-sm rounded-lg hover:bg-red-200 transition-all"
-            >
-              Delete Chat
-            </button>
-          )}
+    <div className="flex flex-col h-[85vh] bg-white rounded-xl border overflow-hidden shadow-sm relative box-border">
+      {isOffline && (
+        <div className="absolute top-0 left-0 right-0 z-50 bg-red-600 text-white text-center text-xs py-1.5 font-medium">
+          No internet connection
         </div>
-        
-        {/* Success Message */}
-        {successMessage && (
-          <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-2 rounded-lg flex items-center gap-2">
-            <CheckCircle size={18} />
-            <span className="text-sm font-medium">{successMessage}</span>
+      )}
+      {/* Header */}
+      <div className="p-3 border-b shrink-0 bg-white flex items-center justify-between px-5">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white text-sm font-bold shadow-sm">
+            {teacher?.full_name?.charAt(0)?.toUpperCase() || 'T'}
           </div>
-        )}
+          <div>
+            <h3 className="font-semibold text-sm text-slate-800">{teacher?.full_name || 'Your Teacher'}</h3>
+            <p className="text-[10px] font-medium">
+              {teacher?.id && isOnline(teacher.id) ? (
+                <span className="text-green-600">● Online</span>
+              ) : (
+                <span className="text-slate-400">Offline</span>
+              )}
+            </p>
+          </div>
+        </div>
       </div>
 
-      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-6 space-y-4">
-        {messages.map(msg => {
-          const isMe = msg.sender_id === profile.id;
-          const senderProfile = msg.sender || msg.profiles;
-          const text = msg.content || '';
-          return (
-            <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-              <div className={`flex gap-3 max-w-[70%] ${isMe ? 'flex-row-reverse' : ''}`}>
-                <img 
-                  src={senderProfile?.avatar_url || 'https://via.placeholder.com/40'} 
-                  alt={senderProfile?.full_name || 'User'}
-                  className="w-10 h-10 rounded-full object-cover flex-shrink-0"
-                />
-                <div>
-                  <div className={`p-4 rounded-lg ${
-                    isMe ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-900'
-                  }`}>
-                    <p className="text-sm">{text}</p>
+      {/* Messages */}
+      <div ref={messagesContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-3 space-y-1 min-h-0 bg-[#e8f4f8]">
+        {loadingOlder && (
+          <div className="flex justify-center py-3">
+            <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          </div>
+        )}
+        {messages.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full text-slate-400">
+            <MessageCircle size={40} className="mb-2 text-slate-300" />
+            <p className="text-sm font-medium text-slate-500">No messages yet</p>
+            <p className="text-xs text-slate-400">Send a message to start chatting with your teacher</p>
+          </div>
+        ) : (
+          messages.map((msg, idx) => {
+            const isMe = msg.sender_id === profile.id;
+            const showDate = idx === 0 || new Date(msg.created_at).toDateString() !== new Date(messages[idx-1]?.created_at).toDateString();
+            return (
+              <React.Fragment key={msg.id}>
+                {showDate && (
+                  <div className="flex justify-center my-3">
+                    <span className="text-[10px] bg-white/80 text-slate-500 px-3 py-1 rounded-full shadow-sm">
+                      {new Date(msg.created_at).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                    </span>
                   </div>
-                  <p className="text-[10px] text-slate-500 mt-1">
-                    {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    {isMe ? (
-                      <span className={`ml-2 font-bold ${getOwnMessageStatus(msg).className}`} title={getOwnMessageStatus(msg).label}>
-                        {getOwnMessageStatus(msg).symbol}
+                )}
+                <div className={`flex ${isMe ? 'justify-end' : 'justify-start'} animate-in`}>
+                  <div className={`max-w-[75%] px-3.5 py-2.5 shadow-sm ${
+                    isMe ? 'bg-[#d9fdd3] text-slate-900 rounded-2xl rounded-br-md' : 'bg-white text-slate-900 rounded-2xl rounded-bl-md'
+                  }`}>
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{msg.content}</p>
+                    <div className={`flex items-center gap-1 mt-0.5 ${isMe ? 'justify-end' : 'justify-start'}`}>
+                      <span className="text-[9px] text-slate-400">
+                        {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
-                    ) : null}
-                  </p>
+                      {isMe && getOwnMessageStatus(msg)}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
-          );
-        })}
+              </React.Fragment>
+            );
+          })
+        )}
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="p-6 border-t bg-slate-50">
-        <div className="flex gap-3">
-          <input 
-            type="text"
-            value={newMessage}
-            onChange={e => setNewMessage(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && sendMessage()}
-            placeholder="Type your message..."
-            className="flex-1 border border-slate-200 rounded-lg p-3 focus:outline-none focus:border-nani-dark text-sm"
+      {/* Input */}
+      <div className="p-2 border-t bg-white shrink-0 px-3">
+        <div className="flex gap-2 items-center">
+          <input
+            type="text" value={newMessage} onChange={e => setNewMessage(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
+            placeholder="Type a message"
+            className="flex-1 border-0 rounded-lg px-3 py-2 text-sm bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
-          <button 
-            onClick={sendMessage}
-            className="bg-nani-dark text-white px-4 py-3 rounded-lg hover:bg-nani-dark/90 transition-all"
-          >
-            <Send size={20} />
+          <button onClick={sendMessage} disabled={!newMessage.trim()}
+            className="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md">
+            <Send size={16} />
           </button>
         </div>
       </div>
+
+      <style>{`
+        @keyframes in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-in { animation: in 0.15s ease-out; }
+      `}</style>
     </div>
   );
 };

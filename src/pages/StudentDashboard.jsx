@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabaseClient';
 import { Link } from 'react-router-dom';
 import { PlayCircle, Clock, Award, Zap, Calendar, MessageCircle, CheckCircle, AlertCircle, RotateCcw, FileText, Copy, Share2 } from 'lucide-react';
+import { useChatOverlay } from '../context/ChatOverlayContext';
 import { format, addDays } from 'date-fns';
 import PremiumGiftCelebration from '../components/PremiumGiftCelebration';
 import StudentExperienceHub from '../components/StudentExperienceHub';
@@ -23,6 +24,7 @@ const OfferCongrats = ({ offer }) => (
 
 const StudentDashboard = () => {
   const { profile, isPremium } = useAuth();
+  const { openChat } = useChatOverlay();
   const [courses, setCourses] = useState([]);
   const [teacher, setTeacher] = useState(null);
   const [showWelcome, setShowWelcome] = useState(false);
@@ -574,15 +576,20 @@ const StudentDashboard = () => {
                   </h3>
                   {teacher ? (
                       <div className="text-center">
-                          <img src={teacher.avatar_url || "https://via.placeholder.com/60"} className="w-20 h-20 rounded-full mx-auto mb-2 object-cover" />
-                          <p className="font-bold">{teacher.full_name}</p>
-                          <p className="text-xs text-slate-500 mb-4">Senior Instructor</p>
-                          <Link
-                              to="/app/chat"
-                              className="w-full bg-nani-light text-white py-2 rounded-lg text-sm flex items-center justify-center gap-2 hover:bg-opacity-90"
+                          <div
+                            onClick={() => openChat(teacher.id, teacher.full_name, teacher.avatar_url)}
+                            className="cursor-pointer group"
+                          >
+                            <img src={teacher.avatar_url || "https://via.placeholder.com/60"} className="w-20 h-20 rounded-full mx-auto mb-2 object-cover group-hover:ring-2 group-hover:ring-blue-400 transition-all" />
+                            <p className="font-bold group-hover:text-blue-600 transition-colors">{teacher.full_name}</p>
+                            <p className="text-xs text-slate-500 mb-4">Click to chat ✦</p>
+                          </div>
+                          <button
+                              onClick={() => openChat(teacher.id, teacher.full_name, teacher.avatar_url)}
+                              className="w-full bg-gradient-to-r from-blue-600 to-blue-500 text-white py-2.5 rounded-xl text-sm flex items-center justify-center gap-2 hover:from-blue-700 hover:to-blue-600 transition-all shadow-md"
                           >
                               <MessageCircle size={16} /> Ask a Doubt
-                          </Link>
+                          </button>
                       </div>
                   ) : (
                       <div className="text-center py-4">
