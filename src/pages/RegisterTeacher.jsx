@@ -5,6 +5,7 @@ import AlertModal from '../components/AlertModal';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { uploadAvatarForUser } from '../utils/avatarUpload';
 import { validateRotatingAccessCode } from '../utils/rotatingAccessCode';
+import { logWarn } from '../utils/errorLogger';
 
 const RegisterTeacher = () => {
   const navigate = useNavigate();
@@ -92,7 +93,7 @@ const RegisterTeacher = () => {
           }
         });
       } catch (metadataError) {
-        console.warn('Teacher metadata sync warning:', metadataError.message || metadataError);
+        logWarn({ message: 'Teacher metadata sync warning:', source: 'RegisterTeacher', details: metadataError.message || metadataError })
       }
       
       const { error: profileError } = await supabase.from('profiles').upsert({

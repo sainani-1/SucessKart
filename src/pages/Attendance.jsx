@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import AlertModal from '../components/AlertModal';
 import { ClipboardList, CheckCircle, XCircle, User, Calendar, Clock, Save, X, Download } from 'lucide-react';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { logError } from '../utils/errorLogger';
 
 const formatDateTime = (value) => {
   if (!value) return '—';
@@ -162,7 +163,7 @@ const Attendance = () => {
           .is('reverted_at', null);
 
         if (reassignmentError) {
-          console.error('Error loading attendance reassignments:', reassignmentError);
+          logError({ message: 'Error loading attendance reassignments:', source: 'Attendance', details: reassignmentError });
         } else {
           reassignmentMap = (reassignments || []).reduce((acc, item) => {
             acc[item.session_id] = item;
@@ -459,7 +460,7 @@ const Attendance = () => {
         .eq('session_id', session.id);
 
       if (participantError) {
-        console.error('Error loading class participants:', participantError);
+        logError({ message: 'Error loading class participants:', source: 'Attendance', details: participantError });
         return [];
       }
 
@@ -475,7 +476,7 @@ const Attendance = () => {
         .order('full_name');
 
       if (profileError) {
-        console.error('Error loading participant profiles:', profileError);
+        logError({ message: 'Error loading participant profiles:', source: 'Attendance', details: profileError });
         return [];
       }
 
@@ -520,7 +521,7 @@ const Attendance = () => {
         .order('full_name');
 
       if (attendanceProfilesError) {
-        console.error('Error loading attendance student profiles:', attendanceProfilesError);
+        logError({ message: 'Error loading attendance student profiles:', source: 'Attendance', details: attendanceProfilesError });
       } else {
         attendanceStudents = attendanceProfiles || [];
       }
@@ -547,7 +548,7 @@ const Attendance = () => {
         .maybeSingle();
 
       if (overrideError) {
-        console.error('Override lookup error:', overrideError);
+        logError({ message: 'Override lookup error:', source: 'Attendance', details: overrideError });
       }
 
       overrideActive = !!overrideData?.is_unlocked;
@@ -722,7 +723,7 @@ const Attendance = () => {
         setCurrentStudentIndex(nextIndex);
       }
     } catch (error) {
-      console.error('Error saving attendance:', error);
+          logError({ message: 'Error saving attendance:', source: 'Attendance', details: error });
       setAlertModal({
         show: true,
         title: 'Error',
@@ -895,7 +896,7 @@ const Attendance = () => {
         }
 
         if (error) {
-          console.error('Error saving attendance:', error);
+      logError({ message: 'Error saving attendance:', source: 'Attendance', details: error });
           setAlertModal({
             show: true,
             title: 'Error',
@@ -922,7 +923,7 @@ const Attendance = () => {
         type: 'success'
       });
     } catch (err) {
-      console.error(err);
+      logError({ message: String(err), source: 'Attendance', details: err });
       setAlertModal({
         show: true,
         title: 'Error',
@@ -1318,7 +1319,7 @@ const Attendance = () => {
                       .eq('session_type', selectedSession.type);
 
                     if (error) {
-                      console.error('Override delete error:', error);
+                      logError({ message: 'Override delete error:', source: 'Attendance', details: error });
                       setAlertModal({
                         show: true,
                         title: 'Error',
@@ -1346,7 +1347,7 @@ const Attendance = () => {
                     });
 
                   if (error) {
-                    console.error('Override insert error:', error);
+                    logError({ message: 'Override insert error:', source: 'Attendance', details: error });
                     setAlertModal({
                       show: true,
                       title: 'Error',

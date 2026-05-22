@@ -6,6 +6,7 @@ import { Send, MessageCircle } from 'lucide-react';
 import { markChatAsRead } from '../utils/chatReadState';
 import { usePresenceContext } from '../context/PresenceContext';
 import { buildPlanCheckoutPath } from '../utils/planCheckout';
+import { logError } from '../utils/errorLogger';
 
 const ChatWithTeacher = () => {
   const ADMIN_USER_ACCESS_TARGET_KEY = 'admin_user_access_target';
@@ -155,7 +156,7 @@ const ChatWithTeacher = () => {
       }
       if (groupIdToUse) setGroupId(groupIdToUse);
     } catch (err) {
-      console.error('Error initializing chat:', err);
+      logError({ message: 'Error initializing chat:', source: 'ChatWithTeacher', details: err });
       setError('Failed to load chat. Please refresh the page.');
     }
   };
@@ -173,7 +174,7 @@ const ChatWithTeacher = () => {
       setHasMoreOldMessages((data || []).length === 8);
       await markChatAsRead(profile.id, groupId);
       await loadReceiverReadState(groupId);
-    } catch (err) { console.error('Error loading messages:', err); }
+    } catch (err) { logError({ message: 'Error loading messages:', source: 'ChatWithTeacher', details: err }); }
   };
 
   const loadNewMessagesOnly = async () => {
@@ -192,7 +193,7 @@ const ChatWithTeacher = () => {
         setMessages(prev => [...prev, ...data]);
       }
       await markChatAsRead(profile.id, groupId);
-    } catch (err) { console.error('Error refreshing messages:', err); }
+    } catch (err) { logError({ message: 'Error refreshing messages:', source: 'ChatWithTeacher', details: err }); }
   };
 
   const loadOlderMessages = async () => {
@@ -213,7 +214,7 @@ const ChatWithTeacher = () => {
       } else {
         setHasMoreOldMessages(false);
       }
-    } catch (err) { console.error('Error loading older messages:', err); }
+    } catch (err) { logError({ message: 'Error loading older messages:', source: 'ChatWithTeacher', details: err }); }
     finally { setLoadingOlder(false); }
   };
 
@@ -248,7 +249,7 @@ const ChatWithTeacher = () => {
       await markChatAsRead(profile.id, groupId);
     } catch (err) {
       setError('Failed to send message. Please try again.');
-      console.error('Error sending message:', err);
+      logError({ message: 'Error sending message:', source: 'ChatWithTeacher', details: err });
     }
   };
 

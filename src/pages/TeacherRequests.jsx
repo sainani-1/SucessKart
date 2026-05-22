@@ -5,6 +5,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import AlertModal from '../components/AlertModal';
 import { X } from 'lucide-react';
 import useDialog from '../hooks/useDialog.jsx';
+import { logError } from '../utils/errorLogger';
 
 const TeacherRequests = () => {
   const { user } = useAuth();
@@ -55,10 +56,7 @@ const TeacherRequests = () => {
         .order('created_at', { ascending: false });
       
       if (error) throw error;
-      
-      console.log('Teacher requests raw data:', data);
-      
-      // Fetch student profiles separately
+// Fetch student profiles separately
       if (data && data.length > 0) {
         const studentIds = data.map(r => r.student_id);
         const { data: profiles } = await supabase
@@ -71,13 +69,12 @@ const TeacherRequests = () => {
           ...req,
           profiles: profiles?.find(p => p.id === req.student_id) || null
         }));
-        console.log('Teacher requests enriched:', enrichedRequests);
-        setRequests(enrichedRequests);
+setRequests(enrichedRequests);
       } else {
         setRequests([]);
       }
     } catch (error) {
-      console.error('Error fetching requests:', error);
+      logError({ message: 'Error fetching requests:', source: 'TeacherRequests', details: error })
     } finally {
       setLoading(false);
     }

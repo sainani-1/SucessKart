@@ -4,6 +4,7 @@ import { supabase } from '../supabaseClient';
 import LoadingSpinner from '../components/LoadingSpinner';
 import AlertModal from '../components/AlertModal';
 import AvatarImage from '../components/AvatarImage';
+import { logError } from '../utils/errorLogger';
 
 const CertificateBlocks = () => {
   const [users, setUsers] = useState([]);
@@ -102,7 +103,7 @@ const CertificateBlocks = () => {
 
       setUsers(merged);
     } catch (err) {
-      console.error('Failed to load certificate block data:', err);
+      logError({ message: 'Failed to load certificate block data:', source: 'CertificateBlocks', details: err });
       setAlertModal({
         show: true,
         title: 'Load Error',
@@ -166,7 +167,7 @@ const CertificateBlocks = () => {
         try {
           await ensureCertificateRowsForPassedExams(user.id, revokedAt);
         } catch (insertErr) {
-          console.warn('Could not materialize fallback certificates before blocking:', insertErr);
+          logError({ message: 'Could not materialize fallback certificates before blocking:', source: 'CertificateBlocks', details: insertErr });
         }
         const { error } = await supabase
           .from('certificates')
@@ -202,7 +203,7 @@ const CertificateBlocks = () => {
         type: 'success'
       });
     } catch (err) {
-      console.error('Certificate update error:', err);
+      logError({ message: 'Certificate update error:', source: 'CertificateBlocks', details: err });
       setAlertModal({
         show: true,
         title: 'Error',
@@ -220,7 +221,7 @@ const CertificateBlocks = () => {
       try {
         await ensureCertificateRowsForPassedExams(user.id, null);
       } catch (insertErr) {
-        console.warn('Could not materialize missing certificate rows:', insertErr);
+        logError({ message: 'Could not materialize missing certificate rows:', source: 'CertificateBlocks', details: insertErr });
       }
 
       const [{ data: certRows, error: certError }, { data: generatedRows, error: generatedError }] = await Promise.all([
@@ -319,7 +320,7 @@ const CertificateBlocks = () => {
       try {
         await ensureCertificateRowsForPassedExams(certModal.user.id, revokedAt);
       } catch (insertErr) {
-        console.warn('Could not materialize missing certificates before block all:', insertErr);
+        logError({ message: 'Could not materialize missing certificates before block all:', source: 'CertificateBlocks', details: insertErr });
       }
       const { error } = await supabase
         .from('certificates')

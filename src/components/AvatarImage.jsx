@@ -43,7 +43,7 @@ const AvatarImage = ({ userId, avatarUrl, alt = 'Avatar', className = '', fallba
       className={className}
       loading="eager"
       decoding="async"
-      fetchPriority="high"
+      fetchpriority="high"
       onError={() => {
         setIndex((i) => (i < candidates.length - 1 ? i + 1 : i));
       }}

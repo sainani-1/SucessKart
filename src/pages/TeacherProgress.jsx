@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { Users, Clock, TrendingUp, Award, MessageSquare } from 'lucide-react';
+import { logError } from '../utils/errorLogger';
 
 const TeacherProgress = () => {
   const [teachers, setTeachers] = useState([]);
@@ -23,11 +24,8 @@ const TeacherProgress = () => {
         .eq('role', 'teacher')
         .order('full_name');
 
-      console.log('Teachers Data:', teachersData);
-      console.log('Teachers Error:', teachersError);
 
       if (!teachersData || teachersData.length === 0) {
-        console.log('No teachers found');
         setTeachers([]);
         setLoading(false);
         return;
@@ -80,11 +78,9 @@ const TeacherProgress = () => {
           };
         })
       );
-
-      console.log('Teachers with Progress:', teachersWithProgress);
       setTeachers(teachersWithProgress);
     } catch (error) {
-      console.error('Error loading teacher progress:', error);
+      logError({ message: 'Error loading teacher progress:', source: 'TeacherProgress', details: error })
     }
     setLoading(false);
   };

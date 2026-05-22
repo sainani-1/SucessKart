@@ -3,6 +3,7 @@ import { Link2, Plus, Check, X } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import LoadingSpinner from '../components/LoadingSpinner';
 import usePopup from '../hooks/usePopup.jsx';
+import { logError } from '../utils/errorLogger';
 
 const AdminStartupCollaborations = () => {
   const { popupNode, openPopup } = usePopup();
@@ -47,7 +48,7 @@ const AdminStartupCollaborations = () => {
       setStudents(studentsResp.data || []);
       setRecords(recordsResp.data || []);
     } catch (error) {
-      console.error('Error loading admin collaborations:', error);
+      logError({ message: 'Error loading admin collaborations:', source: 'AdminStartupCollaborations', details: error });
       openPopup('Load failed', error.message || 'Could not load data.', 'error');
     } finally {
       setLoading(false);
@@ -93,7 +94,7 @@ const AdminStartupCollaborations = () => {
       openPopup('Created', 'Startup collaboration added successfully.', 'success');
       await loadData();
     } catch (error) {
-      console.error('Error creating collaboration:', error);
+      logError({ message: 'Error creating collaboration:', source: 'AdminStartupCollaborations', details: error });
       openPopup('Create failed', error.message || 'Could not create collaboration.', 'error');
     } finally {
       setSaving(false);

@@ -7,6 +7,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import AvatarImage from '../components/AvatarImage';
 import usePopup from '../hooks/usePopup.jsx';
 import useDialog from '../hooks/useDialog.jsx';
+import { logError } from '../utils/errorLogger';
 
 const AdminDashboard = () => {
     const [alertModal, setAlertModal] = useState({ show: false, title: '', message: '', type: 'info' });
@@ -236,7 +237,7 @@ const UserManagement = () => {
 
           setUsers(merged);
         } catch (err) {
-          console.error('Load users failed:', err);
+          logError({ message: 'Load users failed:', source: 'AdminDashboard', details: err });
           openPopup('Error', err.message || 'Failed to load users', 'error');
         } finally {
           setLoading(false);
@@ -298,7 +299,7 @@ const UserManagement = () => {
           try {
             await ensureCertificateRowsForPassedExams(user.id, revokedAt);
           } catch (insertErr) {
-            console.warn('Could not materialize fallback certificates before blocking:', insertErr);
+            logError({ message: 'Could not materialize fallback certificates before blocking:', source: 'AdminDashboard', details: insertErr });
           }
           const { error } = await supabase
             .from('certificates')
@@ -316,7 +317,7 @@ const UserManagement = () => {
 
         await loadUsers();
       } catch (err) {
-        console.error('Certificate update error:', err);
+        logError({ message: 'Certificate update error:', source: 'AdminDashboard', details: err });
         openPopup('Error', err.message || 'Failed to update certificates', 'error');
       } finally {
         setCertUpdatingUserId(null);
@@ -589,9 +590,7 @@ const LeaveRequests = () => {
 
       if (error) throw error;
       setTeachers(data || []);
-    } catch (err) {
-      console.error('Error loading teachers:', err);
-    }
+      } catch {}
   };
 
   const loadLeaves = async () => {
@@ -609,9 +608,7 @@ const LeaveRequests = () => {
 
       if (error) throw error;
       setLeaves(data || []);
-    } catch (err) {
-      console.error('Error loading leaves:', err);
-    } finally {
+    } catch {} finally {
       setLoading(false);
     }
   };
@@ -690,7 +687,7 @@ const LeaveRequests = () => {
       setSelectedTeacher('');
       await loadLeaves();
     } catch (err) {
-      console.error('Error during approval and reassignment:', err);
+      logError({ message: 'Error during approval and reassignment:', source: 'AdminDashboard', details: err });
       setAlertModal({
         show: true,
         title: 'Error',
@@ -716,7 +713,7 @@ const LeaveRequests = () => {
       if (error) throw error;
       await loadLeaves();
     } catch (err) {
-      console.error('Error updating leave:', err);
+      logError({ message: 'Error updating leave:', source: 'AdminDashboard', details: err });
         setAlertModal({
           show: true,
           title: 'Error',
@@ -772,7 +769,7 @@ const LeaveRequests = () => {
       // Success - just refresh, no alert
       await loadLeaves();
     } catch (err) {
-      console.error('Error revoking leave:', err);
+      logError({ message: 'Error revoking leave:', source: 'AdminDashboard', details: err });
       setAlertModal({
         show: true,
         title: 'Error',

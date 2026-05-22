@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabaseClient';
 import LoadingSpinner from '../components/LoadingSpinner';
 import usePopup from '../hooks/usePopup.jsx';
+import { logError } from '../utils/errorLogger';
 
 const StartupCollaborations = () => {
   const { profile } = useAuth();
@@ -45,7 +46,7 @@ const StartupCollaborations = () => {
       setSentRequests(sentResp.data || []);
       setIncomingRequests(incomingResp.data || []);
     } catch (error) {
-      console.error('Error loading startup collaborations:', error);
+      logError({ message: 'Error loading startup collaborations:', source: 'StartupCollaborations', details: error })
       openPopup('Load failed', error.message || 'Could not load collaborations.', 'error');
     } finally {
       setLoading(false);
@@ -76,7 +77,7 @@ const StartupCollaborations = () => {
       openPopup('Request sent', 'Collaboration request sent successfully.', 'success');
       await loadData();
     } catch (error) {
-      console.error('Error sending collaboration request:', error);
+      logError({ message: 'Error sending collaboration request:', source: 'StartupCollaborations', details: error })
       openPopup('Send failed', error.message || 'Could not send request.', 'error');
     }
   };
@@ -91,7 +92,7 @@ const StartupCollaborations = () => {
       openPopup('Updated', `Request ${status}.`, 'success');
       await loadData();
     } catch (error) {
-      console.error('Error updating collaboration request:', error);
+      logError({ message: 'Error updating collaboration request:', source: 'StartupCollaborations', details: error })
       openPopup('Update failed', error.message || 'Could not update request.', 'error');
     }
   };

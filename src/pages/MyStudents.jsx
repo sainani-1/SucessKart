@@ -3,6 +3,7 @@ import { supabase } from '../supabaseClient';
 import { useAuth } from '../context/AuthContext';
 import { Users, Mail, Award } from 'lucide-react';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { logError } from '../utils/errorLogger';
 
 const MyStudents = () => {
   const { profile } = useAuth();
@@ -26,7 +27,7 @@ const MyStudents = () => {
         
         setStudents(data || []);
       } catch (error) {
-        console.error('Error fetching students:', error);
+        logError({ message: 'Error fetching students:', source: 'MyStudents', details: error })
         setStudents([]);
       } finally {
         setLoading(false);

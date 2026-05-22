@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useChatOverlay } from '../context/ChatOverlayContext';
 import { markChatAsRead } from '../utils/chatReadState';
 import { Send, MessageCircle, X } from 'lucide-react';
+import { logError } from '../utils/errorLogger';
 
 const ChatOverlay = () => {
   const { overlayChat, closeChat } = useChatOverlay();
@@ -93,7 +94,7 @@ const ChatOverlay = () => {
         void markChatAsRead(profile.id, gid);
       }
     } catch (err) {
-      console.error('Chat overlay init error:', err);
+      logError({ message: 'Chat overlay init error', source: 'ChatOverlay', details: err });
     }
   };
 

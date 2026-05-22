@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { Link } from 'react-router-dom';
 import { Users, Award, TrendingUp, Search, Calendar } from 'lucide-react';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { logError } from '../utils/errorLogger';
 
 const StudentProgress = () => {
   const { profile } = useAuth();
@@ -40,8 +41,8 @@ const StudentProgress = () => {
             .select('attended')
             .eq('student_id', student.id);
 
-          if (classErr) console.error('Class attendance error:', classErr);
-          if (guidanceErr) console.error('Guidance attendance error:', guidanceErr);
+          if (classErr) logError({ message: 'Class attendance error:', source: 'StudentProgress', details: classErr })
+          if (guidanceErr) logError({ message: 'Guidance attendance error:', source: 'StudentProgress', details: guidanceErr })
 
           const allAttendance = [...(classAtt || []), ...(guidanceAtt || [])];
           const present = allAttendance.filter(a => a.attended).length;

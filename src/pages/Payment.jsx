@@ -7,6 +7,7 @@ import AlertModal from '../components/AlertModal';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { trackPremiumEvent } from '../utils/growth';
 import { normalizeCheckoutPlanTier } from '../utils/planCheckout';
+import { logError } from '../utils/errorLogger';
 
 const RAZORPAY_KEY_ID = import.meta.env.VITE_RAZORPAY_KEY_ID || '';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
@@ -208,7 +209,7 @@ const getFreshAccessToken = async () => {
       return refreshedData.session.access_token;
     }
   } catch (error) {
-    console.error('Session refresh failed during payment flow:', error);
+    logError({ message: 'Session refresh failed during payment flow:', source: 'Payment', details: error })
   }
 
   throw new Error('Your login session has expired. Please log in again and retry payment.');
@@ -404,7 +405,7 @@ const Payment = () => {
           });
         }
       } catch (error) {
-        console.error('Error loading payment pricing:', error);
+        logError({ message: 'Error loading payment pricing:', source: 'Payment', details: error })
         setPremiumCost(199);
         setPremiumPlusCost(299);
         setPlans([]);
@@ -519,7 +520,7 @@ const Payment = () => {
         // Keep offers visible, but do not auto-apply them from the URL.
         // Users should explicitly choose a coupon before it affects the final payable amount.
       } catch (error) {
-        console.error('Error loading offers:', error);
+        logError({ message: 'Error loading offers:', source: 'Payment', details: error })
       } finally {
         setOffersLoading(false);
       }
@@ -665,7 +666,7 @@ const Payment = () => {
           })
         )
         .catch((error) => {
-          console.error('Failed to save payment app selection:', error);
+          logError({ message: 'Failed to save payment app selection:', source: 'Payment', details: error })
         });
     }
     if (isAndroidDevice && app?.packageName) {
@@ -698,7 +699,7 @@ const Payment = () => {
       }
       return data;
     } catch (error) {
-      console.error('Payment finalization failed:', error);
+      logError({ message: 'Payment finalization failed:', source: 'Payment', details: error })
       if (payload.status === 'success') {
         setAlertModal({
           show: true,
@@ -884,7 +885,7 @@ const Payment = () => {
       });
       razorpay.open();
     } catch (error) {
-      console.error('Payment initialization error:', error);
+      logError({ message: 'Payment initialization error:', source: 'Payment', details: error })
       const baseMessage = error.message || 'Failed to initialize payment. Please try again.';
       const message = baseMessage.includes('Failed to send a request to the Edge Function')
           ? 'Payment service is not reachable right now. This usually means the Supabase Edge Functions are not deployed or the project connection is failing. Check and deploy `create-payment-order` and `verify-payment`, then try again.'
@@ -962,7 +963,7 @@ const Payment = () => {
           upsert: false,
         });
       if (uploadError) {
-        console.error('Screenshot upload error:', uploadError);
+        logError({ message: 'Screenshot upload error:', source: 'Payment', details: uploadError })
         screenshotUrl = screenshotPreview;
       } else {
         const { data: { publicUrl } } = supabase.storage

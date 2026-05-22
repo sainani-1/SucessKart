@@ -4,6 +4,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import AlertModal from '../components/AlertModal';
 import { UserPlus, X, Trash2 } from 'lucide-react';
 import useDialog from '../hooks/useDialog.jsx';
+import { logError } from '../utils/errorLogger';
 
 const AdminTeacherRequests = () => {
   const { confirm, dialogNode } = useDialog();
@@ -35,7 +36,6 @@ const AdminTeacherRequests = () => {
       
       if (reqError) throw reqError;
       
-      console.log('Admin requests raw data:', requestsData);
       
       // Fetch student and teacher profiles separately
       if (requestsData && requestsData.length > 0) {
@@ -76,9 +76,7 @@ const AdminTeacherRequests = () => {
       
       if (teachersError) throw teachersError;
       setTeachers(teachersData || []);
-    } catch (error) {
-      console.error('Error fetching data:', error);
-    } finally {
+    } catch {} finally {
       setLoading(false);
     }
   };

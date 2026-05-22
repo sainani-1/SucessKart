@@ -4,6 +4,7 @@ import { supabase } from '../supabaseClient';
 import AlertModal from '../components/AlertModal';
 import { useAuth } from '../context/AuthContext';
 import { attachPendingReferral } from '../utils/referrals';
+import { logError } from '../utils/errorLogger';
 
 const streamOptions = {
   'B.Tech': ['Computer Science', 'Information Technology', 'Electronics', 'Mechanical', 'Civil', 'Others'],
@@ -100,7 +101,7 @@ const CompleteGoogleProfile = () => {
       try {
         await attachPendingReferral(currentUser.id, currentUser.email || null);
       } catch (referralError) {
-        console.warn('Referral attach failed:', referralError.message || referralError);
+        logError({ message: 'Referral attach failed:', source: 'CompleteGoogleProfile', details: referralError.message || referralError });
       }
 
       await fetchProfile(currentUser.id);

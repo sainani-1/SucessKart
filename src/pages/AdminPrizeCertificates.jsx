@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import AlertModal from '../components/AlertModal';
+import { logError } from '../utils/errorLogger';
 
 const PRIZE_TITLE_KEY = 'logic_weekly_prize_title';
 const PRIZE_DESC_KEY = 'logic_weekly_prize_description';
@@ -75,7 +76,7 @@ export default function AdminPrizeCertificates() {
         .order('issued_at', { ascending: false })
         .limit(50);
       if (generatedError) {
-        console.warn('generated_certificates load warning:', generatedError.message);
+        logError({ message: 'generated_certificates load warning:', source: 'AdminPrizeCertificates', details: generatedError });
       }
 
       const settingsMap = Object.fromEntries((settingsData || []).map((x) => [x.key, x.value || '']));

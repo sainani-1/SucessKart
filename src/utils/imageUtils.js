@@ -1,3 +1,5 @@
+import { logError } from '../utils/errorLogger';
+
 export const prepareAvatarFile = async (file, options = {}) => {
   if (!file) return null;
   if (!file.type?.startsWith('image/')) return file;
@@ -38,7 +40,7 @@ export const prepareAvatarFile = async (file, options = {}) => {
     const newName = file.name.replace(/\.[^.]+$/, '.jpg');
     return new File([blob], newName, { type: outputType });
   } catch (err) {
-    console.warn('Image resize failed, using original file:', err);
+    logError({ message: 'Image resize failed, using original file', source: 'imageUtils', details: err });
     return file;
   } finally {
     URL.revokeObjectURL(objectUrl);

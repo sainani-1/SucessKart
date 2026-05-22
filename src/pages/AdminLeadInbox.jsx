@@ -3,6 +3,7 @@ import { Download, Mail, MessageSquare, Search } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabaseClient';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { logError } from '../utils/errorLogger';
 
 const interestLabels = {
   sample_test: 'Free sample test',
@@ -82,7 +83,7 @@ const AdminLeadInbox = () => {
         )
       );
     } catch (error) {
-      console.error('Error loading leads:', error);
+      logError({ message: 'Error loading leads:', source: 'AdminLeadInbox', details: error });
       setErrorMessage(error.message || 'Failed to load leads.');
       setLeads([]);
     } finally {
@@ -140,7 +141,7 @@ const AdminLeadInbox = () => {
       setErrorMessage('');
       await loadLeads();
     } catch (error) {
-      console.error('Error saving lead response:', error);
+      logError({ message: 'Error saving lead response:', source: 'AdminLeadInbox', details: error });
       setErrorMessage(error.message || 'Failed to save response.');
     } finally {
       setSavingId(null);

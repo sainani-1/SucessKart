@@ -5,6 +5,7 @@ import AlertModal from '../components/AlertModal';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { uploadAvatarForUser } from '../utils/avatarUpload';
 import { validateRotatingAccessCode } from '../utils/rotatingAccessCode';
+import { logWarn } from '../utils/errorLogger';
 
 const RegisterAdmin = () => {
   const navigate = useNavigate();
@@ -91,7 +92,7 @@ const RegisterAdmin = () => {
           }
         });
       } catch (metadataError) {
-        console.warn('Admin metadata sync warning:', metadataError.message || metadataError);
+        logWarn({ message: 'Admin metadata sync warning:', source: 'RegisterAdmin', details: metadataError.message || metadataError })
       }
       
       const { error: profileError } = await supabase.from('profiles').upsert({

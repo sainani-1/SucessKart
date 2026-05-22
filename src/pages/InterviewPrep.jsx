@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Mic, Camera, Play, AlertCircle, Clock, BarChart3, Briefcase, MapPin, DollarSign, Building2, CheckCircle } from 'lucide-react';
 import usePopup from '../hooks/usePopup.jsx';
+import { logError } from '../utils/errorLogger';
 
 const InterviewPrep = () => {
   const { profile } = useAuth();
@@ -99,7 +100,7 @@ const InterviewPrep = () => {
       if (targetRef.current) targetRef.current.srcObject = stream;
       return stream;
     } catch (err) {
-      console.error('Media access error:', err);
+      logError({ message: 'Media access error:', source: 'InterviewPrep', details: err })
       if (err.name === 'NotAllowedError') {
         openPopup('Permission Denied', 'Please allow camera and microphone access. Go to browser settings and grant permissions.', 'warning');
         setStreamError('Permission denied. Please allow camera and microphone.');

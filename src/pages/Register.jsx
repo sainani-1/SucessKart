@@ -8,6 +8,7 @@ import AuthShell from '../components/AuthShell';
 import { cachePendingRegistrationAvatar, uploadAvatarForUser } from '../utils/avatarUpload';
 import { attachPendingReferral, savePendingReferralCode } from '../utils/referrals';
 import { useAuth } from '../context/AuthContext';
+import { logWarn } from '../utils/errorLogger';
 
 const Register = () => {
   const { user, loading: authLoading } = useAuth();
@@ -72,8 +73,7 @@ const Register = () => {
           setRegistrationPaused(true);
         }
       } catch (error) {
-        console.log('Settings check:', error.message);
-      }
+}
     };
 
     checkRegistrationStatus();
@@ -262,10 +262,10 @@ const Register = () => {
               }
             });
           } catch (metadataError) {
-            console.warn('Student metadata sync warning:', metadataError.message || metadataError);
+            logWarn({ message: 'Student metadata sync warning:', source: 'Register', details: metadataError.message || metadataError })
           }
         } catch (photoErr) {
-          console.warn('Photo upload warning:', photoErr.message);
+          logWarn({ message: 'Photo upload warning:', source: 'Register', details: photoErr.message })
           // Cache avatar locally and apply on first successful login after email verification.
           await cachePendingAvatar(formData.email, file);
         }
@@ -297,7 +297,7 @@ const Register = () => {
       try {
         await attachPendingReferral(user.id, formData.email.trim());
       } catch (referralError) {
-        console.warn('Referral attach failed:', referralError.message || referralError);
+        logWarn({ message: 'Referral attach failed:', source: 'Register', details: referralError.message || referralError })
       }
 
       setAlertModal({

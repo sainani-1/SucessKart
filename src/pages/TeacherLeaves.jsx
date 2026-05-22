@@ -6,6 +6,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import usePopup from '../hooks/usePopup.jsx';
 import { sendAdminNotification } from '../utils/adminNotifications';
 import { TEACHING_ROLES, isTeachingRole } from '../utils/teachingRoles';
+import { logError } from '../utils/errorLogger';
 
 const TeacherLeaves = () => {
   const { profile } = useAuth();
@@ -67,7 +68,7 @@ const TeacherLeaves = () => {
         setLeaves(data || []);
       }
     } catch (err) {
-      console.error('Error loading leaves:', err);
+      logError({ message: 'Error loading leaves:', source: 'TeacherLeaves', details: err })
       setError('Failed to load leave requests');
     }
   };
@@ -83,7 +84,7 @@ const TeacherLeaves = () => {
       if (fetchError) throw fetchError;
       setTeachers(data || []);
     } catch (err) {
-      console.error('Error loading teachers:', err);
+      logError({ message: 'Error loading teachers:', source: 'TeacherLeaves', details: err })
     }
   };
 
@@ -129,7 +130,7 @@ const TeacherLeaves = () => {
       setTimeout(() => setSuccess(''), 3000);
       await loadLeaves();
     } catch (err) {
-      console.error('Error applying leave:', err);
+      logError({ message: 'Error applying leave:', source: 'TeacherLeaves', details: err })
       setError(err.message || 'Failed to submit leave request');
     } finally {
       setLoading(false);
@@ -165,7 +166,7 @@ const TeacherLeaves = () => {
       openPopup('Updated', `Leave request ${status}.`, 'success');
       await loadLeaves();
     } catch (err) {
-      console.error('Error updating leave:', err);
+      logError({ message: 'Error updating leave:', source: 'TeacherLeaves', details: err })
       setError('Failed to update leave request');
       openPopup('Error', 'Failed to update leave request.', 'error');
     }
@@ -206,7 +207,7 @@ const TeacherLeaves = () => {
       if (fetchError) throw fetchError;
       setApprovalState((prev) => ({ ...prev, sessions: data || [], loadingSessions: false }));
     } catch (err) {
-      console.error('Error loading sessions for leave approval:', err);
+      logError({ message: 'Error loading sessions for leave approval:', source: 'TeacherLeaves', details: err })
       setApprovalState((prev) => ({ ...prev, sessions: [], loadingSessions: false }));
       openPopup('Warning', 'Could not load scheduled classes for this leave. You can still approve it.', 'warning');
     }
@@ -295,7 +296,7 @@ const TeacherLeaves = () => {
       openPopup('Approved', 'Leave approved successfully.', 'success');
       await loadLeaves();
     } catch (err) {
-      console.error('Error approving leave with reassignment:', err);
+      logError({ message: 'Error approving leave with reassignment:', source: 'TeacherLeaves', details: err })
       setError(err.message || 'Failed to approve leave request');
       openPopup('Error', err.message || 'Failed to approve leave request.', 'error');
     } finally {
@@ -366,7 +367,7 @@ const TeacherLeaves = () => {
       openPopup('Updated', 'Leave revoked successfully.', 'success');
       await loadLeaves();
     } catch (err) {
-      console.error('Error revoking leave:', err);
+      logError({ message: 'Error revoking leave:', source: 'TeacherLeaves', details: err })
       setError('Failed to revoke leave');
       openPopup('Error', 'Failed to revoke leave.', 'error');
     }

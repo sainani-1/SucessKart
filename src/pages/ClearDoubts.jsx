@@ -4,6 +4,7 @@ import { supabase } from '../supabaseClient';
 import { usePresenceContext } from '../context/PresenceContext';
 import { MessageCircle, Send, Search } from 'lucide-react';
 import { getChatReadTimes, markChatAsRead } from '../utils/chatReadState';
+import { logError } from '../utils/errorLogger';
 
 const ClearDoubts = () => {
   const { profile } = useAuth();
@@ -152,7 +153,7 @@ const ClearDoubts = () => {
       });
       groupsWithMeta.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
       setChats(groupsWithMeta);
-    } catch (err) { console.error('Error fetching chats:', err); }
+    } catch (err) { logError({ message: 'Error fetching chats:', source: 'ClearDoubts', details: err }); }
     finally { setChatsLoaded(true); }
   };
 
@@ -169,7 +170,7 @@ const ClearDoubts = () => {
       if (markAsReadFlag) await markChatAsRead(profile.id, groupId);
       await loadReceiverReadState(groupId);
       setChats(prev => prev.map(c => c.id === groupId ? { ...c, is_read: true, unreadCount: 0 } : c));
-    } catch (err) { console.error('Error loading messages:', err); }
+    } catch (err) { logError({ message: 'Error loading messages:', source: 'ClearDoubts', details: err }); }
   };
 
   const loadNewChatMessagesOnly = async () => {
@@ -187,7 +188,7 @@ const ClearDoubts = () => {
         setChatMessages(prev => [...prev, ...messages]);
       }
       await markChatAsRead(profile.id, selectedChat.id);
-    } catch (err) { console.error('Error refreshing messages:', err); }
+    } catch (err) { logError({ message: 'Error refreshing messages:', source: 'ClearDoubts', details: err }); }
   };
 
   const loadOlderMessages = async () => {
@@ -208,7 +209,7 @@ const ClearDoubts = () => {
       } else {
         setHasMoreOldMessages(false);
       }
-    } catch (err) { console.error('Error loading older messages:', err); }
+    } catch (err) { logError({ message: 'Error loading older messages:', source: 'ClearDoubts', details: err }); }
     finally { setLoadingOlder(false); }
   };
 
@@ -279,7 +280,7 @@ const ClearDoubts = () => {
       }
       await markChatAsRead(profile.id, selectedChat.id);
       fetchStudentChats();
-    } catch (err) { console.error('Error sending reply:', err); }
+    } catch (err) { logError({ message: 'Error sending reply:', source: 'ClearDoubts', details: err }); }
   };
 
   const { isOnline } = usePresenceContext();

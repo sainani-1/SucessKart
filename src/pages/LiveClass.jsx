@@ -25,6 +25,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import useDialog from '../hooks/useDialog.jsx';
 import LiveKitClassSession from '../components/LiveKitClassSession';
 import { controlLiveKitClassSession, getLiveKitTokenForClassSession } from '../lib/livekitSession';
+import { logError } from '../utils/errorLogger';
 
 const formatSessionDateTime = (value) =>
   new Date(value).toLocaleString('en-IN', {
@@ -515,10 +516,8 @@ const LiveClass = () => {
   }, [waitingForHostApproval, meetingStarted, session?.meeting_type, session?.livekit_controls, profile?.id]);
 
   const loadSession = async ({ silent = false } = {}) => {
-    console.log('loadSession called');
-    
-    if (!profile) {
-      console.error('No profile found');
+if (!profile) {
+      logError({ message: 'No profile found', source: 'LiveClass', details: null })
       return;
     }
     
@@ -528,19 +527,13 @@ const LiveClass = () => {
         .select('*, class_session_participants(student_id)')
         .eq('id', sessionId)
         .single();
-
-      console.log('Session query result:', { data, error });
-
-      if (error) throw error;
+if (error) throw error;
 
       // Check if user is allowed to join
       const isTeacher = profile.role === 'teacher' || profile.role === 'admin';
       const isParticipant = data.class_session_participants?.some(p => p.student_id === profile.id);
       const noParticipants = !data.class_session_participants || data.class_session_participants.length === 0;
-
-      console.log('Permission check:', { isTeacher, isParticipant, noParticipants });
-
-      if (!isTeacher && !isParticipant && !noParticipants) {
+if (!isTeacher && !isParticipant && !noParticipants) {
         openPopup('Access denied', 'You are not invited to this session.', 'error');
         navigate('/app');
         return;
@@ -610,7 +603,7 @@ const LiveClass = () => {
       }
       setLoading(false);
     } catch (error) {
-      console.error('Error loading session:', error);
+      logError({ message: 'Error loading session:', source: 'LiveClass', details: error })
       if (!silent) {
         openPopup('Load failed', 'Failed to load class session.', 'error');
         navigate('/app');
@@ -761,7 +754,7 @@ const LiveClass = () => {
         .eq('id', sessionId);
 
       if (error) {
-        console.error('Error ending session:', error);
+        logError({ message: 'Error ending session:', source: 'LiveClass', details: error })
       }
 
       // Dispose meeting state
@@ -783,7 +776,7 @@ const LiveClass = () => {
         redirectBackToApp();
       }, 3000);
     } catch (error) {
-      console.error('Error ending session:', error);
+      logError({ message: 'Error ending session:', source: 'LiveClass', details: error })
       openPopup('End failed', 'Failed to end session.', 'error');
     }
   };

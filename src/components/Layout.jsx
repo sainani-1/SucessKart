@@ -12,6 +12,7 @@ import { readBrowserState, writeBrowserState } from '../utils/browserState';
 import NotificationPermissionPopup from './NotificationPermissionPopup';
 import ZoomDetector from './ZoomDetector';
 import ChatOverlay from './ChatOverlay';
+import { logError } from '../utils/errorLogger';
 
 const SIDEBAR_COLLAPSED_KEY = 'layout_sidebar_collapsed';
 const LAST_OPENED_PAGE_KEY = 'layout_last_opened_page';
@@ -240,6 +241,7 @@ const Layout = () => {
       { label: 'Website Protection', path: '/app/admin/website-protection' },
       { label: 'Reset Password', path: '/app/admin/reset-password' },
       { label: 'Activity Logs', path: '/app/admin/activity-logs' },
+      { label: 'Error Logs', path: '/app/admin/error-logs' },
       { label: 'Lead Inbox', path: '/app/admin/lead-inbox' },
       { label: 'Growth Analytics', path: '/app/admin/growth-analytics' },
       { label: 'Payment QR', path: '/app/admin/payment-qr' },
@@ -677,7 +679,7 @@ const Layout = () => {
           saveSentExamReminderKeys(profile.id, sentKeys);
         }
       } catch (reminderError) {
-        console.warn('Exam reminder check failed:', reminderError?.message || reminderError);
+        logError({ message: String(reminderError?.message || reminderError), source: 'Layout', details: reminderError });
       }
     };
 

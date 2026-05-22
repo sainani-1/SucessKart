@@ -10,6 +10,7 @@ import { trackPremiumEvent } from '../utils/growth';
 import { sendAdminNotification } from '../utils/adminNotifications';
 import { buildPlanCheckoutPath } from '../utils/planCheckout';
 import { TEACHING_ROLES, isTeachingRole } from '../utils/teachingRoles';
+import { logError } from '../utils/errorLogger';
 
 const GuidanceSessions = () => {
   const { confirm, dialogNode } = useDialog();
@@ -71,7 +72,7 @@ const GuidanceSessions = () => {
           .order('created_at', { ascending: false });
         
         if (reqError) {
-          console.error('Error fetching student requests:', reqError);
+          logError({ message: 'Error fetching student requests:', source: 'GuidanceSessions', details: reqError })
           setAlertModal({
             show: true,
             title: 'Error',
@@ -95,7 +96,7 @@ const GuidanceSessions = () => {
             .in('request_id', reqs.map(r => r.id))
             .order('scheduled_for', { ascending: false });
           
-          if (sessError) console.error('Error fetching sessions:', sessError);
+          if (sessError) logError({ message: 'Error fetching sessions:', source: 'GuidanceSessions', details: sessError })
           fetchedSessions = sess || [];
           setSessions(fetchedSessions);
         } else {
@@ -111,7 +112,7 @@ const GuidanceSessions = () => {
             .select('id, full_name, email')
             .in('id', allTeacherIds);
           if (teacherErr) {
-            console.error('Error fetching assigned teachers:', teacherErr);
+            logError({ message: 'Error fetching assigned teachers:', source: 'GuidanceSessions', details: teacherErr })
             setTeachers([]);
           } else {
             setTeachers(assignedTeachers || []);
@@ -131,7 +132,7 @@ const GuidanceSessions = () => {
         const { data: reqs, error: reqError } = await query.order('created_at', { ascending: false });
         
         if (reqError) {
-          console.error('Error fetching requests:', reqError);
+          logError({ message: 'Error fetching requests:', source: 'GuidanceSessions', details: reqError })
           setAlertModal({
             show: true,
             title: 'Error',
@@ -148,7 +149,7 @@ const GuidanceSessions = () => {
           .select('*')
           .order('scheduled_for', { ascending: false });
         
-        if (sessError) console.error('Error fetching sessions:', sessError);
+        if (sessError) logError({ message: 'Error fetching sessions:', source: 'GuidanceSessions', details: sessError })
         setSessions(sess || []);
 
         // Fetch available teachers for assignment (admin only)
@@ -158,7 +159,7 @@ const GuidanceSessions = () => {
             .select('id, full_name, email, role')
             .in('role', TEACHING_ROLES);
           
-          if (tchError) console.error('Error fetching teachers:', tchError);
+          if (tchError) logError({ message: 'Error fetching teachers:', source: 'GuidanceSessions', details: tchError })
           setTeachers(tchs || []);
 
           // Fetch all students
@@ -167,7 +168,7 @@ const GuidanceSessions = () => {
             .select('id, full_name, email')
             .eq('role', 'student');
           
-          if (stdError) console.error('Error fetching students:', stdError);
+          if (stdError) logError({ message: 'Error fetching students:', source: 'GuidanceSessions', details: stdError })
           setStudents(stds || []);
 
           // Fetch mentor assignments
@@ -176,12 +177,12 @@ const GuidanceSessions = () => {
             .select('*')
             .eq('active', true);
           
-          if (mentorError) console.error('Error fetching mentors:', mentorError);
+          if (mentorError) logError({ message: 'Error fetching mentors:', source: 'GuidanceSessions', details: mentorError })
           setMentors(mentorData || []);
         }
       }
     } catch (error) {
-      console.error('Error loading guidance data:', error);
+      logError({ message: 'Error loading guidance data:', source: 'GuidanceSessions', details: error })
       setAlertModal({
         show: true,
         title: 'Error',
@@ -253,7 +254,7 @@ const GuidanceSessions = () => {
       });
       
       if (error) {
-        console.error('Submit error:', error);
+        logError({ message: 'Submit error:', source: 'GuidanceSessions', details: error })
         setAlertModal({
           show: true,
           title: 'Submission Error',
@@ -279,7 +280,7 @@ const GuidanceSessions = () => {
         type: 'success'
       });
     } catch (err) {
-      console.error('Submit error:', err);
+      logError({ message: 'Submit error:', source: 'GuidanceSessions', details: err })
       setAlertModal({
         show: true,
         title: 'Error',
@@ -307,7 +308,7 @@ const GuidanceSessions = () => {
       }).eq('id', selectedRequest.id);
       
       if (error) {
-        console.error('Assign teacher error:', error);
+        logError({ message: 'Assign teacher error:', source: 'GuidanceSessions', details: error })
         setAlertModal({
           show: true,
           title: 'Error',
@@ -336,7 +337,7 @@ const GuidanceSessions = () => {
         type: 'success'
       });
     } catch (err) {
-      console.error('Assign teacher error:', err);
+      logError({ message: 'Assign teacher error:', source: 'GuidanceSessions', details: err })
       setAlertModal({
         show: true,
         title: 'Error',
@@ -375,7 +376,7 @@ const GuidanceSessions = () => {
         .eq('id', sessionId);
 
       if (deleteError) {
-        console.error('Delete session error:', deleteError);
+        logError({ message: 'Delete session error:', source: 'GuidanceSessions', details: deleteError })
         setAlertModal({
           show: true,
           title: 'Error',
@@ -401,7 +402,7 @@ const GuidanceSessions = () => {
         type: 'success'
       });
     } catch (err) {
-      console.error('Delete session error:', err);
+      logError({ message: 'Delete session error:', source: 'GuidanceSessions', details: err })
       setAlertModal({
         show: true,
         title: 'Error',
@@ -440,7 +441,7 @@ const GuidanceSessions = () => {
       });
       
       if (error) {
-        console.error('Assign mentor error:', error);
+        logError({ message: 'Assign mentor error:', source: 'GuidanceSessions', details: error })
         setAlertModal({
           show: true,
           title: 'Error',
@@ -470,7 +471,7 @@ const GuidanceSessions = () => {
         type: 'success'
       });
     } catch (err) {
-      console.error('Assign mentor error:', err);
+      logError({ message: 'Assign mentor error:', source: 'GuidanceSessions', details: err })
       setAlertModal({
         show: true,
         title: 'Error',
@@ -1322,7 +1323,7 @@ const GuidanceSessions = () => {
                     status: 'scheduled'
                   });
                   if (sessionError) {
-                    console.error('Session error:', sessionError);
+                    logError({ message: 'Session error:', source: 'GuidanceSessions', details: sessionError })
                     setAlertModal({
                       show: true,
                       title: 'Error',
@@ -1336,7 +1337,7 @@ const GuidanceSessions = () => {
                     status: 'scheduled'
                   }).eq('id', selectedRequest.id);
                   if (updateError) {
-                    console.error('Update error:', updateError);
+                    logError({ message: 'Update error:', source: 'GuidanceSessions', details: updateError })
                     setAlertModal({
                       show: true,
                       title: 'Update failed',

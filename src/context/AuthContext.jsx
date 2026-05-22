@@ -18,6 +18,7 @@ import { ensureUsernameForUser } from '../utils/usernames';
 import { clearSecureAuthStorage, readStoredAuthTokens, removeLegacyLocalAuthArtifacts } from '../utils/secureAuthStorage';
 import { refreshSessionFromHttpOnlyCookie } from '../utils/authCookieBridge';
 import { requestSessionFromOtherTabs } from '../utils/crossTabAuth';
+import { logError } from '../utils/errorLogger';
 
 const AuthContext = createContext();
 
@@ -450,7 +451,7 @@ export const AuthProvider = ({ children }) => {
       try {
         hydratedProfile = await ensureUsernameForUser(baseProfile);
       } catch (usernameError) {
-        console.warn('Profile loaded without username hydration:', usernameError?.message || usernameError);
+        logError({ message: 'Profile loaded without username hydration', source: 'AuthContext', details: usernameError });
       }
 
       if (
@@ -462,7 +463,7 @@ export const AuthProvider = ({ children }) => {
           await clearTeacherAssignmentForStudent(supabase, userId);
           hydratedProfile.assigned_teacher_id = null;
         } catch (assignmentError) {
-          console.error('Failed to clear expired teacher assignment:', assignmentError);
+          logError({ message: 'Failed to clear expired teacher assignment', source: 'AuthContext', details: assignmentError });
         }
       }
 

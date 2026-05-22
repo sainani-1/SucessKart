@@ -11,6 +11,7 @@ import { runCode } from './codeRunner';
 import Toast from '../components/Toast';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { estimateCodeComplexity } from './leaderboardUtils';
+import { logError } from '../utils/errorLogger';
 
 export default function LogicBuildingContest() {
         // State for inline while loop suggestion
@@ -215,7 +216,7 @@ export default function LogicBuildingContest() {
         setPrizeTitle(map.logic_weekly_prize_title || '');
         setPrizeDescription(map.logic_weekly_prize_description || '');
       } catch (err) {
-        console.warn('Unable to load weekly prize config:', err.message);
+        logError({ message: 'Unable to load weekly prize config', source: 'LogicBuildingContest', details: err.message });
       }
     };
     loadPrizeConfig();

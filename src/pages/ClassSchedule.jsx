@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { Calendar, Plus, Clock, Video, ExternalLink, Trash2, X } from 'lucide-react';
 import AlertModal from '../components/AlertModal';
 import { sendAdminNotification } from '../utils/adminNotifications';
+import { logError } from '../utils/errorLogger';
 import {
   addMonths,
   eachDayOfInterval,
@@ -313,7 +314,7 @@ const ClassSchedule = ({
 
       loadSessions();
     } catch (error) {
-      console.error('Error ending session:', error);
+      logError({ message: 'Error ending session:', source: 'ClassSchedule', details: error });
       setAlertModal({
         show: true,
         title: 'Error',
@@ -351,7 +352,7 @@ const ClassSchedule = ({
 
       loadSessions();
     } catch (error) {
-      console.error('Error deleting session:', error);
+      logError({ message: 'Error deleting session:', source: 'ClassSchedule', details: error });
       setAlertModal({
         show: true,
         title: 'Error',
@@ -552,7 +553,7 @@ const ClassSchedule = ({
         }
       }
     } catch (notificationError) {
-      console.error('Failed to create class notifications:', notificationError);
+      logError({ message: 'Failed to create class notifications:', source: 'ClassSchedule', details: notificationError });
     }
 
     if (profile?.role === 'teacher') {

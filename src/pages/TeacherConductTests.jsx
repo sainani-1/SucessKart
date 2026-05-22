@@ -5,6 +5,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import { Save, Plus, Trash2, BookOpen, Users, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { sendAdminNotification } from '../utils/adminNotifications';
+import { logWarn } from '../utils/errorLogger';
 
 const makeEmptyQuestion = (examId, orderIndex = 0) => ({
   exam_id: examId,
@@ -476,7 +477,7 @@ function TeacherConductTests() {
         }
 
         if (notificationError) {
-          console.warn('Teacher test notifications could not be created:', notificationError.message || notificationError);
+          logWarn({ message: 'Teacher test notifications could not be created:', source: 'TeacherConductTests', details: notificationError.message || notificationError })
         }
       }
 

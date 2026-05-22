@@ -1,4 +1,5 @@
 import { supabase } from '../supabaseClient';
+import { logError } from '../utils/errorLogger';
 
 const navLogState = new Map();
 const NAV_THROTTLE_MS = 4000;
@@ -32,7 +33,7 @@ export const logAdminActivity = async ({
     if (error) throw error;
   } catch (error) {
     if (!isMissingTableError(error)) {
-      console.warn('Admin activity log insert failed:', error?.message || error);
+      logError({ message: 'Admin activity log insert failed', source: 'adminActivityLogger', details: error });
     }
   }
 };

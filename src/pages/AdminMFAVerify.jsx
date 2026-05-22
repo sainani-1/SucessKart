@@ -6,6 +6,7 @@ import AlertModal from "../components/AlertModal";
 import Toast from "../components/Toast";
 import { useAuth } from "../context/AuthContext";
 import { LogOut, ShieldCheck, ArrowLeft } from "lucide-react";
+import { logError } from "../utils/errorLogger";
 
 export default function AdminMFAVerify() {
   const [code, setCode] = useState(["", "", "", "", "", ""]);
@@ -148,7 +149,7 @@ export default function AdminMFAVerify() {
       });
       setTimeout(() => navigate(nextPath, { replace: true }), 1200);
     } catch (err) {
-      console.error(err);
+      logError({ message: String(err), source: 'AdminMFAVerify', details: err });
       setAlert({ show: true, title: "Verification Failed", message: err.message || "Could not verify MFA code.", type: "error" });
       resetCodeAndFocusFirst();
     } finally {

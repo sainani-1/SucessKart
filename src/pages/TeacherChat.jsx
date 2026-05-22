@@ -5,6 +5,7 @@ import { useChat } from '../context/ChatContext';
 import { usePresenceContext } from '../context/PresenceContext';
 import { Send, MessageCircle, Users, Search, ChevronDown } from 'lucide-react';
 import { markChatAsRead } from '../utils/chatReadState';
+import { logError } from '../utils/errorLogger';
 
 const TeacherChat = () => {
   const { profile } = useAuth();
@@ -169,7 +170,7 @@ const TeacherChat = () => {
         lastMessage: lastByGroup[g.id] || null,
         studentNames: nameByGroup[g.id] || ['Student']
       })));
-    } catch (err) { console.error('Error loading groups:', err); }
+    } catch (err) { logError({ message: 'Error loading groups:', source: 'TeacherChat', details: err }) }
     finally { setGroupsLoaded(true); }
   };
 
@@ -199,7 +200,7 @@ const TeacherChat = () => {
       setHasMoreOldMessages((data || []).length === 8);
       await markChatAsRead(profile.id, selectedGroup);
       await loadReceiverReadState();
-    } catch (err) { console.error('Error loading messages:', err); }
+    } catch (err) { logError({ message: 'Error loading messages:', source: 'TeacherChat', details: err }) }
   };
 
   const loadNewMessagesOnly = async () => {
@@ -217,7 +218,7 @@ const TeacherChat = () => {
         setMessages(prev => [...prev, ...data]);
       }
       await markChatAsRead(profile.id, selectedGroup);
-    } catch (err) { console.error('Error refreshing messages:', err); }
+    } catch (err) { logError({ message: 'Error refreshing messages:', source: 'TeacherChat', details: err }) }
   };
 
   const loadOlderMessages = async () => {
@@ -238,7 +239,7 @@ const TeacherChat = () => {
       } else {
         setHasMoreOldMessages(false);
       }
-    } catch (err) { console.error('Error loading older messages:', err); }
+    } catch (err) { logError({ message: 'Error loading older messages:', source: 'TeacherChat', details: err }) }
     finally { setLoadingOlder(false); }
   };
 
@@ -250,7 +251,7 @@ const TeacherChat = () => {
         .select('*, profiles(full_name, avatar_url, email)')
         .eq('group_id', selectedGroup);
       setGroupMembers(data || []);
-    } catch (err) { console.error('Error loading members:', err); }
+    } catch (err) { logError({ message: 'Error loading members:', source: 'TeacherChat', details: err }) }
   };
 
   const sendMessage = async () => {
@@ -273,7 +274,7 @@ const TeacherChat = () => {
       }
       await markChatAsRead(profile.id, selectedGroup);
       loadChatGroups();
-    } catch (err) { console.error('Error sending:', err); }
+    } catch (err) { logError({ message: 'Error sending:', source: 'TeacherChat', details: err }) }
   };
 
   const { isOnline } = usePresenceContext();

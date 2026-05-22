@@ -7,6 +7,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import { buildWhatsAppShareUrl, trackPremiumEvent } from '../utils/growth';
 import { getCertificateDisplayName, hasApprovedIdentity } from '../utils/identityVerification';
 import { buildCertificateDataUrl } from '../utils/certificateCanvas';
+import { logError } from '../utils/errorLogger';
 
 /**
  * MyCertificates Component
@@ -137,7 +138,7 @@ const MyCertificates = () => {
       pdf.save(fileName);
       setDownloading(null);
     } catch (err) {
-      console.error('Download error:', err);
+      logError({ message: 'Download error:', source: 'MyCertificates', details: err })
       openPopup('Download failed', 'Failed to download certificate.', 'error');
       setDownloading(null);
     }
@@ -151,7 +152,7 @@ const MyCertificates = () => {
       trackPremiumEvent('certificate_share_linkedin', 'my_certificates', { certId }, profile?.id || null);
       window.open(linkedinUrl, '_blank', 'noopener,noreferrer');
     } catch (err) {
-      console.error('LinkedIn share error:', err);
+      logError({ message: 'LinkedIn share error:', source: 'MyCertificates', details: err })
       openPopup('Share failed', 'Unable to open LinkedIn share.', 'error');
     }
   };
@@ -164,7 +165,7 @@ const MyCertificates = () => {
       trackPremiumEvent('certificate_share_whatsapp', 'my_certificates', { certId }, profile?.id || null);
       window.open(buildWhatsAppShareUrl(text), '_blank', 'noopener,noreferrer');
     } catch (err) {
-      console.error('WhatsApp share error:', err);
+      logError({ message: 'WhatsApp share error:', source: 'MyCertificates', details: err })
       openPopup('Share failed', 'Unable to open WhatsApp share.', 'error');
     }
   };
@@ -310,7 +311,7 @@ const MyCertificates = () => {
         setRevokedCount(revoked);
         setCertificates(merged);
       } catch (err) {
-        console.error(err);
+        logError({ message: err, source: 'MyCertificates', details: null })
       } finally {
         setLoading(false);
       }

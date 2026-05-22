@@ -135,6 +135,7 @@ import AdminCareerAnalytics from './pages/AdminCareerAnalytics';
 import PortfolioBuilder from './pages/PortfolioBuilder';
 import PublicPortfolio from './pages/PublicPortfolio';
 import AdminLoginOtpSettings from './pages/AdminLoginOtpSettings';
+import AdminErrorLogs from './pages/AdminErrorLogs';
 import {
   AchievementTimeline,
   AdminAtRiskStudents,
@@ -148,7 +149,8 @@ import {
 } from './pages/ZeroCostGrowthPanels';
 
 const ProtectedRoute = ({ children }) => {
-  const { user, profile, realProfile, isImpersonating, loading } = useAuth();
+  const auth = useAuth();
+  const { user, profile, realProfile, isImpersonating, loading } = auth || {};
   const [supportContactEmail, setSupportContactEmail] = useState('');
 
   const handleBlockedAccountLogout = async () => {
@@ -177,7 +179,7 @@ const ProtectedRoute = ({ children }) => {
     };
   }, [realProfile?.is_disabled, realProfile?.is_locked]);
 
-  if (loading) return <LoadingSpinner message="Initializing your account..." />;
+  if (loading || !auth) return <LoadingSpinner message="Initializing your account..." />;
   if (!user) return <Navigate to="/login" />;
   const isGoogleAuth = user?.app_metadata?.provider === 'google' || profile?.auth_provider === 'google';
   const googleProfileIncomplete =
@@ -264,10 +266,10 @@ const ProtectedRoute = ({ children }) => {
 };
 
 const AdminRoute = ({ children }) => {
+  const auth = useAuth();
+  const { realProfile, loading } = auth || {};
 
-  const { realProfile, loading } = useAuth();
-
-  if (loading)
+  if (loading || !auth)
     return <LoadingSpinner message="Loading dashboard..." />;
 
   if (realProfile?.role !== "admin")
@@ -277,9 +279,10 @@ const AdminRoute = ({ children }) => {
 };
 
 const TeacherRoute = ({ children }) => {
-  const { profile, loading } = useAuth();
+  const auth = useAuth();
+  const { profile, loading } = auth || {};
 
-  if (loading) return <LoadingSpinner message="Loading dashboard..." />;
+  if (loading || !auth) return <LoadingSpinner message="Loading dashboard..." />;
   if (!profile || profile.role !== "teacher")
     return <Navigate to="/app" />;
 
@@ -287,9 +290,10 @@ const TeacherRoute = ({ children }) => {
 };
 
 const InstructorRoute = ({ children }) => {
-  const { profile, loading } = useAuth();
+  const auth = useAuth();
+  const { profile, loading } = auth || {};
 
-  if (loading) return <LoadingSpinner message="Loading dashboard..." />;
+  if (loading || !auth) return <LoadingSpinner message="Loading dashboard..." />;
   if (!profile || profile.role !== "instructor")
     return <Navigate to="/app" />;
 
@@ -297,19 +301,21 @@ const InstructorRoute = ({ children }) => {
 };
 
 const VerifierRoute = ({ children }) => {
-  const { profile, loading } = useAuth();
+  const auth = useAuth();
+  const { profile, loading } = auth || {};
 
-  if (loading) return <LoadingSpinner message="Loading verifier panel..." />;
+  if (loading || !auth) return <LoadingSpinner message="Loading verifier panel..." />;
   if (!profile || profile.role !== "verifier") return <Navigate to="/app" />;
 
   return children;
 };
 
 const StaffAllInOneRoute = ({ children }) => {
-  const { realProfile, profile, loading } = useAuth();
+  const auth = useAuth();
+  const { realProfile, profile, loading } = auth || {};
   const activeRole = realProfile?.role || profile?.role;
 
-  if (loading) return <LoadingSpinner message="Loading live monitoring..." />;
+  if (loading || !auth) return <LoadingSpinner message="Loading live monitoring..." />;
   if (!['admin', 'teacher', 'instructor'].includes(activeRole)) {
     return <Navigate to="/app" />;
   }
@@ -476,6 +482,7 @@ function App() {
           <Route path="admin/website-protection" element={<AdminRoute><AdminWebsiteProtection /></AdminRoute>} />
           <Route path="admin/support-contact" element={<AdminRoute><AdminSupportContact /></AdminRoute>} />
           <Route path="admin/activity-logs" element={<AdminRoute><AdminActivityLogs /></AdminRoute>} />
+          <Route path="admin/error-logs" element={<AdminRoute><AdminErrorLogs /></AdminRoute>} />
           <Route path="admin/online" element={<AdminRoute><AdminOnline /></AdminRoute>} />
           <Route path="admin/growth-analytics" element={<AdminRoute><AdminGrowthAnalytics /></AdminRoute>} />
           <Route path="admin/lead-inbox" element={<AdminRoute><AdminLeadInbox /></AdminRoute>} />

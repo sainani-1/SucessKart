@@ -4,6 +4,7 @@ import { supabase } from '../supabaseClient';
 import LoadingSpinner from '../components/LoadingSpinner';
 import usePopup from '../hooks/usePopup.jsx';
 import { useAuth } from '../context/AuthContext';
+import { logError } from '../utils/errorLogger';
 
 const AdminStartupIdeas = () => {
   const { profile } = useAuth();
@@ -45,7 +46,7 @@ const AdminStartupIdeas = () => {
       if (error) throw error;
       setIdeas(data || []);
     } catch (error) {
-      console.error('Error loading startup ideas:', error);
+      logError({ message: 'Error loading startup ideas:', source: 'AdminStartupIdeas', details: error });
       openPopup('Load failed', error.message || 'Could not load startup ideas.', 'error');
     } finally {
       setLoading(false);
@@ -85,7 +86,7 @@ const AdminStartupIdeas = () => {
       openPopup('Updated', `Idea ${status} successfully.`, 'success');
       await loadIdeas();
     } catch (error) {
-      console.error('Error updating startup idea:', error);
+      logError({ message: 'Error updating startup idea:', source: 'AdminStartupIdeas', details: error });
       openPopup('Update failed', error.message || 'Could not update idea.', 'error');
     }
   };

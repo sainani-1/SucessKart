@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { setContestQuestions } from './contestModel';
 import { weeklyContest } from './contestModel';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { logError } from '../utils/errorLogger';
 
 export default function AdminContestSetup() {
   const [questions, setQuestions] = useState([]);
@@ -75,7 +76,7 @@ export default function AdminContestSetup() {
       didTimeout = true;
       setLoading(false);
       setError('Save timed out. Check your network or Firestore rules.');
-      console.error('Firestore save timed out.');
+      logError({ message: 'Firestore save timed out.', source: 'AdminContestSetup', details: null });
     }, 8000);
     weeklyContest.save()
       .then(() => {
@@ -91,7 +92,7 @@ export default function AdminContestSetup() {
         clearTimeout(timeout);
         setLoading(false);
         setError((e && e.message) ? e.message : 'Failed to save contest');
-        console.error('Firestore save error:', e);
+        logError({ message: 'Firestore save error', source: 'AdminContestSetup', details: e });
       });
   }
 

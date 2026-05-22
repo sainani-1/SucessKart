@@ -85,11 +85,6 @@ export async function getContestResultState() {
   const nowHour = date.getHours();
   const nowMin = date.getMinutes();
   const shouldLog = import.meta.env.DEV && import.meta.env.VITE_LOGIC_BUILDING_DEBUG === 'true';
-  if (shouldLog) {
-    console.log('[LogicBuilding] Server time:', date.toString());
-    console.log('[LogicBuilding] Server day:', day, '| Contest day:', weeklyContest.day);
-    console.log('[LogicBuilding] Server hour:min:', nowHour + ':' + nowMin, '| Contest window:', weeklyContest.startTime, '-', weeklyContest.endTime);
-  }
 
   const startMinutes = startHour * 60 + startMin;
   const endMinutes = endHour * 60 + endMin;
@@ -107,9 +102,7 @@ export async function getContestResultState() {
     isResultTime = !isContestDay && nowMinutes > endMinutes && nowMinutes < startMinutes;
   }
 
-  if (shouldLog) {
-    console.log('[LogicBuilding] In window:', inWindow);
-  }
+
 
   return {
     checkedAt: date,

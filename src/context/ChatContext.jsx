@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from './AuthContext';
 import { getChatReadTimes } from '../utils/chatReadState';
+import { logError } from '../utils/errorLogger';
 
 const ChatContext = createContext();
 
@@ -70,7 +71,7 @@ export const ChatProvider = ({ children }) => {
       } catch (error) {
         setTotalUnreadCount(0);
         if (!isFetchNetworkIssue(error)) {
-          console.error('ChatContext: Error loading unread count:', error);
+          logError({ message: 'ChatContext: Error loading unread count', source: 'ChatContext', details: error });
         }
       }
     };

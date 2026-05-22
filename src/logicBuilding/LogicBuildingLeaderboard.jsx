@@ -13,6 +13,7 @@ import {
   notifyTopFivePlacement
 } from './leaderboardUtils';
 import { getContestResultState, weeklyContest } from './contestModel';
+import { logError } from '../utils/errorLogger';
 
 const rankStyles = [
   'from-amber-400 to-yellow-500 text-slate-950',
@@ -75,7 +76,7 @@ export default function LogicBuildingLeaderboard() {
         const nextState = await getContestResultState();
         if (active) setResultState(nextState);
       } catch (err) {
-        console.warn('Unable to load logic contest result state:', err?.message || err);
+        logError({ message: 'Unable to load logic contest result state', source: 'LogicBuildingLeaderboard', details: err?.message || err });
       }
     };
 

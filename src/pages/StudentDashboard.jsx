@@ -12,6 +12,7 @@ import { copyText, trackPremiumEvent } from '../utils/growth';
 import { getPublicAppUrl } from '../utils/appUrl';
 import { isLifetimePremium } from '../utils/premium';
 import { formatVideoResumeLabel, getVideoCompletionPercent, readVideoProgress } from '../utils/videoProgress';
+import { logError } from '../utils/errorLogger';
 
 // Offer congrats widget
 const OfferCongrats = ({ offer }) => (
@@ -98,7 +99,7 @@ const StudentDashboard = () => {
           .limit(5);
 
         if (error) {
-          console.error('Error loading class session alerts:', error);
+          logError({ message: 'Error loading class session alerts:', source: 'StudentDashboard', details: error })
           return;
         }
 
@@ -120,7 +121,7 @@ const StudentDashboard = () => {
         }));
         setClassAlerts(alerts);
       } catch (err) {
-        console.error('Error loading class alerts:', err);
+        logError({ message: 'Error loading class alerts:', source: 'StudentDashboard', details: err })
       }
     };
 
@@ -154,7 +155,7 @@ const StudentDashboard = () => {
         const code = await ensureReferralCode(profile.id, profile.full_name);
         setReferralCode(code || '');
       } catch (error) {
-        console.error('Error loading referral code:', error);
+        logError({ message: 'Error loading referral code:', source: 'StudentDashboard', details: error })
       }
     };
     loadReferralCode();
@@ -178,7 +179,7 @@ const StudentDashboard = () => {
           paid: rows.filter((row) => row.qualified_payment_id || row.status === 'qualified' || row.status === 'rewarded').length
         });
       } catch (error) {
-        console.error('Error loading referral stats:', error);
+        logError({ message: 'Error loading referral stats:', source: 'StudentDashboard', details: error })
       }
     };
 
@@ -284,7 +285,7 @@ const StudentDashboard = () => {
         setExamResults(examsByourse);
       }
     } catch (err) {
-      console.error('Error fetching exam results:', err);
+      logError({ message: 'Error fetching exam results:', source: 'StudentDashboard', details: err })
     }
     
     // Fetch assigned teacher

@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import LoadingSpinner from '../components/LoadingSpinner';
 import LiveExamStreamMonitor from '../components/LiveExamStreamMonitor';
 import AvatarImage from '../components/AvatarImage';
+import { logWarn } from '../utils/errorLogger';
 
 const LIVE_EXAM_CONTEXT_KEY = 'live_exam_context';
 const BOOKING_WINDOW_DAYS = 60;
@@ -204,7 +205,7 @@ async function insertNotifications(rows) {
   if (error) {
     const message = String([error.message, error.details, error.hint].filter(Boolean).join(' ').toLowerCase());
     if (message.includes('row-level security') || message.includes('permission denied')) {
-      console.warn('Live exam notifications skipped because admin_notifications is blocked by RLS.');
+      logWarn({ message: 'Live exam notifications skipped because admin_notifications is blocked by RLS.', source: 'LiveExamProctoring', details: null })
       return false;
     }
     throw error;
@@ -216,7 +217,7 @@ async function insertLiveSystemMessages(rows) {
   if (!rows.length) return;
   const { error } = await supabase.from('exam_live_messages').insert(rows);
   if (error) {
-    console.warn('Live exam fallback messages failed.', error.message || error);
+    logWarn({ message: 'Live exam fallback messages failed.', source: 'LiveExamProctoring', details: error.message || error })
   }
 }
 
@@ -252,7 +253,7 @@ async function loadNotificationRecipientRoles(recipientIds, fallbackRole) {
     const roleById = new Map((data || []).map((row) => [String(row.id), row.role || fallbackRole]));
     return ids.map((id) => ({ id, role: roleById.get(id) || fallbackRole }));
   } catch (error) {
-    console.warn('Live exam recipient role lookup failed.', error.message || error);
+    logWarn({ message: 'Live exam recipient role lookup failed.', source: 'LiveExamProctoring', details: error.message || error })
     return fallbackMap;
   }
 }
@@ -269,7 +270,7 @@ async function loadAssignedTeacherIdsForStudent(studentId) {
     if (error) throw error;
     return uniqueIds((data || []).map((row) => row.teacher_id));
   } catch (error) {
-    console.warn('Live exam teacher assignment lookup failed.', error.message || error);
+    logWarn({ message: 'Live exam teacher assignment lookup failed.', source: 'LiveExamProctoring', details: error.message || error })
     return [];
   }
 }
@@ -1602,7 +1603,7 @@ export default function LiveExamProctoring({ forcedPanel = '' }) {
         try {
           nextSlotBookingCounts = await loadLiveExamBookingCounts(finalSlotRows.map((slot) => slot.id));
         } catch (countError) {
-          console.warn('Live exam booking counts unavailable.', countError.message || countError);
+          logWarn({ message: 'Live exam booking counts unavailable.', source: 'LiveExamProctoring', details: countError.message || countError })
         }
       }
 
@@ -3016,10 +3017,10 @@ export default function LiveExamProctoring({ forcedPanel = '' }) {
           throw messageError;
         }
       } else if (messageError) {
-        console.warn('Live exam message delivery failed.', messageError.message || messageError);
+        logWarn({ message: 'Live exam message delivery failed.', source: 'LiveExamProctoring', details: messageError.message || messageError })
       }
       if (actionError) {
-        console.warn('Live exam action log failed.', actionError.message || actionError);
+        logWarn({ message: 'Live exam action log failed.', source: 'LiveExamProctoring', details: actionError.message || actionError })
       }
 
       const slot = slots.find((row) => String(row.id) === String(targetSession.slot_id));

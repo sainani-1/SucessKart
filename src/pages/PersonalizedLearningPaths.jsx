@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabaseClient';
 import { Sparkles, BookOpen, Target, AlertCircle } from 'lucide-react';
+import { logError } from '../utils/errorLogger';
 
 const PersonalizedLearningPaths = () => {
   const { profile } = useAuth();
@@ -56,7 +57,7 @@ const PersonalizedLearningPaths = () => {
           setPaths(generatedPaths);
         }
       } catch (err) {
-        console.error('Error loading paths:', err);
+        logError({ message: 'Error loading paths:', source: 'PersonalizedLearningPaths', details: err })
       } finally {
         setLoading(false);
       }

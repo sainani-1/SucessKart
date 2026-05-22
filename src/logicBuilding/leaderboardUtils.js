@@ -1,6 +1,7 @@
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from './firebase';
 import { supabase } from '../supabaseClient';
+import { logError } from '../utils/errorLogger';
 
 export const estimateCodeComplexity = (code = '') => {
   const source = String(code || '').toLowerCase();
@@ -132,7 +133,7 @@ export const notifyTopFivePlacement = async ({ profile, member, incrementUnreadN
     localStorage.setItem(storageKey, 'true');
     incrementUnreadNotifications?.(1);
   } catch (error) {
-    console.warn('Logic leaderboard notification failed:', error?.message || error);
+    logError({ message: 'Logic leaderboard notification failed', source: 'leaderboardUtils', details: error?.message || error });
   }
 };
 
@@ -208,6 +209,6 @@ export const awardLogicBuildingWinnerCertificate = async ({ profile, member, inc
       localStorage.setItem(storageKey, 'true');
       return;
     }
-    console.warn('Logic winner certificate award failed:', error?.message || error);
+    logError({ message: 'Logic winner certificate award failed', source: 'leaderboardUtils', details: error?.message || error });
   }
 };

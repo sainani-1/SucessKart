@@ -5,6 +5,7 @@ import { MessageCircle, Send, Bot, User, Crown, Lock, BookOpen, Lightbulb, Arrow
 import { supabase } from '../supabaseClient';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { generateAssistantReply } from '../utils/aiAssistant';
+import { logError } from '../utils/errorLogger';
 
 const AILearningPath = () => {
   const { profile } = useAuth();
@@ -46,7 +47,7 @@ const AILearningPath = () => {
       if (error) throw error;
       setCourses(data || []);
     } catch (err) {
-      console.error('Error loading courses:', err);
+      logError({ message: 'Error loading courses:', source: 'AILearningPath', details: err });
     } finally {
       setLoadingCourses(false);
     }

@@ -1,4 +1,5 @@
 import { supabase } from '../supabaseClient';
+import { logError } from '../utils/errorLogger';
 
 const getStorageKey = (userId) => `chatReadTimes_${userId}`;
 
@@ -57,7 +58,7 @@ export const markChatAsRead = async (userId, groupId, readAt = new Date().toISOS
     .upsert(payload, { onConflict: 'user_id,group_id' });
 
   if (error) {
-    console.error('Error saving chat read state:', error);
+    logError({ message: 'Error saving chat read state', source: 'chatReadState', details: error });
   }
 
   return readAtIso;
@@ -86,7 +87,7 @@ export const markChatsAsRead = async (userId, groupIds, readAt = new Date().toIS
     .upsert(payload, { onConflict: 'user_id,group_id' });
 
   if (error) {
-    console.error('Error saving chat read states:', error);
+    logError({ message: 'Error saving chat read states', source: 'chatReadState', details: error });
   }
 
   return localTimes;
@@ -107,7 +108,7 @@ export const getChatReadTimes = async (userId, groupIds) => {
     .in('group_id', uniqueGroupIds);
 
   if (error) {
-    console.error('Error loading chat read states:', error);
+    logError({ message: 'Error loading chat read states', source: 'chatReadState', details: error });
     return localTimes;
   }
 
@@ -141,7 +142,7 @@ export const getChatReadTimes = async (userId, groupIds) => {
       .upsert(syncPayload, { onConflict: 'user_id,group_id' });
 
     if (syncError) {
-      console.error('Error syncing local chat read states:', syncError);
+      logError({ message: 'Error syncing local chat read states', source: 'chatReadState', details: syncError });
     }
   }
 

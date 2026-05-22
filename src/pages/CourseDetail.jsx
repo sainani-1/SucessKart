@@ -28,6 +28,7 @@ import { fetchCourseProtectedAssets } from '../utils/courseProtectedAssets';
 import { readBrowserState, upsertRecentItem, writeBrowserState } from '../utils/browserState';
 import { buildPlanCheckoutPath } from '../utils/planCheckout';
 import { getVideoCompletionPercent, readVideoProgress, writeVideoProgress } from '../utils/videoProgress';
+import { logError } from '../utils/errorLogger';
 
 const APP_ORIGIN = typeof window !== 'undefined' ? window.location.origin : '';
 const VIDEO_PROGRESS_SAVE_INTERVAL_SECONDS = 5;
@@ -1286,7 +1287,7 @@ const CourseDetail = () => {
           .eq('course_id', courseId)
           .maybeSingle();
         if (enrollmentError) {
-          console.error('Error checking enrollment:', enrollmentError);
+          logError({ message: 'Error checking enrollment:', source: 'CourseDetail', details: enrollmentError });
         }
         isEnrolled = !!data;
         setEnrolled(isEnrolled);
@@ -1300,14 +1301,14 @@ const CourseDetail = () => {
           const assets = await fetchCourseProtectedAssets(courseId);
           setProtectedAssets(assets);
         } catch (assetError) {
-          console.error('Error fetching protected course assets:', assetError);
+          logError({ message: 'Error fetching protected course assets:', source: 'CourseDetail', details: assetError });
           openPopup('Access blocked', 'Protected course files are not available for this account.', 'warning');
         } finally {
           setAssetsLoading(false);
         }
       }
     } catch (error) {
-      console.error('Error fetching course:', error);
+      logError({ message: 'Error fetching course:', source: 'CourseDetail', details: error });
     } finally {
       setPageLoading(false);
     }
@@ -1386,7 +1387,7 @@ const CourseDetail = () => {
         .eq('student_id', profile.id)
         .eq('course_id', courseId)
         .then(({ error: progressError }) => {
-          if (progressError) console.warn('Course video progress sync failed.', progressError.message || progressError);
+          if (progressError) logError({ message: 'Course video progress sync failed.', source: 'CourseDetail', details: progressError.message || progressError });
         });
     }
   };

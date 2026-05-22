@@ -1,4 +1,5 @@
 import { supabase } from '../supabaseClient';
+import { logError } from '../utils/errorLogger';
 
 const invokeUsernameRegistry = async (body) => {
   const {
@@ -49,7 +50,7 @@ export const ensureUsernamesForUsers = async (users) => {
       })),
     });
   } catch (error) {
-    console.warn('Username registry unavailable; continuing without username hydration:', error?.message || error);
+    logError({ message: 'Username registry unavailable; continuing without username hydration', source: 'usernames', details: error });
     return list.map((user) => ({
       ...user,
       username: user.username || '',

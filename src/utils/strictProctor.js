@@ -1,3 +1,5 @@
+import { logError } from '../utils/errorLogger';
+
 export function startStrictProctor({
   onViolation,
   onAutoSubmit
@@ -7,7 +9,7 @@ export function startStrictProctor({
 
   const addViolation = (reason) => {
     violations++;
-    console.warn("Violation:", reason);
+    logError({ message: 'Violation', source: 'strictProctor', details: reason });
 
     onViolation?.(violations, reason);
 

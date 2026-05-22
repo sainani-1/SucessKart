@@ -1,4 +1,5 @@
 import { supabase } from '../supabaseClient';
+import { logError } from '../utils/errorLogger';
 
 export const trackPremiumEvent = async (eventName, source, metadata = {}, userId = null) => {
   try {
@@ -9,7 +10,7 @@ export const trackPremiumEvent = async (eventName, source, metadata = {}, userId
       metadata,
     });
   } catch (error) {
-    console.error('Failed to track premium event:', error);
+    logError({ message: 'Failed to track premium event', source: 'growth', details: error });
   }
 };
 

@@ -31,15 +31,18 @@ export function PresenceProvider({ children }) {
     const ids = [...onlineUserIds];
     if (!ids.length) { setOnlineProfiles([]); return; }
 
+    const validIds = ids.filter(Boolean);
+    if (!validIds.length) { setOnlineProfiles([]); return; }
+
     supabase
       .from('profiles')
       .select('id, full_name, email, role, avatar_url')
-      .in('id', ids)
+      .in('id', validIds)
       .then(({ data }) => setOnlineProfiles(data || []))
       .catch(() => {});
   }, [onlineUserIds]);
 
-  const isOnline = useCallback((id) => onlineUserIds.has(Number(id)), [onlineUserIds]);
+  const isOnline = useCallback((id) => id && onlineUserIds.has(String(id)), [onlineUserIds]);
 
   return (
     <PresenceContext.Provider value={{ onlineUserIds, onlineProfiles, isOnline }}>

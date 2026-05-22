@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabaseClient';
 import LoadingSpinner from '../components/LoadingSpinner';
 import usePopup from '../hooks/usePopup.jsx';
+import { logError } from '../utils/errorLogger';
 
 const StartupIdeas = () => {
   const { profile } = useAuth();
@@ -48,7 +49,7 @@ const StartupIdeas = () => {
       if (error) throw error;
       setIdeas(data || []);
     } catch (error) {
-      console.error('Error loading startup ideas:', error);
+      logError({ message: 'Error loading startup ideas:', source: 'StartupIdeas', details: error })
       openPopup('Load failed', error.message || 'Could not load ideas.', 'error');
     } finally {
       setLoading(false);
@@ -88,7 +89,7 @@ const StartupIdeas = () => {
       openPopup('Submitted', 'Your startup idea was submitted to admin.', 'success');
       await loadMyIdeas();
     } catch (error) {
-      console.error('Error submitting startup idea:', error);
+      logError({ message: 'Error submitting startup idea:', source: 'StartupIdeas', details: error })
       openPopup('Submit failed', error.message || 'Could not submit idea.', 'error');
     } finally {
       setSubmitting(false);

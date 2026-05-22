@@ -1,4 +1,5 @@
 import { supabase } from '../supabaseClient';
+import { logError } from '../utils/errorLogger';
 
 export async function sendAdminNotification(payload) {
   try {
@@ -26,6 +27,6 @@ export async function sendAdminNotification(payload) {
       throw error;
     }
   } catch (error) {
-    console.warn('Admin notification failed:', error?.message || error);
+    logError({ message: 'Admin notification failed', source: 'adminNotifications', details: error });
   }
 }

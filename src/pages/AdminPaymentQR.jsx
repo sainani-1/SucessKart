@@ -3,6 +3,7 @@ import { supabase } from '../supabaseClient';
 import { Image, QrCode, Save } from 'lucide-react';
 import AlertModal from '../components/AlertModal';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { logError } from '../utils/errorLogger';
 
 const AdminPaymentQR = () => {
   const [premiumQr, setPremiumQr] = useState('');
@@ -27,9 +28,7 @@ const AdminPaymentQR = () => {
         if (setting.key === 'manual_payment_qr_premium') setPremiumQr(setting.value || '');
         if (setting.key === 'manual_payment_qr_plus') setPremiumPlusQr(setting.value || '');
       });
-    } catch (error) {
-      console.error('Error loading QR codes:', error);
-    } finally {
+    } catch {} finally {
       setLoading(false);
     }
   };

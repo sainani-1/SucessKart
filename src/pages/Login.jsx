@@ -12,6 +12,7 @@ import { useAuth } from '../context/AuthContext';
 import { clearAdminVerificationState } from '../utils/adminPasskey';
 import { getPendingAvatarKey } from '../utils/avatarUpload';
 import { reportMultiSessionViolation } from '../utils/sessionSecurity';
+import { logError, logWarn } from '../utils/errorLogger';
 
 const Login = () => {
   const { user, loading: authLoading } = useAuth();
@@ -71,7 +72,7 @@ const Login = () => {
       localStorage.removeItem(storageKey);
       return publicUrl;
     } catch (err) {
-      console.warn('Pending avatar apply failed:', err.message || err);
+      logWarn({ message: 'Pending avatar apply failed:', source: 'Login', details: err.message || err })
       return null;
     }
   };
@@ -220,7 +221,7 @@ const Login = () => {
       if (error) throw error;
       return data?.value !== 'false';
     } catch (error) {
-      console.warn('Login OTP setting check failed, defaulting to enabled:', error?.message || error);
+      logWarn({ message: 'Login OTP setting check failed, defaulting to enabled:', source: 'Login', details: error?.message || error })
       return true;
     }
   };
@@ -593,7 +594,7 @@ const Login = () => {
       try {
         await attachPendingReferral(signInData.user.id, signInData.user.email || email.trim());
       } catch (referralError) {
-        console.warn('Referral attach failed after login:', referralError.message || referralError);
+        logWarn({ message: 'Referral attach failed after login:', source: 'Login', details: referralError.message || referralError })
       }
 
       // Check for admin role and MFA
@@ -627,7 +628,7 @@ const Login = () => {
       setInlineNotice('');
       navigate('/app');
     } catch (error) {
-      console.error('Error during login:', error);
+      logError({ message: 'Error during login:', source: 'Login', details: error })
       setAlertModal({
         show: true,
         title: 'Error',

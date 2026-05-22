@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { logError } from '../utils/errorLogger';
 
 const recommendations = [
   { title: 'Backend Engineer Path', steps: ['Data Structures & Algorithms', 'APIs with Node.js', 'SQL + PostgreSQL', 'System Design Basics'], cta: 'View roadmap' },
@@ -47,7 +48,7 @@ const CareerGuidance = () => {
         .order('created_at', { ascending: false });
       setRequests(data || []);
     } catch (error) {
-      console.error('Error loading requests:', error);
+      logError({ message: 'Error loading requests:', source: 'CareerGuidance', details: error });
     } finally {
       setLoading(false);
     }

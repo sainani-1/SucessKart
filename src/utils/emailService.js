@@ -2,12 +2,6 @@
 // These are stubs - integrate with SendGrid, AWS SES, or your email service
 
 export const sendSessionReminder = async (userEmail, userName, sessionTitle, sessionTime, joinLink) => {
-  console.log('📧 [EMAIL STUB] Sending session reminder...');
-  console.log({
-    to: userEmail,
-    subject: `Reminder: ${sessionTitle} starts in 20 minutes`,
-    body: `Hi ${userName},\n\nYour session "${sessionTitle}" starts at ${sessionTime}.\n\nJoin here: ${joinLink}\n\nSee you soon!\n- SkillPro Team`
-  });
   
   // TODO: Integrate with actual email service
   // Example with SendGrid:
@@ -24,46 +18,22 @@ export const sendSessionReminder = async (userEmail, userName, sessionTitle, ses
 };
 
 export const sendPremiumExpiryReminder = async (userEmail, userName, expiryDate) => {
-  console.log('📧 [EMAIL STUB] Sending premium expiry reminder...');
-  console.log({
-    to: userEmail,
-    subject: 'Your Premium Access Expires in 5 Days',
-    body: `Hi ${userName},\n\nYour premium access expires on ${expiryDate}.\n\nRenew now: https://skillpro.com/app/payment\n\n- SkillPro Team`
-  });
   
   // TODO: Integrate with actual email service
   return { success: true, stub: true };
 };
 
 export const sendWelcomeEmail = async (userEmail, userName) => {
-  console.log('📧 [EMAIL STUB] Sending welcome email...');
-  console.log({
-    to: userEmail,
-    subject: 'Welcome to SkillPro!',
-    body: `Hi ${userName},\n\nWelcome to SkillPro! Start your learning journey today.\n\n- SkillPro Team`
-  });
   
   return { success: true, stub: true };
 };
 
 export const sendTeacherAssignmentEmail = async (userEmail, userName, teacherName) => {
-  console.log('📧 [EMAIL STUB] Sending teacher assignment notification...');
-  console.log({
-    to: userEmail,
-    subject: `You've been assigned to ${teacherName}`,
-    body: `Hi ${userName},\n\nGreat news! ${teacherName} is now your assigned teacher.\n\nYou can start chatting and attending live classes.\n\n- SkillPro Team`
-  });
   
   return { success: true, stub: true };
 };
 
 export const sendCertificateEmail = async (userEmail, userName, courseTitle, certificateId) => {
-  console.log('📧 [EMAIL STUB] Sending certificate notification...');
-  console.log({
-    to: userEmail,
-    subject: `Congratulations! You earned a certificate`,
-    body: `Hi ${userName},\n\nCongratulations on completing ${courseTitle}!\n\nView your certificate: https://skillpro.com/verify/${certificateId}\n\n- SkillPro Team`
-  });
   
   return { success: true, stub: true };
 };
@@ -71,7 +41,6 @@ export const sendCertificateEmail = async (userEmail, userName, courseTitle, cer
 // Cron job function to check and send reminders
 // This should run every 5 minutes
 export const checkAndSendReminders = async () => {
-  console.log('🔔 [CRON STUB] Checking for pending reminders...');
   
   // TODO: Query renewal_reminders table
   // TODO: Send emails for due reminders

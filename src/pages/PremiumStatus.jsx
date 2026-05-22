@@ -8,6 +8,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import PremiumGiftCelebration from '../components/PremiumGiftCelebration';
 import { getPremiumPlanType, hasPremiumAccess, isLifetimePremium, formatPremiumLabel, getPremiumDaysRemaining, isPremiumExpiringSoon } from '../utils/premium';
 import { buildPlanCheckoutPath } from '../utils/planCheckout';
+import { logError } from '../utils/errorLogger';
 
 const PremiumStatus = () => {
   const { profile } = useAuth();
@@ -61,7 +62,7 @@ const PremiumStatus = () => {
         .eq('user_id', profile.id);
 
       if (assignmentsError) {
-        console.error('Error loading assigned offers:', assignmentsError);
+        logError({ message: 'Error loading assigned offers:', source: 'PremiumStatus', details: assignmentsError })
       }
 
       const assignedOffers = (assignments || []).map((assignment) => assignment.offers);
@@ -72,7 +73,7 @@ const PremiumStatus = () => {
         .eq('applies_to_all', true);
 
       if (globalOffersError) {
-        console.error('Error loading global offers:', globalOffersError);
+        logError({ message: 'Error loading global offers:', source: 'PremiumStatus', details: globalOffersError })
       }
 
       const { data: redemptions } = await supabase
@@ -114,7 +115,7 @@ const PremiumStatus = () => {
         });
       }
     } catch (error) {
-      console.error('Error loading premium details:', error);
+      logError({ message: 'Error loading premium details:', source: 'PremiumStatus', details: error })
       openPopup('Error', 'Failed to load premium details', 'error');
     } finally {
       setLoading(false);

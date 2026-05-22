@@ -5,6 +5,7 @@ import { Unlock, Clock, CheckCircle, Search, RefreshCw, ShieldOff, Trash2 } from
 import usePopup from '../hooks/usePopup.jsx';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { logAdminActivity } from '../utils/adminActivityLogger';
+import { logError } from '../utils/errorLogger';
 
 /**
  * AdminExamRetakes Component
@@ -146,7 +147,7 @@ const AdminExamRetakes = () => {
         .order('updated_at', { ascending: false });
 
       if (attemptBlocksError) {
-        console.error('Error loading attempt blocks:', attemptBlocksError);
+        logError({ message: 'Error loading attempt blocks:', source: 'AdminExamRetakes', details: attemptBlocksError });
       } else {
         const terminated = (attemptBlocks || [])
           .filter((row) => row.user)
@@ -168,7 +169,7 @@ const AdminExamRetakes = () => {
 
       setLockedStudents(Array.from(studentMap.values()));
     } catch (error) {
-      console.error('Error loading locked students:', error);
+      logError({ message: 'Error loading locked students:', source: 'AdminExamRetakes', details: error });
       openPopup('Error', 'Error loading exam cooldown data', 'error');
     } finally {
       setLoading(false);
@@ -227,7 +228,7 @@ const AdminExamRetakes = () => {
       });
       await loadLockedStudents();
     } catch (error) {
-      console.error('Error granting permission:', error);
+      logError({ message: 'Error granting permission:', source: 'AdminExamRetakes', details: error });
       openPopup('Error', `Failed to grant permission: ${error.message}`, 'error');
     } finally {
       setGrantingId(null);
@@ -271,7 +272,7 @@ const AdminExamRetakes = () => {
       });
       await loadLockedStudents();
     } catch (error) {
-      console.error('Error revoking permission:', error);
+      logError({ message: 'Error revoking permission:', source: 'AdminExamRetakes', details: error });
       openPopup('Error', 'Failed to revoke permission', 'error');
     } finally {
       setGrantingId(null);
@@ -322,7 +323,7 @@ const AdminExamRetakes = () => {
       });
       await loadLockedStudents();
     } catch (error) {
-      console.error('Error releasing terminated exam:', error);
+      logError({ message: 'Error releasing terminated exam:', source: 'AdminExamRetakes', details: error });
       openPopup('Error', `Failed to release terminated exam: ${error.message}`, 'error');
     } finally {
       setGrantingId(null);
@@ -378,7 +379,7 @@ const AdminExamRetakes = () => {
       });
       await loadLockedStudents();
     } catch (error) {
-      console.error('Error deleting failed exam record:', error);
+      logError({ message: 'Error deleting failed exam record:', source: 'AdminExamRetakes', details: error });
       openPopup('Error', `Failed to delete exam record: ${error.message}`, 'error');
     } finally {
       setGrantingId(null);

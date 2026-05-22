@@ -12,6 +12,7 @@ import {
   upsertCourseProtectedAssets
 } from '../utils/courseProtectedAssets';
 import { readBrowserState, writeBrowserState } from '../utils/browserState';
+import { logError } from '../utils/errorLogger';
 
 const COURSES_CACHE_KEY = 'course_list_cache';
 const COURSE_FORM_DRAFT_KEY = 'course_list_new_course_draft';
@@ -183,7 +184,7 @@ const CourseList = () => {
                 writeBrowserState(COURSES_CACHE_KEY, MOCK_COURSES);
               }
             } catch (error) {
-              console.error('Error fetching courses:', error);
+              logError({ message: 'Error fetching courses:', source: 'CourseList', details: error });
               setCourses(MOCK_COURSES);
               writeBrowserState(COURSES_CACHE_KEY, MOCK_COURSES);
             } finally {
@@ -241,7 +242,7 @@ const CourseList = () => {
                 setExamResults(results);
               }
             } catch (err) {
-              console.error('Error fetching exam results:', err);
+              logError({ message: 'Error fetching exam results:', source: 'CourseList', details: err });
             }
           };
           fetchExamResults();
@@ -312,7 +313,7 @@ const CourseList = () => {
             setShowAddCourseModal(false);
             openPopup('Course added', 'Course added successfully.', 'success');
           } catch (error) {
-            console.error('Error adding course:', error);
+            logError({ message: 'Error adding course:', source: 'CourseList', details: error });
             openPopup('Add failed', `Error adding course: ${error.message}`, 'error');
           }
         };
@@ -351,7 +352,7 @@ const CourseList = () => {
             setShowEditModal(false);
             openPopup('Course updated', 'Course updated successfully.', 'success');
           } catch (error) {
-            console.error('Error updating course:', error);
+            logError({ message: 'Error updating course:', source: 'CourseList', details: error });
             openPopup('Update failed', `Error updating course: ${error.message}`, 'error');
           }
         };
@@ -419,7 +420,7 @@ const CourseList = () => {
               setExamQuestions(draft || questions || []);
             }
           } catch (error) {
-            console.error('Error loading questions:', error);
+            logError({ message: 'Error loading questions:', source: 'CourseList', details: error });
             openPopup('Error', `Error loading exam: ${error.message}`, 'error');
             setExamQuestions([]);
             setSelectedExamId(null);

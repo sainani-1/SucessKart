@@ -4,6 +4,7 @@ import { Users, Search, UserPlus } from 'lucide-react';
 import AlertModal from '../components/AlertModal';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { TEACHING_ROLES } from '../utils/teachingRoles';
+import { logError } from '../utils/errorLogger';
 
 const TeacherAssignment = () => {
   const [students, setStudents] = useState([]);
@@ -47,7 +48,7 @@ const TeacherAssignment = () => {
         .order('full_name');
       
       if (studError) {
-        console.error('Error loading students:', studError);
+        logError({ message: 'Error loading students:', source: 'TeacherAssignment', details: studError })
       }
       setStudents(studs || []);
 
@@ -58,11 +59,11 @@ const TeacherAssignment = () => {
         .order('full_name');
       
       if (tchError) {
-        console.error('Error loading teachers:', tchError);
+        logError({ message: 'Error loading teachers:', source: 'TeacherAssignment', details: tchError })
       }
       setTeachers(tchs || []);
     } catch (error) {
-      console.error('Error in loadData:', error);
+      logError({ message: 'Error in loadData:', source: 'TeacherAssignment', details: error })
       setAlertModal({
         show: true,
         title: 'Error',

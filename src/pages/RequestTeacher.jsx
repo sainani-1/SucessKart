@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import LoadingSpinner from '../components/LoadingSpinner';
 import AlertModal from '../components/AlertModal';
 import { sendAdminNotification } from '../utils/adminNotifications';
+import { logError } from '../utils/errorLogger';
 
 const RequestTeacher = () => {
   const { user, profile, isPremium } = useAuth();
@@ -52,7 +53,7 @@ const RequestTeacher = () => {
         setMyRequests([]);
       }
     } catch (error) {
-      console.error('Error fetching requests:', error);
+      logError({ message: 'Error fetching requests:', source: 'RequestTeacher', details: error })
     } finally {
       setLoading(false);
     }

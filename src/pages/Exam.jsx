@@ -14,6 +14,7 @@ import {
   serializeSessionDescription,
 } from "../lib/liveExamWebRTC";
 import { getLiveKitTokenForSession } from "../lib/livekitSession";
+import { logError } from "../utils/errorLogger";
 
 const EXAM_PHASES = {
   RULES: "RULES",
@@ -587,10 +588,7 @@ export default function Exam({ examMode = "certification" }) {
         expectedStudentId: currentUserId,
       });
       if (String(action.target_student_id || '') !== String(currentUserId)) {
-        console.warn('[Exam] Ignored live action: target_student_id mismatch', {
-          actionTargetStudentId: action.target_student_id,
-          expectedStudentId: currentUserId,
-        });
+        logError({ message: '[Exam] Ignored live action: target_student_id mismatch', source: 'Exam', details: { actionTargetStudentId: action.target_student_id, expectedStudentId: currentUserId } });
         return;
       }
       let actionTargetsCurrentLiveContext =
@@ -621,12 +619,7 @@ export default function Exam({ examMode = "certification" }) {
           );
       }
       if (!actionTargetsCurrentLiveContext) {
-        console.warn('[Exam] Ignored live action: session_id mismatch', {
-          actionSessionId: action.session_id,
-          expectedSessionId: activeLiveSessionId,
-          actionSlotId: action.slot_id,
-          expectedSlotId: activeLiveSlotId,
-        });
+        logError({ message: '[Exam] Ignored live action: session_id mismatch', source: 'Exam', details: { actionSessionId: action.session_id, expectedSessionId: activeLiveSessionId, actionSlotId: action.slot_id, expectedSlotId: activeLiveSlotId } });
         return;
       }
       if (action.id) {
@@ -1236,7 +1229,7 @@ export default function Exam({ examMode = "certification" }) {
         await connectAndPublishWithRetries();
       } catch (liveKitError) {
         if (!mounted) return;
-        console.error("[Exam] LiveKit publish failed:", liveKitError);
+        logError({ message: "[Exam] LiveKit publish failed:", source: 'Exam', details: liveKitError });
         setErrorMsg(liveKitError.message || "Failed to connect LiveKit live stream.");
       }
     };
@@ -3126,11 +3119,6 @@ export default function Exam({ examMode = "certification" }) {
     setCameraStream(stream);
     setScreenShareStream(displayStream);
     await primeMicAudioContext();
-    // Debug: Log stream info after permissions granted
-    console.log('[Exam] Camera stream set:', stream, stream?.getTracks?.().map(t => ({kind: t.kind, readyState: t.readyState, enabled: t.enabled})));
-    if (displayStream) {
-      console.log('[Exam] Screen share stream set:', displayStream, displayStream?.getTracks?.().map(t => ({kind: t.kind, readyState: t.readyState, enabled: t.enabled})));
-    }
 
     if (ensuredContext?.sessionId) {
       const sessionPersisted = await persistLiveSessionAndBooking({
@@ -3307,7 +3295,7 @@ export default function Exam({ examMode = "certification" }) {
       });
       await syncLiveExamBooking({ status: "terminated" });
     } catch (error) {
-      console.error("[Exam] Failed to record timeout failure:", error);
+      logError({ message: "[Exam] Failed to record timeout failure:", source: 'Exam', details: error });
     }
 
     if (cameraStream) {
@@ -3793,7 +3781,7 @@ export default function Exam({ examMode = "certification" }) {
             },
           ]);
         if (certError && certError.code !== "23505" && certError.code !== "42501") {
-          console.warn("Certificate insert skipped:", certError.message);
+          logError({ message: "Certificate insert skipped:", source: 'Exam', details: certError.message });
         }
       }
 

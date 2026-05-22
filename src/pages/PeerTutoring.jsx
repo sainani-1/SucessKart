@@ -4,6 +4,7 @@ import { supabase } from '../supabaseClient';
 import { Users, Star, MessageCircle, DollarSign, CheckCircle } from 'lucide-react';
 import usePopup from '../hooks/usePopup.jsx';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { logError } from '../utils/errorLogger';
 
 const PeerTutoring = () => {
   const { profile } = useAuth();
@@ -52,7 +53,7 @@ const PeerTutoring = () => {
         ];
         setTutors(mockTutors);
       } catch (err) {
-        console.error('Error loading tutors:', err);
+        logError({ message: 'Error loading tutors:', source: 'PeerTutoring', details: err })
       } finally {
         setLoading(false);
       }

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabaseClient';
 import PremiumGiftCelebration from '../components/PremiumGiftCelebration';
+import { logError } from '../utils/errorLogger';
 
 const AdminSendGift = () => {
   const { profile } = useAuth();
@@ -108,7 +109,7 @@ const AdminSendGift = () => {
       setSuccess(true);
     } catch (e) {
       setError('Failed to send gift: ' + (e?.message || JSON.stringify(e)));
-      console.error('Supabase error:', e);
+      logError({ message: 'Supabase error:', source: 'AdminSendGift', details: e });
     }
     setSending(false);
   };

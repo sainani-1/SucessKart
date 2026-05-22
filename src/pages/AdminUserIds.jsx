@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { logError } from '../utils/errorLogger';
 
 const AdminUserIds = () => {
   const [users, setUsers] = useState([]);
@@ -20,7 +21,7 @@ const AdminUserIds = () => {
       .order('full_name');
 
     if (error) {
-      console.error('Error loading users:', error);
+      logError({ message: 'Error loading users:', source: 'AdminUserIds', details: error });
     }
 
     setUsers(data || []);

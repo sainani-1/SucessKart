@@ -4,6 +4,7 @@ import { supabase } from '../supabaseClient';
 import { useAuth } from '../context/AuthContext';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { Calendar, User, ArrowRight, AlertCircle, Video, ExternalLink } from 'lucide-react';
+import { logError } from '../utils/errorLogger';
 
 export default function SessionReassignments() {
   const { profile } = useAuth();
@@ -61,7 +62,7 @@ export default function SessionReassignments() {
       );
       setReassignments(filteredRows);
     } catch (err) {
-      console.error('Error loading reassignments:', err);
+      logError({ message: 'Error loading reassignments:', source: 'SessionReassignments', details: err })
       setError('Failed to load session reassignments');
     } finally {
       setLoading(false);
