@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, BookOpen, User, GraduationCap, Video, Users, CheckSquare, LogOut, FileBadge, ShieldCheck, ClipboardList, Sparkles, MessageCircle, Calendar, Award, UserPlus, Lock, Unlock, Bell, Clock, Briefcase, ChevronLeft, ChevronRight, Settings, Gift, Trash2, Mail, FileText, Wrench, BarChart3, Code2, MessageSquare, KeyRound, MonitorUp, ShieldAlert, CreditCard, X, Download, ListChecks, Globe2, Trophy, Wifi } from 'lucide-react';
+import { LayoutDashboard, BookOpen, User, GraduationCap, Video, Users, CheckSquare, LogOut, FileBadge, ShieldCheck, ClipboardList, Sparkles, MessageCircle, Calendar, Award, UserPlus, Lock, Unlock, Bell, Clock, Briefcase, ChevronLeft, ChevronRight, Settings, Gift, Trash2, Mail, FileText, Wrench, BarChart3, Code2, MessageSquare, KeyRound, MonitorUp, ShieldAlert, CreditCard, X, Download, ListChecks, Globe2, Trophy, Wifi, QrCode } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabaseClient';
 import { useNotifications } from '../context/NotificationContext';
@@ -1112,6 +1112,18 @@ const Sidebar = ({ isMobile = false, mobileOpen = false, onClose = () => {}, onR
             <NavLink to="/app/admin/payment-attempts" className={navItemClass} title="Payment Attempts">
               <CreditCard size={28} />
               {shouldShowText && <span className="truncate text-sm font-medium">Payment Attempts</span>}
+            </NavLink>
+            <NavLink to="/app/admin/payment-qr" className={navItemClass} title="Payment QR">
+              <QrCode size={28} />
+              {shouldShowText && <span className="truncate text-sm font-medium">Payment QR</span>}
+            </NavLink>
+            <NavLink to="/app/admin/payment-responses" className={navItemClass} title="Payment Responses">
+              <ListChecks size={28} />
+              {shouldShowText && <span className="truncate text-sm font-medium">Payment Responses</span>}
+            </NavLink>
+            <NavLink to="/app/admin/send-email" className={navItemClass} title="Send Email">
+              <Mail size={28} />
+              {shouldShowText && <span className="truncate text-sm font-medium">Send Email</span>}
             </NavLink>
             <NavLink to="/app/admin/growth-analytics" className={navItemClass} title="Growth Analytics">
               <BarChart3 size={28} />

@@ -239,9 +239,19 @@ const Payment = () => {
   const [paymentTag] = useState(() => createPaymentTag());
   const [manualRequestSummary, setManualRequestSummary] = useState(null);
   const [showUpiAppPicker, setShowUpiAppPicker] = useState(false);
+  const [manualGatewayMode, setManualGatewayMode] = useState(false);
+  const [premiumQr, setPremiumQr] = useState('');
+  const [premiumPlusQr, setPremiumPlusQr] = useState('');
+  const [showManualForm, setShowManualForm] = useState(false);
+  const [transactionId, setTransactionId] = useState('');
+  const [screenshotFile, setScreenshotFile] = useState(null);
+  const [screenshotPreview, setScreenshotPreview] = useState('');
+  const [submittingManual, setSubmittingManual] = useState(false);
+  const [manualSubmitted, setManualSubmitted] = useState(false);
   const [alertModal, setAlertModal] = useState({ show: false, title: '', message: '', type: 'info' });
   const razorpayInstanceRef = useRef(null);
   const paymentAttemptRef = useRef({ paymentId: null, finalizing: false, finalized: false });
+  const screenshotInputRef = useRef(null);
 
   const activePlans = useMemo(() => {
     if (plans.length > 0) return pickLatestPlansByTier(plans);
@@ -326,7 +336,9 @@ const Payment = () => {
         const fallbackPremiumPlusCost = Number.isFinite(parsedPremiumPlusCost) ? parsedPremiumPlusCost : Math.max(fallbackPremiumCost + 100, 299);
         setPremiumCost(fallbackPremiumCost);
         setPremiumPlusCost(fallbackPremiumPlusCost);
-        setPaymentGatewayMode(settingsMap.payment_gateway_mode === 'skillpro_upi' ? 'skillpro_upi' : 'razorpay');
+        const mode = settingsMap.payment_gateway_mode === 'skillpro_upi' ? 'skillpro_upi' : settingsMap.payment_gateway_mode === 'manual' ? 'manual' : 'razorpay';
+        setPaymentGatewayMode(mode);
+        setManualGatewayMode(mode === 'manual');
         const tierCostMap = {
           premium: fallbackPremiumCost,
           premium_plus: fallbackPremiumPlusCost,
@@ -405,6 +417,22 @@ const Payment = () => {
   }, []);
 
   useEffect(() => {
+    if (paymentGatewayMode === 'manual') {
+      const loadManualConfig = async () => {
+        const { data } = await supabase
+          .from('settings')
+          .select('key, value')
+          .in('key', ['manual_payment_qr_premium', 'manual_payment_qr_plus']);
+        (data || []).forEach((setting) => {
+          if (setting.key === 'manual_payment_qr_premium') setPremiumQr(setting.value || '');
+          if (setting.key === 'manual_payment_qr_plus') setPremiumPlusQr(setting.value || '');
+        });
+      };
+      loadManualConfig();
+    }
+  }, [paymentGatewayMode]);
+
+  useEffect(() => {
     if (!selectedPlan && activePlans[0]) {
       setSelectedPlanTier(activePlans[0].tier);
     }
@@ -413,6 +441,28 @@ const Payment = () => {
   useEffect(() => {
     setSelectedPlanTier(normalizeCheckoutPlanTier(searchParams.get('plan')));
   }, [searchParams]);
+
+  useEffect(() => {
+    if (!profile?.id || paymentGatewayMode !== 'manual') return;
+    const checkManualPaymentStatus = async () => {
+      const { data } = await supabase
+        .from('payments')
+        .select('status')
+        .eq('user_id', profile.id)
+        .eq('gateway', 'manual')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!data) {
+        setManualSubmitted(false);
+      } else if (data.status === 'pending') {
+        setManualSubmitted(true);
+      } else if (data.status === 'success' || data.status === 'failed') {
+        setManualSubmitted(false);
+      }
+    };
+    checkManualPaymentStatus();
+  }, [profile?.id, paymentGatewayMode]);
 
   useEffect(() => {
     if (!profile?.id) return;
@@ -724,6 +774,14 @@ const Payment = () => {
   };
 
   const handlePayment = async () => {
+    if (paymentGatewayMode === 'manual' && pricing.finalAmount > 0) {
+      if (manualSubmitted) {
+        setAlertModal({ show: true, title: 'Already Submitted', message: 'Your payment request is already being verified by the SkillPro team.', type: 'info' });
+        return;
+      }
+      setShowManualForm(true);
+      return;
+    }
     setLoading(true);
 
     try {
@@ -874,8 +932,102 @@ const Payment = () => {
         ? isDesktopDevice
           ? 'Pay On Mobile'
           : `Pay Rs ${pricing.finalAmount} via UPI`
-        : `Pay Rs ${pricing.finalAmount} for ${selectedPlan?.name || 'Premium'}`
+        : paymentGatewayMode === 'manual'
+          ? `Pay Rs ${pricing.finalAmount} via QR`
+          : `Pay Rs ${pricing.finalAmount} for ${selectedPlan?.name || 'Premium'}`
       : `Activate ${selectedPlan?.name || 'Premium'} Now`;
+
+  const handleManualPaymentSubmit = async () => {
+    if (!transactionId.trim()) {
+      setAlertModal({ show: true, title: 'Required', message: 'Please enter your UPI transaction ID.', type: 'warning' });
+      return;
+    }
+
+    if (!screenshotFile) {
+      setAlertModal({ show: true, title: 'Required', message: 'Please upload a payment screenshot.', type: 'warning' });
+      return;
+    }
+
+    setSubmittingManual(true);
+    try {
+      const accessToken = await getFreshAccessToken();
+
+      let screenshotUrl = '';
+      const fileExt = screenshotFile.name.split('.').pop();
+      const fileName = `manual_payment_${profile?.id}_${Date.now()}.${fileExt}`;
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('payment-screenshots')
+        .upload(fileName, screenshotFile, {
+          cacheControl: '3600',
+          upsert: false,
+        });
+      if (uploadError) {
+        console.error('Screenshot upload error:', uploadError);
+        screenshotUrl = screenshotPreview;
+      } else {
+        const { data: { publicUrl } } = supabase.storage
+          .from('payment-screenshots')
+          .getPublicUrl(fileName);
+        screenshotUrl = publicUrl;
+      }
+
+      const planCode = selectedPlanTier === 'premium_plus' ? 'premium_plus' : 'premium';
+      const months = selectedPlan?.periodMonths || 6;
+
+      let adminEmail = '';
+      const { data: adminEmailData } = await supabase
+        .from('settings')
+        .select('value')
+        .eq('key', 'manual_payment_admin_email')
+        .maybeSingle();
+      if (adminEmailData?.value) {
+        adminEmail = adminEmailData.value;
+      }
+
+      const result = await callEdgeFunction('create-manual-payment', accessToken, {
+        plan_code: `${planCode}_${months}months`,
+        base_amount: displayBaseAmount,
+        discount_amount: pricing.discountAmount,
+        final_amount: pricing.finalAmount,
+        currency: 'INR',
+        coupon_offer_id: selectedOffer?.id || null,
+        coupon_code: appliedCouponCode || null,
+        metadata: {
+          transaction_id: transactionId.trim(),
+          screenshot_url: screenshotUrl,
+          plan_label: selectedPlan?.name || (selectedPlanTier === 'premium_plus' ? 'Premium Plus' : 'Premium'),
+          plan_tier: planCode,
+          plan_months: months,
+          coupon_name: appliedCouponName || '',
+          coupon_code: appliedCouponCode || '',
+          admin_email: adminEmail,
+        },
+      });
+
+      setManualSubmitted(true);
+      setAlertModal({
+        show: true,
+        title: 'Payment Submitted',
+        message: 'Your manual payment response has been submitted. The SkillPro team is verifying your request. You will be notified once your payment is confirmed.',
+        type: 'success',
+      });
+
+      setTransactionId('');
+      setScreenshotFile(null);
+      setScreenshotPreview('');
+      setShowManualForm(false);
+      setShowUpiAppPicker(false);
+      fetchProfile();
+    } catch (error) {
+      setAlertModal({
+        show: true, title: 'Submission Failed',
+        message: error.message || 'Failed to submit payment response. Please try again.',
+        type: 'error',
+      });
+    } finally {
+      setSubmittingManual(false);
+    }
+  };
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
@@ -883,6 +1035,19 @@ const Payment = () => {
         <h1 className="text-2xl font-bold text-slate-900">{checkoutHeading}</h1>
         <p className="text-slate-500">{checkoutSubheading}</p>
       </div>
+
+      {manualSubmitted && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-8 text-center">
+          <Clock3 className="mx-auto text-amber-600" size={48} />
+          <h2 className="mt-4 text-xl font-bold text-amber-800">Request Submitted</h2>
+          <p className="mt-2 text-amber-700">
+            Your payment request has been submitted. The SkillPro team will contact you soon.
+          </p>
+          <p className="mt-2 text-sm text-amber-600">
+            You already have a pending application. A new submission is not allowed until the current one is resolved.
+          </p>
+        </div>
+      )}
 
       <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-rose-900">
         <div className="flex items-start gap-3">
@@ -957,7 +1122,7 @@ const Payment = () => {
             <div className="mt-4 rounded-xl bg-slate-50 px-4 py-3">
               <p className="text-sm text-slate-500">Base price</p>
               <p className="mt-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                Gateway: {paymentGatewayMode === 'skillpro_upi' ? 'SkillPro UPI' : 'Razorpay'}
+                Gateway: {paymentGatewayMode === 'skillpro_upi' ? 'SkillPro UPI' : paymentGatewayMode === 'manual' ? 'Manual' : 'Razorpay'}
               </p>
               <p className="text-3xl font-bold text-slate-900">₹{displayBaseAmount}</p>
             </div>
@@ -1114,6 +1279,11 @@ const Payment = () => {
               Premium stays pending after the request is created. It will activate only after admin verifies the payment and approves it.
             </div>
           ) : null}
+          {paymentGatewayMode === 'manual' ? (
+            <div className="rounded-lg border border-purple-200 bg-purple-50 p-3 text-sm text-purple-900">
+              Scan the QR code and make the payment. After paying, submit your transaction ID and screenshot. Premium will activate after admin verification.
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -1138,7 +1308,9 @@ const Payment = () => {
             <span>
               {paymentGatewayMode === 'skillpro_upi'
                 ? 'The amount is fixed by admin for the selected plan and cannot be edited'
-                : 'Only the final discounted amount is sent to Razorpay'}
+                : paymentGatewayMode === 'manual'
+                  ? 'Pay the exact amount via UPI QR code'
+                  : 'Only the final discounted amount is sent to Razorpay'}
             </span>
           </div>
           <div className="flex items-center gap-2">
@@ -1192,6 +1364,119 @@ const Payment = () => {
           </div>
         )}
 
+        {paymentGatewayMode === 'manual' && pricing.finalAmount > 0 && !showManualForm && !manualSubmitted && (
+          <div className="mb-4 space-y-4 rounded-xl border border-purple-200 bg-purple-50 p-4">
+            <h4 className="font-bold text-purple-900 text-lg">Pay via QR Code</h4>
+
+            <div className="flex justify-center">
+              {selectedPlanTier === 'premium_plus' && premiumPlusQr ? (
+                <img src={premiumPlusQr} alt="Premium Plus QR" className="max-w-[250px] rounded-lg border bg-white p-2" />
+              ) : selectedPlanTier === 'premium' && premiumQr ? (
+                <img src={premiumQr} alt="Premium QR" className="max-w-[250px] rounded-lg border bg-white p-2" />
+              ) : (
+                <div className="p-8 bg-white rounded-lg border-2 border-dashed text-center text-slate-400">
+                  QR code not configured. Please contact support.
+                </div>
+              )}
+            </div>
+
+            {selectedOffer ? (
+              <div className="rounded-lg border border-pink-200 bg-pink-50 p-3 text-sm text-pink-900">
+                <p className="font-semibold">Applied coupon: {appliedCouponName}</p>
+                <p className="mt-1 break-all text-xs text-pink-800">Code: {appliedCouponCode || 'Unavailable'}</p>
+              </div>
+            ) : null}
+
+            <div className="text-center">
+              <p className="text-sm text-purple-700">Final Amount to Pay</p>
+              <p className="text-3xl font-bold text-purple-900">₹{pricing.finalAmount}</p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowManualForm(true)}
+              className="w-full bg-purple-600 text-white py-3 rounded-lg hover:bg-purple-700 font-semibold"
+            >
+              Next
+            </button>
+          </div>
+        )}
+
+        {paymentGatewayMode === 'manual' && showManualForm && !manualSubmitted && (
+          <div className="mb-4 space-y-4 rounded-xl border border-purple-200 bg-purple-50 p-4">
+            <h4 className="font-bold text-purple-900 text-lg">Submit Payment Details</h4>
+            <p className="text-sm text-purple-700">Enter your UPI transaction ID and upload a screenshot of the payment.</p>
+
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1">UPI Transaction ID <span className="text-red-500">*</span></label>
+              <input
+                type="text"
+                value={transactionId}
+                onChange={(e) => setTransactionId(e.target.value)}
+                placeholder="e.g. 123456789012"
+                className="w-full p-3 border border-slate-300 rounded-lg"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1">Payment Screenshot <span className="text-red-500">*</span></label>
+              <input
+                ref={screenshotInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files[0];
+                  if (file) {
+                    setScreenshotFile(file);
+                    const reader = new FileReader();
+                    reader.onload = (ev) => setScreenshotPreview(ev.target.result);
+                    reader.readAsDataURL(file);
+                  }
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => screenshotInputRef.current?.click()}
+                className="w-full p-3 border-2 border-dashed border-slate-300 rounded-lg text-slate-500 hover:border-purple-400 hover:text-purple-600"
+              >
+                {screenshotPreview ? 'Change Screenshot' : 'Upload Screenshot'}
+              </button>
+              {screenshotPreview && (
+                <div className="mt-2">
+                  <img src={screenshotPreview} alt="Screenshot preview" className="max-w-[200px] rounded-lg border" />
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => { setShowManualForm(false); setTransactionId(''); setScreenshotFile(null); setScreenshotPreview(''); }}
+                className="flex-1 px-4 py-2.5 rounded-lg border border-slate-300 text-slate-700 font-semibold hover:bg-slate-50"
+              >
+                Back
+              </button>
+              <button
+                type="button"
+                onClick={handleManualPaymentSubmit}
+                disabled={submittingManual || !transactionId.trim() || !screenshotFile}
+                className="flex-1 px-4 py-2.5 rounded-lg bg-purple-600 text-white font-semibold hover:bg-purple-700 disabled:opacity-60"
+              >
+                {submittingManual ? 'Submitting...' : 'Submit Payment Response'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {paymentGatewayMode === 'manual' && pricing.finalAmount <= 0 && !manualSubmitted && (
+          <div className="mb-4 rounded-lg bg-green-50 border border-green-200 p-4 text-sm text-green-700">
+            <p className="font-semibold">Coupon covers the full amount.</p>
+            <p className="mt-1">Your coupon covers the entire plan cost. No QR payment needed.</p>
+          </div>
+        )}
+
+        {paymentGatewayMode !== 'manual' ? (
         <button
           onClick={handlePayment}
           disabled={loading || (paymentGatewayMode === 'razorpay' && pricing.finalAmount > 0 && !RAZORPAY_KEY_ID)}
@@ -1205,6 +1490,7 @@ const Payment = () => {
         >
           {buttonLabel}
         </button>
+        ) : null}
       </div>
 
       <AlertModal
@@ -1255,7 +1541,7 @@ const Payment = () => {
   );
 };
 
-const FeatureItem = ({ text, dim = false }) => (
+  const FeatureItem = ({ text, dim = false }) => (
   <div className="flex items-center gap-2">
     <Check className={dim ? 'text-slate-500' : 'text-gold-100'} size={18} />
     <span className={dim ? 'text-slate-700' : 'text-white'}>{text}</span>

@@ -5,6 +5,7 @@ import {
   normalizePlanTier,
   notifyAdminOfPaymentEvent,
   notifyUserOfPaymentReview,
+  savePlanTypeForUser,
 } from "../_shared/paymentHelpers.ts";
 
 const corsHeaders = {
@@ -18,6 +19,8 @@ type ReviewPayload = {
   payment_id?: string;
   action?: "approve" | "reject";
   note?: string;
+  plan_months?: number;
+  valid_until?: string;
 };
 
 const jsonResponse = (body: Record<string, unknown>, status = 200) =>
@@ -101,10 +104,6 @@ Deno.serve(async (req: Request) => {
     return errorResponse("Payment record not found.", 404);
   }
 
-  if (String(payment.metadata?.payment_method || "") !== "skillpro_upi") {
-    return errorResponse("Only SkillPro UPI payments can be reviewed here.", 400);
-  }
-
   const { data: profile, error: profileError } = await adminClient
     .from("profiles")
     .select("premium_until, full_name, email, phone")
@@ -146,18 +145,28 @@ Deno.serve(async (req: Request) => {
   }
 
   const planTier = normalizePlanTier(String(payment.metadata?.plan_tier || ""));
-  const planMonths = Number(payment.metadata?.plan_months || PREMIUM_MONTHS) || PREMIUM_MONTHS;
+  const planMonths = payload.plan_months || Number(payment.metadata?.plan_months || PREMIUM_MONTHS) || PREMIUM_MONTHS;
+  const paymentMethod = payment.gateway === "manual" ? "manual" : "skillpro_upi";
 
   let activated;
   try {
-    activated = await activatePaidPremium(adminClient, {
-      userId: payment.user_id,
-      paymentId: payment.id,
-      profilePremiumUntil: profile.premium_until,
-      planTier,
-      planMonths,
-      isLifetimeFree: false,
-    });
+    if (payload.valid_until) {
+      await adminClient
+        .from("profiles")
+        .update({ premium_until: payload.valid_until })
+        .eq("id", payment.user_id);
+      await savePlanTypeForUser(adminClient, payment.user_id, planTier);
+      activated = { validUntil: payload.valid_until, now: new Date().toISOString() };
+    } else {
+      activated = await activatePaidPremium(adminClient, {
+        userId: payment.user_id,
+        paymentId: payment.id,
+        profilePremiumUntil: profile.premium_until,
+        planTier,
+        planMonths,
+        isLifetimeFree: false,
+      });
+    }
   } catch (error) {
     await adminClient
       .from("payments")
@@ -188,7 +197,7 @@ Deno.serve(async (req: Request) => {
     eventType: "payment_success",
     planName: String(payment.metadata?.plan_label || (planTier === "premium_plus" ? "Premium Plus" : "Premium")),
     amount: Number(payment.amount || 0),
-    paymentMethod: "skillpro_upi",
+    paymentMethod,
     userEmail: profile.email || null,
     userName: profile.full_name || null,
     userPhone: profile.phone || null,

@@ -25,6 +25,7 @@ const AdminSettings = () => {
   const [paymentUrgencyLabel, setPaymentUrgencyLabel] = useState('April 15, 2026');
   const [paymentGatewayMode, setPaymentGatewayMode] = useState('razorpay');
   const [skillproUpiId, setSkillproUpiId] = useState('');
+  const [manualPaymentAdminEmail, setManualPaymentAdminEmail] = useState('');
   const [paymentAdminPhone, setPaymentAdminPhone] = useState('');
   const [paymentAdminEmail, setPaymentAdminEmail] = useState('');
   const [paymentRequestAdminEmailEnabled, setPaymentRequestAdminEmailEnabled] = useState(true);
@@ -74,7 +75,7 @@ const AdminSettings = () => {
       const { data, error } = await supabase
         .from('settings')
         .select('key, value')
-        .in('key', ['exam_duration', 'premium_cost', 'premium_plus_cost', 'payment_urgency_banner', 'payment_gateway_mode', 'skillpro_upi_id', 'payment_admin_phone', 'payment_admin_email', 'payment_request_admin_email_enabled', 'registration_paused', 'min_questions', 'public_plans', 'support_contact_email', 'resume_builder_access']);
+        .in('key', ['exam_duration', 'premium_cost', 'premium_plus_cost', 'payment_urgency_banner', 'payment_gateway_mode', 'skillpro_upi_id', 'payment_admin_phone', 'payment_admin_email', 'payment_request_admin_email_enabled', 'registration_paused', 'min_questions', 'public_plans', 'support_contact_email', 'resume_builder_access', 'manual_payment_admin_email']);
 
       if (error) throw error;
 
@@ -86,12 +87,13 @@ const AdminSettings = () => {
         if (setting.key === 'min_questions') setMinQuestions(parseInt(setting.value, 10) || 25);
         if (setting.key === 'public_plans') setPlans(parsePlans(setting.value));
         if (setting.key === 'support_contact_email') setSupportContactEmail(setting.value || '');
-        if (setting.key === 'payment_gateway_mode') setPaymentGatewayMode(setting.value === 'skillpro_upi' ? 'skillpro_upi' : 'razorpay');
+        if (setting.key === 'payment_gateway_mode') setPaymentGatewayMode(setting.value === 'skillpro_upi' ? 'skillpro_upi' : setting.value === 'manual' ? 'manual' : 'razorpay');
         if (setting.key === 'skillpro_upi_id') setSkillproUpiId(setting.value || '');
         if (setting.key === 'payment_admin_phone') setPaymentAdminPhone(setting.value || '');
         if (setting.key === 'payment_admin_email') setPaymentAdminEmail(setting.value || '');
         if (setting.key === 'payment_request_admin_email_enabled') setPaymentRequestAdminEmailEnabled(setting.value !== 'false');
         if (setting.key === 'resume_builder_access') setResumeBuilderAccess(setting.value === 'free' ? 'free' : 'premium');
+        if (setting.key === 'manual_payment_admin_email') setManualPaymentAdminEmail(setting.value || '');
         if (setting.key === 'payment_urgency_banner') {
           try {
             const parsed = setting.value ? JSON.parse(setting.value) : null;
@@ -128,6 +130,7 @@ const AdminSettings = () => {
       await saveSetting('support_contact_email', supportContactEmail.trim());
       await saveSetting('payment_gateway_mode', paymentGatewayMode);
       await saveSetting('skillpro_upi_id', skillproUpiId.trim());
+      await saveSetting('manual_payment_admin_email', manualPaymentAdminEmail.trim());
       await saveSetting('payment_admin_phone', paymentAdminPhone.trim());
       await saveSetting('payment_admin_email', paymentAdminEmail.trim());
       await saveSetting('payment_request_admin_email_enabled', paymentRequestAdminEmailEnabled);
@@ -268,6 +271,19 @@ const AdminSettings = () => {
               onChange={(e) => setPremiumPlusCost(parseInt(e.target.value, 10) || 299)}
             />
           </div>
+          {paymentGatewayMode === 'manual' && (
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-1">Manual Payment Admin Email</label>
+            <input
+              type="email"
+              className="w-full p-3 border border-slate-300 rounded-lg"
+              placeholder="admin@example.com"
+              value={manualPaymentAdminEmail}
+              onChange={(e) => setManualPaymentAdminEmail(e.target.value)}
+            />
+            <p className="mt-1 text-xs text-slate-500">Admin gets email notification when a user submits a manual payment response.</p>
+          </div>
+          )}
           <div>
             <label className="block text-sm font-semibold text-slate-700 mb-1">Support Contact Email</label>
             <input
@@ -348,9 +364,20 @@ const AdminSettings = () => {
               >
                 SkillPro UPI
               </button>
+              <button
+                type="button"
+                onClick={() => setPaymentGatewayMode('manual')}
+                className={`px-4 py-2 rounded-lg text-sm font-semibold ${
+                  paymentGatewayMode === 'manual'
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-slate-100 text-slate-700'
+                }`}
+              >
+                Manual
+              </button>
             </div>
             <p className="mt-2 text-xs text-slate-500">
-              Razorpay uses the current checkout flow. SkillPro UPI creates fixed-amount UPI requests/manual review records.
+              Razorpay uses the current checkout flow. SkillPro UPI creates fixed-amount UPI requests/manual review records. Manual shows admin-set QR codes on the payment page.
             </p>
           </div>
           <div>
