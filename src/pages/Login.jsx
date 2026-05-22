@@ -727,17 +727,12 @@ const Login = () => {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/login?provider=google`
+          redirectTo: `${window.location.origin}/login`
         }
       });
       if (error) throw error;
     } catch (error) {
-      setAlertModal({
-        show: true,
-        title: 'Google Sign-in Error',
-        message: error.message || 'Unable to continue with Google.',
-        type: 'error'
-      });
+      setAlertModal({ show: true, title: 'Google Sign-in Error', message: error.message || 'Unable to continue with Google.', type: 'error' });
       setGoogleSigningIn(false);
     }
   };
