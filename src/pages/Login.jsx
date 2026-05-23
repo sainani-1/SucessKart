@@ -394,8 +394,12 @@ const Login = () => {
     const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
     if (!clientId) return;
 
-    const initGoogle = () => {
-      if (typeof window.google?.accounts?.id === 'undefined') return;
+    let renderInterval = null;
+
+    const tryRender = () => {
+      if (typeof window.google?.accounts?.id === 'undefined') return false;
+      const container = document.getElementById('google-gsi-container');
+      if (!container) return false;
 
       window.google.accounts.id.initialize({
         client_id: clientId,
@@ -453,28 +457,22 @@ const Login = () => {
         },
       });
 
-      const container = document.getElementById('google-gsi-container');
-      if (container) {
-        window.google.accounts.id.renderButton(container, {
-          type: 'standard',
-          shape: 'rectangular',
-          theme: 'outline',
-          size: 'large',
-          text: 'continue_with',
-          width: container.offsetWidth || 400,
-        });
-      }
+      window.google.accounts.id.renderButton(container, {
+        type: 'standard',
+        shape: 'rectangular',
+        theme: 'outline',
+        size: 'large',
+        text: 'continue_with',
+        width: container.offsetWidth || 400,
+      });
+
+      return true;
     };
 
-    if (typeof window.google?.accounts?.id !== 'undefined') {
-      initGoogle();
-    } else {
-      const check = setInterval(() => {
-        if (typeof window.google?.accounts?.id !== 'undefined') {
-          clearInterval(check);
-          initGoogle();
-        }
-      }, 100);
+    if (!tryRender()) {
+      renderInterval = setInterval(() => {
+        if (tryRender()) clearInterval(renderInterval);
+      }, 200);
     }
 
     return () => {
@@ -482,6 +480,7 @@ const Login = () => {
         clearTimeout(googleAuthTimeoutRef.current);
         googleAuthTimeoutRef.current = null;
       }
+      if (renderInterval) clearInterval(renderInterval);
     };
   }, []);
 
