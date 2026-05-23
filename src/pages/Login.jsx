@@ -326,6 +326,7 @@ const Login = () => {
         role: 'student',
         email: oauthUser.email || null,
         full_name: meta.full_name || meta.name || '',
+        avatar_url: meta.avatar_url || meta.picture || null,
         auth_provider: 'google',
         terms_accepted: false,
         google_profile_completed: false,
@@ -355,8 +356,6 @@ const Login = () => {
 
     navigate('/app');
   };
-
-  const googleAuthTimeoutRef = useRef(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -404,9 +403,11 @@ const Login = () => {
       window.google.accounts.id.initialize({
         client_id: clientId,
         callback: (response) => {
-          setGoogleSigningIn(false);
+          setProcessingOAuth(true);
 
           if (!response?.credential) {
+            setProcessingOAuth(false);
+            setGoogleSigningIn(false);
             setAlertModal({
               show: true,
               title: 'Google Sign-in Error',
@@ -417,6 +418,8 @@ const Login = () => {
           }
 
           if (!supabase.auth.signInWithIdToken) {
+            setProcessingOAuth(false);
+            setGoogleSigningIn(false);
             setAlertModal({
               show: true,
               title: 'Google Sign-in Error',
@@ -426,27 +429,23 @@ const Login = () => {
             return;
           }
 
-          googleAuthTimeoutRef.current = setTimeout(() => {
+          const safetyTimeout = setTimeout(() => {
             setProcessingOAuth(false);
             setGoogleSigningIn(false);
-          }, 30000);
+          }, 25000);
 
           supabase.auth.signInWithIdToken({ provider: 'google', token: response.credential })
             .then(() => {
-              if (googleAuthTimeoutRef.current) {
-                clearTimeout(googleAuthTimeoutRef.current);
-                googleAuthTimeoutRef.current = null;
-              }
+              clearTimeout(safetyTimeout);
               setTimeout(() => {
                 setProcessingOAuth(false);
                 setGoogleSigningIn(false);
-              }, 15000);
+              }, 4000);
             })
             .catch((err) => {
-              if (googleAuthTimeoutRef.current) {
-                clearTimeout(googleAuthTimeoutRef.current);
-                googleAuthTimeoutRef.current = null;
-              }
+              clearTimeout(safetyTimeout);
+              setProcessingOAuth(false);
+              setGoogleSigningIn(false);
               setAlertModal({
                 show: true,
                 title: 'Google Sign-in Error',
@@ -476,10 +475,6 @@ const Login = () => {
     }
 
     return () => {
-      if (googleAuthTimeoutRef.current) {
-        clearTimeout(googleAuthTimeoutRef.current);
-        googleAuthTimeoutRef.current = null;
-      }
       if (renderInterval) clearInterval(renderInterval);
     };
   }, []);
@@ -795,6 +790,31 @@ const Login = () => {
     }
   };
 
+  const handleGoogleLogin = () => {
+    const container = document.getElementById('google-gsi-container');
+    if (!container) {
+      setAlertModal({
+        show: true,
+        title: 'Google Sign-in',
+        message: 'Google Sign-In is loading. Please try again in a moment.',
+        type: 'info',
+      });
+      return;
+    }
+    const btn = container.querySelector('button, div[role="button"]');
+    if (!btn) {
+      setAlertModal({
+        show: true,
+        title: 'Google Sign-in',
+        message: 'Google Sign-In is not ready yet. Please try again.',
+        type: 'info',
+      });
+      return;
+    }
+    setGoogleSigningIn(true);
+    btn.click();
+  };
+
   const handleOAuthReturnRef = useRef(false);
   useEffect(() => {
     if (handleOAuthReturnRef.current) return;
@@ -845,7 +865,23 @@ const Login = () => {
   }
 
   if (processingOAuth) {
-    return <LoadingSpinner message="Finishing Google sign-in..." />;
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 via-white to-amber-50">
+        <div className="text-center px-6">
+          <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100 shadow-lg shadow-emerald-200/50">
+            <svg className="h-10 w-10 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+            </svg>
+          </div>
+          <h2 className="text-2xl font-extrabold text-slate-800">Successfully Authenticated</h2>
+          <p className="mt-2 text-base text-slate-500">You are being logged in. Please wait...</p>
+          <div className="mx-auto mt-8 h-1.5 w-48 overflow-hidden rounded-full bg-slate-200">
+            <div className="h-full w-full origin-left animate-[loading_1.5s_ease-in-out_infinite] rounded-full bg-gradient-to-r from-amber-500 to-emerald-500" />
+          </div>
+        </div>
+        <style>{`@keyframes loading{0%{transform:scaleX(0)}50%{transform:scaleX(1)}100%{transform:scaleX(0)}}`}</style>
+      </div>
+    );
   }
 
   if (user?.id && !loggingIn && !takeoverModalOpen && !otpStep) {
@@ -1019,10 +1055,22 @@ const Login = () => {
             </div>
           </div>
 
-          <div
-            id="google-gsi-container"
-            className="w-full inline-flex justify-center"
-          ></div>
+          <div id="google-gsi-container" style={{ display: 'none' }}></div>
+
+          <button
+            type="button"
+            onClick={handleGoogleLogin}
+            disabled={googleSigningIn}
+            className="inline-flex w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-60"
+          >
+            <svg className="h-5 w-5" viewBox="0 0 24 24">
+              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
+              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+              <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+            </svg>
+            {googleSigningIn ? 'Connecting...' : 'Continue with Google'}
+          </button>
         </div>
 
         <div className="mt-5 grid gap-3 sm:grid-cols-2">

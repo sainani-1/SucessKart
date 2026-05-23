@@ -147,8 +147,7 @@ export const AuthProvider = ({ children }) => {
 
     // Wait for Supabase to restore the tab-scoped secure session.
     const restoreSession = async () => {
-      // Force loading to stop after 2s max so UI isn't stuck
-      const forceTimeout = setTimeout(() => { if (isMounted) setLoading(false); }, 2000);
+      const forceTimeout = setTimeout(() => { if (isMounted) setLoading(false); }, 500);
       try {
         let tries = 0;
         let session = null;
@@ -530,7 +529,7 @@ export const AuthProvider = ({ children }) => {
       // Ignore storage cleanup failures.
     }
     if (typeof window !== 'undefined') {
-      window.location.assign('/');
+      window.location.assign('/login');
     }
   };
 
