@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ZoomIn, X } from 'lucide-react';
+import { ZoomIn } from 'lucide-react';
 
 let defaultDPR = typeof window !== 'undefined' ? window.devicePixelRatio : 1;
 
@@ -18,9 +18,17 @@ const getZoomPercent = () => {
   }
 };
 
+const STORAGE_KEY = 'skillpro_zoom_detector_dismissed';
+
 const ZoomDetector = () => {
   const [zoom, setZoom] = useState(getZoomPercent);
-  const [dismissed, setDismissed] = useState(false);
+  const [dismissed, setDismissed] = useState(() => {
+    try {
+      return localStorage.getItem(STORAGE_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  });
 
   useEffect(() => {
     const check = () => {
@@ -35,29 +43,32 @@ const ZoomDetector = () => {
     };
   }, []);
 
-  if (dismissed || zoom >= 85) return null;
+  const handleDismiss = () => {
+    setDismissed(true);
+    try {
+      localStorage.setItem(STORAGE_KEY, 'true');
+    } catch {}
+  };
+
+  if (dismissed || zoom <= 88) return null;
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-[100] bg-amber-50 border-b-2 border-amber-400 px-4 py-2.5 shadow-md">
-      <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5">
-          <div className="bg-amber-100 p-1.5 rounded-full">
-            <ZoomIn size={16} className="text-amber-700" />
-          </div>
-          <div>
-            <span className="text-sm font-semibold text-amber-900">
-              Current zoom: <span className="text-amber-700">{zoom}%</span>
-            </span>
-            <span className="text-sm text-amber-700 ml-2">
-              For best experience, set zoom to 85% or lower.
-            </span>
-          </div>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pointer-events-none">
+      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-sm w-full p-6 text-center space-y-5 pointer-events-auto">
+        <div className="mx-auto w-16 h-16 rounded-full bg-red-100 flex items-center justify-center">
+          <ZoomIn size={32} className="text-red-600" />
+        </div>
+        <div>
+          <h2 className="text-xl font-bold text-slate-800">Zoom Too High</h2>
+          <p className="mt-2 text-sm text-slate-500">
+            Current zoom: <span className="font-semibold text-red-600">{zoom}%</span>. For best experience, set zoom to 85% or lower.
+          </p>
         </div>
         <button
-          onClick={() => setDismissed(true)}
-          className="text-amber-500 hover:text-amber-700 p-1 rounded-full hover:bg-amber-100 transition-colors shrink-0"
+          onClick={handleDismiss}
+          className="w-full rounded-xl bg-red-600 py-3 font-bold text-white hover:bg-red-700 transition"
         >
-          <X size={16} />
+          OK
         </button>
       </div>
     </div>

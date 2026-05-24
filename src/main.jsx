@@ -8,6 +8,8 @@ import { NotificationProvider } from "./context/NotificationContext";
 import { ChatOverlayProvider } from "./context/ChatOverlayContext";
 import { PresenceProvider } from "./context/PresenceContext";
 import GlobalInteractionGuards from "./components/GlobalInteractionGuards";
+import OfflineBanner from "./components/OfflineBanner";
+import ZoomDetector from "./components/ZoomDetector";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
@@ -18,6 +20,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(
             <PresenceProvider>
             <GlobalInteractionGuards />
             <App />
+            <OfflineBanner />
+            <ZoomDetector />
           </PresenceProvider>
           </ChatOverlayProvider>
         </ChatProvider>

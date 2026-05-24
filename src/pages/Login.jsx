@@ -35,6 +35,7 @@ const Login = () => {
   const [inlineNotice, setInlineNotice] = useState('');
   const takeoverResolverRef = useRef(null);
   const otpInputRefs = useRef([]);
+  const googleAuthStartedRef = useRef(false);
   const navigate = useNavigate();
   const currentDeviceLabel = 'Web Login';
   const loginOtpEndpoint = import.meta.env.VITE_LOGIN_OTP_ENDPOINT || '/api/login-otp';
@@ -365,21 +366,8 @@ const Login = () => {
       if (event !== 'SIGNED_IN') return;
       const provider = session?.user?.app_metadata?.provider;
       if (provider === 'google' && session?.user) {
-        setProcessingOAuth(true);
-        try {
-          await routeGoogleUser(session.user);
-        } catch (err) {
-          logError({ message: 'Google OAuth routing failed', source: 'Login', details: err?.message || err });
-          setAlertModal({
-            show: true,
-            title: 'Login Error',
-            message: err?.message || 'Could not complete Google sign-in. Please try again.',
-            type: 'error',
-          });
-        } finally {
-          setProcessingOAuth(false);
-          setGoogleSigningIn(false);
-        }
+        // Routing handled in GIS callback after success delay
+        return;
       }
     });
 
@@ -387,6 +375,28 @@ const Login = () => {
       isMounted = false;
       subscription.unsubscribe();
     };
+  }, []);
+
+  useEffect(() => {
+    const handleFocus = () => {
+      if (googleAuthStartedRef.current) {
+        const checkId = setTimeout(() => {
+          if (googleAuthStartedRef.current) {
+            googleAuthStartedRef.current = false;
+            setGoogleSigningIn(false);
+            setProcessingOAuth(false);
+            setAlertModal({
+              show: true,
+              title: 'Google Login Failed',
+              message: 'Google sign-in was cancelled. Please try again.',
+              type: 'error',
+            });
+          }
+        }, 1500);
+      }
+    };
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
   }, []);
 
   useEffect(() => {
@@ -403,6 +413,7 @@ const Login = () => {
       window.google.accounts.id.initialize({
         client_id: clientId,
         callback: (response) => {
+          googleAuthStartedRef.current = false;
           setProcessingOAuth(true);
 
           if (!response?.credential) {
@@ -410,7 +421,7 @@ const Login = () => {
             setGoogleSigningIn(false);
             setAlertModal({
               show: true,
-              title: 'Google Sign-in Error',
+              title: 'Google Login Failed',
               message: 'No credential returned from Google.',
               type: 'error',
             });
@@ -422,7 +433,7 @@ const Login = () => {
             setGoogleSigningIn(false);
             setAlertModal({
               show: true,
-              title: 'Google Sign-in Error',
+              title: 'Google Login Failed',
               message: 'Sign-in with ID token is not supported. Please update @supabase/supabase-js.',
               type: 'error',
             });
@@ -435,12 +446,13 @@ const Login = () => {
           }, 25000);
 
           supabase.auth.signInWithIdToken({ provider: 'google', token: response.credential })
-            .then(() => {
+            .then(async () => {
               clearTimeout(safetyTimeout);
-              setTimeout(() => {
-                setProcessingOAuth(false);
-                setGoogleSigningIn(false);
-              }, 4000);
+              await new Promise(resolve => setTimeout(resolve, 2000));
+              const { data: { session } } = await supabase.auth.getSession();
+              if (session?.user) {
+                await routeGoogleUser(session.user);
+              }
             })
             .catch((err) => {
               clearTimeout(safetyTimeout);
@@ -448,7 +460,7 @@ const Login = () => {
               setGoogleSigningIn(false);
               setAlertModal({
                 show: true,
-                title: 'Google Sign-in Error',
+                title: 'Google Login Failed',
                 message: err.message || 'Authentication failed.',
                 type: 'error',
               });
@@ -791,28 +803,24 @@ const Login = () => {
   };
 
   const handleGoogleLogin = () => {
-    const container = document.getElementById('google-gsi-container');
-    if (!container) {
-      setAlertModal({
-        show: true,
-        title: 'Google Sign-in',
-        message: 'Google Sign-In is loading. Please try again in a moment.',
-        type: 'info',
-      });
-      return;
-    }
-    const btn = container.querySelector('button, div[role="button"]');
-    if (!btn) {
-      setAlertModal({
-        show: true,
-        title: 'Google Sign-in',
-        message: 'Google Sign-In is not ready yet. Please try again.',
-        type: 'info',
-      });
-      return;
-    }
     setGoogleSigningIn(true);
-    btn.click();
+    googleAuthStartedRef.current = true;
+
+    const tryClick = () => {
+      const container = document.getElementById('google-gsi-container');
+      if (!container) {
+        setTimeout(tryClick, 300);
+        return;
+      }
+      const btn = container.querySelector('button, div[role="button"]');
+      if (!btn) {
+        setTimeout(tryClick, 300);
+        return;
+      }
+      btn.click();
+    };
+
+    tryClick();
   };
 
   const handleOAuthReturnRef = useRef(false);

@@ -147,6 +147,11 @@ export const AuthProvider = ({ children }) => {
 
     // Wait for Supabase to restore the tab-scoped secure session.
     const restoreSession = async () => {
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        if (isMounted) setLoading(false);
+        initialAuthRestoreRef.current = false;
+        return;
+      }
       const forceTimeout = setTimeout(() => { if (isMounted) setLoading(false); }, 500);
       try {
         let tries = 0;
@@ -272,6 +277,7 @@ export const AuthProvider = ({ children }) => {
 
     const resumeAuthState = async () => {
       if (resuming || !mounted) return;
+      if (typeof navigator !== 'undefined' && !navigator.onLine) return;
       resuming = true;
       try {
         const session = await restorePersistedSession();

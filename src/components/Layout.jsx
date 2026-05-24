@@ -10,7 +10,6 @@ import { logAdminNavigation } from '../utils/adminActivityLogger';
 import { useNotifications } from '../context/NotificationContext';
 import { readBrowserState, writeBrowserState } from '../utils/browserState';
 import NotificationPermissionPopup from './NotificationPermissionPopup';
-import ZoomDetector from './ZoomDetector';
 import ChatOverlay from './ChatOverlay';
 import { logError } from '../utils/errorLogger';
 
@@ -757,7 +756,6 @@ const Layout = () => {
           </div>
         </div>
       ) : null}
-      <ZoomDetector />
       <Sidebar
         isMobile={isMobileViewport}
         mobileOpen={mobileSidebarOpen}
