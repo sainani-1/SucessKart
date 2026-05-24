@@ -31,6 +31,7 @@
           var overlay = document.getElementById('zoomOverlay');
           var display = document.getElementById('currentZoomDisplay');
           if (!overlay) return;
+          if (window.innerWidth < 768) { overlay.style.display = 'none'; return; }
           var zoom = Math.round((window.outerWidth / window.innerWidth) * 100);
           if (zoom < 10 || zoom > 500) zoom = 100;
           if (zoom > 88) {

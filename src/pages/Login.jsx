@@ -338,7 +338,7 @@ const Login = () => {
     }
 
     if (!profile.terms_accepted || !profile.google_profile_completed) {
-      navigate('/complete-profile');
+      navigate('/google-onboarding');
       return;
     }
 

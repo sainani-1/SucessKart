@@ -90,6 +90,7 @@ import CertificatePreview from './pages/CertificatePreview';
 import AdminDeletedAccounts from './pages/AdminDeletedAccounts';
 import TermsAndConditions from './pages/TermsAndConditions';
 import CompleteGoogleProfile from './pages/CompleteGoogleProfile';
+import GoogleOnboarding from './pages/GoogleOnboarding';
 
 import AdminSupportContact from './pages/AdminSupportContact';
 import AdminActivityLogs from './pages/AdminActivityLogs';
@@ -185,7 +186,7 @@ const ProtectedRoute = ({ children }) => {
   const isGoogleAuth = user?.app_metadata?.provider === 'google' || profile?.auth_provider === 'google';
   const googleProfileIncomplete =
     isGoogleAuth && (!profile?.google_profile_completed || !profile?.terms_accepted);
-  if (googleProfileIncomplete) return <Navigate to="/complete-profile" />;
+  if (googleProfileIncomplete) return <Navigate to="/google-onboarding" />;
 
   // Check if user is disabled
   if (realProfile?.is_disabled && !isImpersonating) {
@@ -336,6 +337,7 @@ function App() {
         <Route path="/plans" element={<Plans />} />
         <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
         <Route path="/complete-profile" element={<CompleteGoogleProfile />} />
+        <Route path="/google-onboarding" element={<GoogleOnboarding />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/reset-password-confirm" element={<ResetPassword />} />
         <Route path="/register-admin" element={<RegisterAdmin />} />

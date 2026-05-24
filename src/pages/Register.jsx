@@ -509,7 +509,7 @@ const Register = () => {
                       </div>
 
                       <div>
-                        <label className="block text-sm text-slate-600 mb-2 font-semibold">Profile Photo *</label>
+                        <label className="block text-sm text-slate-600 mb-2 font-semibold">Profile Photo</label>
                         <input
                           type="file"
                           accept="image/*"

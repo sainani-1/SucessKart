@@ -193,10 +193,7 @@ export const AuthProvider = ({ children }) => {
         }
         setUser(session?.user ?? null);
         if (session?.user) {
-          if (cachedProfile?.profile) {
-            setLoading(false);
-          }
-          fetchProfile(session.user.id, { background: !!cachedProfile?.profile });
+          fetchProfile(session.user.id, { background: true });
         } else {
           setProfile(null);
           setImpersonationProfile(null);

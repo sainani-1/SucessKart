@@ -6,6 +6,7 @@ import { Lock, TrendingUp, Award, Upload } from 'lucide-react';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { prepareAvatarFile } from '../utils/imageUtils';
 import { buildAvatarPublicUrl } from '../utils/avatarUtils';
+import { detectFace } from '../utils/detectFace';
 import AvatarImage from '../components/AvatarImage';
 import { isLifetimePremium, formatPremiumLabel } from '../utils/premium';
 import { getCertificateDisplayName } from '../utils/identityVerification';
@@ -142,6 +143,20 @@ const Profile = () => {
     const file = e.target.files?.[0];
     if (!file || !profile) return;
     setUploading(true);
+
+    const faceResult = await detectFace(file);
+    if (!faceResult.detected) {
+      setAlertModal({
+        show: true,
+        title: 'No Face Detected',
+        message: (faceResult.error || 'No face found in this photo.') + ' Please upload a clear photo where your face is visible.',
+        type: 'warning'
+      });
+      setUploading(false);
+      e.target.value = '';
+      return;
+    }
+
     try {
       const safeFile = await prepareAvatarFile(file);
       const fileExt = safeFile?.name?.split('.').pop() || file.name.split('.').pop();

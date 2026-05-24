@@ -25,6 +25,16 @@ const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'your-anon-key'
 
 migrateLegacyAuthStorage();
 
+if (typeof navigator !== 'undefined' && navigator.locks) {
+  const orig = navigator.locks.request.bind(navigator.locks);
+  navigator.locks.request = function (name, options, callback) {
+    if (typeof options === 'function') {
+      return orig(name, { timeout: 2000 }, options);
+    }
+    return orig(name, { ...options, timeout: options?.timeout ?? 2000 }, callback);
+  };
+}
+
 export const supabase = createClient(supabaseUrl, supabaseKey, {
   auth: {
     persistSession: true,
