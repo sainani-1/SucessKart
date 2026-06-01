@@ -96,10 +96,10 @@ const generateDefaultUsername = ({
   const baseName = toSlug(fullName) || "User";
   const joinStamp = formatJoinStamp(createdAt);
   const seed = buildSeed(userId);
-  let candidate = `SkillPro-${baseName}-${seed}-${joinStamp}`;
+  let candidate = `SucessKart-${baseName}-${seed}-${joinStamp}`;
   let suffix = 2;
   while (usernameExists(registry, candidate, userId)) {
-    candidate = `SkillPro-${baseName}-${seed}-${joinStamp}-${suffix}`;
+    candidate = `SucessKart-${baseName}-${seed}-${joinStamp}-${suffix}`;
     suffix += 1;
   }
   return candidate;

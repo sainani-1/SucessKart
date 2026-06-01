@@ -1,6 +1,6 @@
 import { supabase } from '../supabaseClient';
 
-const PENDING_REFERRAL_KEY = 'skillpro_pending_referral_code';
+const PENDING_REFERRAL_KEY = 'SucessKart_pending_referral_code';
 
 const sanitizeCode = (value) =>
   String(value || '')
@@ -9,7 +9,7 @@ const sanitizeCode = (value) =>
     .slice(0, 16);
 
 const generateReferralCode = (fullName, userId) => {
-  const nameSeed = String(fullName || 'SKILLPRO')
+  const nameSeed = String(fullName || 'SucessKart')
     .toUpperCase()
     .replace(/[^A-Z]/g, '')
     .slice(0, 5)

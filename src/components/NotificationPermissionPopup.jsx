@@ -38,7 +38,7 @@ const NotificationPermissionPopup = ({
 
         <div className="space-y-4 px-5 py-5">
           <p className="text-sm leading-6 text-slate-600">
-            SkillPro can send updates for classes, exams, certificates, messages, and account activity.
+            SucessKart can send updates for classes, exams, certificates, messages, and account activity.
           </p>
           <div className={`rounded-lg border px-4 py-3 text-sm ${isBlocked ? 'border-red-200 bg-red-50 text-red-700' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
             {isBlocked

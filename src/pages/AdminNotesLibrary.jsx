@@ -180,7 +180,7 @@ const AdminNotesLibrary = () => {
               className="w-full rounded-lg border border-slate-300 p-3"
               placeholder="https://drive.google.com/file/d/... or docs.google.com/..."
             />
-            <p className="mt-1 text-xs text-slate-500">Students will only see the protected preview inside SkillPro, not a visible external link.</p>
+            <p className="mt-1 text-xs text-slate-500">Students will only see the protected preview inside SucessKart, not a visible external link.</p>
           </div>
         </div>
         <label className="mt-4 flex items-center gap-2 text-sm font-medium text-slate-700">

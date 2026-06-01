@@ -34,7 +34,7 @@ const AuthCallback = () => {
         if (session) {
           window.opener.postMessage(
             {
-              type: 'skillpro-oauth-callback',
+              type: 'SucessKart-oauth-callback',
               access_token: session.access_token,
               refresh_token: session.refresh_token,
               user: {
@@ -49,7 +49,7 @@ const AuthCallback = () => {
         } else {
           window.opener.postMessage(
             {
-              type: 'skillpro-oauth-callback',
+              type: 'SucessKart-oauth-callback',
               error: lastError?.message || 'OAuth completed but no session was created.',
             },
             window.location.origin

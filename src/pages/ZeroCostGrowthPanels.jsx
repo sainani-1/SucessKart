@@ -290,10 +290,10 @@ export const AchievementTimeline = () => {
     if (!profile?.id) return;
     loadStudentLearningData(profile.id).then(({ courses, certificates, submissions }) => {
       const rows = [
-        { date: profile.created_at, title: 'Joined SkillPro', detail: profile.email, icon: Users },
+        { date: profile.created_at, title: 'Joined SucessKart', detail: profile.email, icon: Users },
         ...courses.map((course) => ({ date: course.lastActivityAt, title: `Started ${course.title}`, detail: `${Math.round(course.progress)}% progress`, icon: BookOpen })),
         ...submissions.map((submission) => ({ date: submission.submitted_at, title: submission.passed ? 'Passed exam' : 'Attempted exam', detail: `${Number(submission.score_percent || 0).toFixed(1)}% score`, icon: Target })),
-        ...certificates.map((cert) => ({ date: cert.issued_at, title: cert.revoked_at ? 'Certificate blocked' : 'Certificate earned', detail: cert.course_id || 'SkillPro certificate', icon: Award })),
+        ...certificates.map((cert) => ({ date: cert.issued_at, title: cert.revoked_at ? 'Certificate blocked' : 'Certificate earned', detail: cert.course_id || 'SucessKart certificate', icon: Award })),
       ].filter((row) => row.date).sort((a, b) => new Date(b.date) - new Date(a.date));
       setEvents(rows);
     }).finally(() => setLoading(false));
@@ -348,7 +348,7 @@ export const CourseDoubtHelper = () => {
     const lower = question.toLowerCase();
     if (!question.trim()) return `For ${selected.title}, first revise the overview and finish the next incomplete step. Your current progress is ${Math.round(selected.progress)}%.`;
     if (lower.includes('exam') || lower.includes('test')) return `Exam tip for ${selected.title}: complete at least 80% video progress, revise notes, then use Exam Readiness before booking.`;
-    if (lower.includes('certificate')) return selected.certified ? 'Your certificate is already issued. Open My Certificates or your public portfolio proof.' : 'Certificates unlock after passing the linked exam and meeting SkillPro rules.';
+    if (lower.includes('certificate')) return selected.certified ? 'Your certificate is already issued. Open My Certificates or your public portfolio proof.' : 'Certificates unlock after passing the linked exam and meeting SucessKart rules.';
     if (lower.includes('video')) return `Your saved video progress is ${Math.round(selected.videoPercent)}%. Continue the course video and avoid skipping important revision sections.`;
     return `Suggested next step: break your doubt into one topic, check the course notes, then ask your teacher in Ask a Doubt if it still feels unclear.`;
   }, [question, selected]);
@@ -417,7 +417,7 @@ export const MotivationLeaderboard = () => {
             <div key={row.id} className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:grid-cols-[60px_1fr_120px] sm:items-center">
               <p className="text-2xl font-black text-amber-600">#{index + 1}</p>
               <div>
-                <p className="font-bold text-slate-900">{row.full_name || 'SkillPro Student'}</p>
+                <p className="font-bold text-slate-900">{row.full_name || 'SucessKart Student'}</p>
                 <p className="text-sm text-slate-500">{row.completed} courses, {row.passed} exams, {row.certificates} certificates</p>
               </div>
               <p className="text-right text-xl font-black text-slate-900">{row.points} pts</p>
@@ -587,7 +587,7 @@ export const AdminSecurityReview = () => {
 
   return (
     <div className="space-y-6">
-      <PageHeader icon={ShieldCheck} eyebrow="Security" title="Website Security Review" description="A practical security dashboard for the current SkillPro frontend. It does not replace a professional penetration test, but it keeps the main controls visible." />
+      <PageHeader icon={ShieldCheck} eyebrow="Security" title="Website Security Review" description="A practical security dashboard for the current SucessKart frontend. It does not replace a professional penetration test, but it keeps the main controls visible." />
       <div className="grid gap-4 md:grid-cols-3">
         <MetricCard icon={ShieldCheck} label="Strong controls" value={4} tone="green" />
         <MetricCard icon={AlertTriangle} label="Needs review" value={2} tone="amber" />

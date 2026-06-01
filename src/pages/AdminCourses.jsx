@@ -931,7 +931,7 @@ const AdminCourses = () => {
                         placeholder="Direct MP4 URL or Google Drive file/embed link"
                         rows="3"
                       />
-                      <p className="text-xs text-slate-500 mt-1">Use a Google Drive file link or embed code. Avoid YouTube here because it can expose the original video outside SkillPro.</p>
+                      <p className="text-xs text-slate-500 mt-1">Use a Google Drive file link or embed code. Avoid YouTube here because it can expose the original video outside SucessKart.</p>
                     </div>
 
                     <div>
@@ -1155,7 +1155,7 @@ const AdminCourses = () => {
                     }}
                     placeholder="https://example.com/advanced-notes-cover.jpg"
                   />
-                  <p className="mt-1 text-[11px] text-slate-500">Shown inside SkillPro as a preview image only.</p>
+                  <p className="mt-1 text-[11px] text-slate-500">Shown inside SucessKart as a preview image only.</p>
                 </div>
 
                 <div>
@@ -1449,7 +1449,7 @@ const AdminCourses = () => {
                   className="w-full p-2 border border-slate-300 rounded font-mono text-sm"
                 />
                 <p className="text-xs text-slate-500 mt-1">
-                  Use a Google Drive file link or embed code. Avoid YouTube here because it can expose the original video outside SkillPro.
+                  Use a Google Drive file link or embed code. Avoid YouTube here because it can expose the original video outside SucessKart.
                 </p>
               </div>
 

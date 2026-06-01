@@ -280,7 +280,7 @@ Deno.serve(async (req: Request) => {
   if (!selectedOffer && discount.finalAmount <= 0) {
     return errorResponse("Selected plan amount is invalid. Ask admin to configure a price greater than zero before activating premium.", 400);
   }
-  const manualUpiNote = "SkillPro payment";
+  const manualUpiNote = "SucessKart payment";
   const validUntil = discount.isLifetimeFree
     ? LIFETIME_PREMIUM_DATE
     : addMonthsFrom(profile.premium_until, selectedPlanMonths);
@@ -386,7 +386,7 @@ Deno.serve(async (req: Request) => {
 
   if (configuredGatewayMode === "skillpro_upi") {
     if (!configuredPaymentAddress) {
-      return errorResponse("SkillPro payment destination is not configured.", 500);
+      return errorResponse("SucessKart payment destination is not configured.", 500);
     }
 
     const paymentTag = String(payload.payment_tag || "").trim() || null;
@@ -443,7 +443,7 @@ Deno.serve(async (req: Request) => {
     });
 
     const noteWithTag = paymentTag ? `${manualUpiNote} ${paymentTag}` : manualUpiNote;
-    const upiLink = `upi://pay?pa=${encodeURIComponent(configuredPaymentAddress)}&pn=${encodeURIComponent("SkillPro")}&am=${encodeURIComponent(String(discount.finalAmount))}&cu=INR&tn=${encodeURIComponent(noteWithTag)}`;
+    const upiLink = `upi://pay?pa=${encodeURIComponent(configuredPaymentAddress)}&pn=${encodeURIComponent("SucessKart")}&am=${encodeURIComponent(String(discount.finalAmount))}&cu=INR&tn=${encodeURIComponent(noteWithTag)}`;
 
     return jsonResponse({
       mode: "skillpro_upi",

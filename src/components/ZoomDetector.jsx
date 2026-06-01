@@ -1,27 +1,37 @@
 import React, { useState, useEffect } from 'react';
 import { ZoomIn } from 'lucide-react';
 
-let defaultDPR = typeof window !== 'undefined' ? window.devicePixelRatio : 1;
-
 const getZoomPercent = () => {
   try {
     if (typeof window === 'undefined') return 100;
+
     if (window.visualViewport && typeof window.visualViewport.scale === 'number' && window.visualViewport.scale > 0) {
       const scale = window.visualViewport.scale;
       if (Math.abs(scale - 1) > 0.02) {
         return Math.round(scale * 100);
       }
     }
-    return Math.round((window.devicePixelRatio / defaultDPR) * 100);
+
+    const viewportEstimate =
+      window.outerWidth && window.innerWidth
+        ? Math.round((window.outerWidth / window.innerWidth) * 100)
+        : null;
+    const dpr = Number(window.devicePixelRatio || 1);
+    const commonDeviceScale = dpr > 2 ? 2 : dpr > 1.5 ? 1.5 : dpr > 1.25 ? 1.25 : 1;
+    const dprEstimate = Math.round((dpr / commonDeviceScale) * 100);
+    const estimates = [viewportEstimate, dprEstimate].filter((value) => Number.isFinite(value) && value > 30 && value < 300);
+    if (!estimates.length) return 100;
+    return Math.min(...estimates);
   } catch {
     return 100;
   }
 };
 
-const STORAGE_KEY = 'skillpro_zoom_detector_dismissed';
+const STORAGE_KEY = 'sucesskart_zoom_detector_dismissed';
 
 const ZoomDetector = () => {
   const [zoom, setZoom] = useState(getZoomPercent);
+  const [stableHighCount, setStableHighCount] = useState(0);
   const [dismissed, setDismissed] = useState(() => {
     try {
       return localStorage.getItem(STORAGE_KEY) === 'true';
@@ -32,7 +42,9 @@ const ZoomDetector = () => {
 
   useEffect(() => {
     const check = () => {
-      setZoom(getZoomPercent());
+      const nextZoom = getZoomPercent();
+      setZoom(nextZoom);
+      setStableHighCount((count) => (nextZoom > 80 ? Math.min(count + 1, 3) : 0));
     };
     check();
     window.addEventListener('resize', check);
@@ -50,7 +62,7 @@ const ZoomDetector = () => {
     } catch {}
   };
 
-  if (dismissed || zoom <= 88) return null;
+  if (dismissed || zoom <= 80 || stableHighCount < 2) return null;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pointer-events-none">
@@ -61,7 +73,7 @@ const ZoomDetector = () => {
         <div>
           <h2 className="text-xl font-bold text-slate-800">Zoom Too High</h2>
           <p className="mt-2 text-sm text-slate-500">
-            Current zoom: <span className="font-semibold text-red-600">{zoom}%</span>. For best experience, set zoom to 85% or lower.
+            Current zoom: <span className="font-semibold text-red-600">{zoom}%</span>. For best experience, set zoom to 80% or lower.
           </p>
         </div>
         <button

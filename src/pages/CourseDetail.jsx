@@ -34,6 +34,7 @@ const APP_ORIGIN = typeof window !== 'undefined' ? window.location.origin : '';
 const VIDEO_PROGRESS_SAVE_INTERVAL_SECONDS = 5;
 const COURSE_TAB_KEY_PREFIX = 'course_detail_active_tab_';
 const RECENTLY_VIEWED_COURSES_KEY = 'recently_viewed_courses';
+const COURSE_LIST_CACHE_KEY = 'course_list_cache';
 
 const extractIframeSrc = (value) => {
   const srcMatch = value.match(/src=["']([^"']+)["']/i);
@@ -170,7 +171,7 @@ const parseVideoSource = (rawValue) => {
         type: 'youtube',
         src,
         blocked: true,
-        message: 'YouTube is blocked in the protected player because it can reveal the source video outside SkillPro. Use Google Drive preview or a direct hosted video URL instead.'
+        message: 'YouTube is blocked in the protected player because it can reveal the source video outside SucessKart. Use Google Drive preview or a direct hosted video URL instead.'
       };
     }
     return {
@@ -278,7 +279,7 @@ const ContentProtectionNotice = () => (
       <div>
         <p className="font-semibold">Protected premium content</p>
         <p className="mt-1 text-amber-800">
-          Viewing is limited to the logged-in premium account inside SkillPro. Right click, print, copy,
+          Viewing is limited to the logged-in premium account inside SucessKart. Right click, print, copy,
           common devtool shortcuts, and direct note downloads are blocked here.
         </p>
       </div>
@@ -409,12 +410,12 @@ const ProtectedMediaFrame = ({
   return (
     <div
       ref={frameRef}
-      className={`skillpro-media-frame group relative flex h-full w-full flex-col overflow-hidden bg-slate-950 text-white ${
-        isFullscreen && isChromeIdle ? 'skillpro-fullscreen-idle' : ''
+      className={`SucessKart-media-frame group relative flex h-full w-full flex-col overflow-hidden bg-slate-950 text-white ${
+        isFullscreen && isChromeIdle ? 'SucessKart-fullscreen-idle' : ''
       } ${className}`}
       onContextMenuCapture={preventContextMenu}
     >
-      <div className="skillpro-player-chrome skillpro-frame-header flex min-h-[48px] items-center justify-between gap-3 border-b border-white/10 bg-slate-950/95 px-4 py-2">
+      <div className="SucessKart-player-chrome SucessKart-frame-header flex min-h-[48px] items-center justify-between gap-3 border-b border-white/10 bg-slate-950/95 px-4 py-2">
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold">{title}</p>
           <p className="text-xs text-slate-400">{badge}</p>
@@ -429,7 +430,7 @@ const ProtectedMediaFrame = ({
           <span className="hidden sm:inline">{isFullscreen ? 'Exit' : 'Fullscreen'}</span>
         </button>
       </div>
-      <div className="skillpro-frame-body relative min-h-0 flex-1">
+      <div className="SucessKart-frame-body relative min-h-0 flex-1">
         {children}
         {(lockSurfaceAlways || (lockFullscreenSurface && isFullscreen)) ? (
           <div
@@ -456,7 +457,7 @@ const DriveLockedIframe = ({ title, src }) => {
   const unlockTimerRef = useRef(null);
   const [iframeKey, setIframeKey] = useState(0);
   const [surfaceUnlocked, setSurfaceUnlocked] = useState(false);
-  const [isSkillProFullscreen, setIsSkillProFullscreen] = useState(false);
+  const [isSucessKartFullscreen, setIsSucessKartFullscreen] = useState(false);
   const [playWindowUsed, setPlayWindowUsed] = useState(false);
 
   useEffect(() => {
@@ -470,7 +471,7 @@ const DriveLockedIframe = ({ title, src }) => {
     const scheduleSurfaceLock = () => {
       clearUnlockTimer();
       const fullscreenActive = Boolean(document.fullscreenElement);
-      setIsSkillProFullscreen(fullscreenActive);
+      setIsSucessKartFullscreen(fullscreenActive);
 
       if (!fullscreenActive) {
         setSurfaceUnlocked(false);
@@ -554,9 +555,9 @@ const DriveLockedIframe = ({ title, src }) => {
     return () => document.removeEventListener('keydown', focusDriveForKeyboard, true);
   }, [surfaceUnlocked]);
 
-  const enterSkillProFullscreen = async () => {
+  const enterSucessKartFullscreen = async () => {
     try {
-      const frame = wrapperRef.current?.closest?.('.skillpro-media-frame');
+      const frame = wrapperRef.current?.closest?.('.SucessKart-media-frame');
       await frame?.requestFullscreen?.();
     } catch {
       // Fullscreen requires a trusted user gesture.
@@ -596,19 +597,19 @@ const DriveLockedIframe = ({ title, src }) => {
         >
           <div className="pointer-events-auto rounded-lg bg-slate-950/90 p-3 text-center text-xs font-semibold text-white shadow-xl">
             <p>
-              {isSkillProFullscreen
+              {isSucessKartFullscreen
                 ? playWindowUsed
                   ? 'Drive surface locked. Return with Esc or F; video access stays protected.'
                   : 'Start the Drive video now. The surface locks immediately after playback starts.'
-                : 'Enter SkillPro fullscreen to start this Drive video.'}
+                : 'Enter SucessKart fullscreen to start this Drive video.'}
             </p>
-            {isSkillProFullscreen && playWindowUsed ? null : (
+            {isSucessKartFullscreen && playWindowUsed ? null : (
               <button
                 type="button"
-                onClick={isSkillProFullscreen ? unlockSurfaceBriefly : enterSkillProFullscreen}
+                onClick={isSucessKartFullscreen ? unlockSurfaceBriefly : enterSucessKartFullscreen}
                 className="mt-2 rounded-lg bg-blue-600 px-3 py-2 font-bold text-white transition hover:bg-blue-700"
               >
-                {isSkillProFullscreen ? 'Start video' : 'Open fullscreen'}
+                {isSucessKartFullscreen ? 'Start video' : 'Open fullscreen'}
               </button>
             )}
           </div>
@@ -829,17 +830,17 @@ const CustomProtectedVideo = ({
   };
 
   return (
-    <div className="skillpro-custom-video relative flex h-full w-full flex-col bg-black" onContextMenuCapture={preventContextMenu}>
+    <div className="SucessKart-custom-video relative flex h-full w-full flex-col bg-black" onContextMenuCapture={preventContextMenu}>
       <button
         type="button"
         onClick={togglePlayback}
         onContextMenu={preventContextMenu}
-        className="skillpro-video-stage group/video relative min-h-0 flex-1 bg-black"
+        className="SucessKart-video-stage group/video relative min-h-0 flex-1 bg-black"
         aria-label={isPlaying ? 'Pause video' : 'Play video'}
       >
         <video
           ref={videoRef}
-          className={`h-full w-full bg-black object-contain ${watchIn3d ? 'skillpro-video-3d' : ''}`}
+          className={`h-full w-full bg-black object-contain ${watchIn3d ? 'SucessKart-video-3d' : ''}`}
           src={displaySrc}
           controls={false}
           controlsList="nodownload noplaybackrate noremoteplayback"
@@ -856,7 +857,7 @@ const CustomProtectedVideo = ({
           Your browser does not support the video tag.
         </video>
         {!isPlaying ? (
-          <span className="skillpro-player-chrome absolute inset-0 flex items-center justify-center bg-black/20 text-white">
+          <span className="SucessKart-player-chrome absolute inset-0 flex items-center justify-center bg-black/20 text-white">
             <span className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-white/15 backdrop-blur">
               <Play size={26} />
             </span>
@@ -864,7 +865,7 @@ const CustomProtectedVideo = ({
         ) : null}
       </button>
 
-      <div className="skillpro-player-chrome skillpro-video-controls flex min-h-[64px] flex-col gap-2 border-t border-white/10 bg-slate-950/95 px-4 py-3">
+      <div className="SucessKart-player-chrome SucessKart-video-controls flex min-h-[64px] flex-col gap-2 border-t border-white/10 bg-slate-950/95 px-4 py-3">
         <input
           type="range"
           min="0"
@@ -1064,23 +1065,27 @@ const CourseDetail = () => {
   const { courseId } = useParams();
   const [activeTab, setActiveTab] = useState(() => readBrowserState(`${COURSE_TAB_KEY_PREFIX}${courseId}`, 'overview'));
   const [activeNoteIndex, setActiveNoteIndex] = useState(0);
-  const [course, setCourse] = useState(null);
+  const [course, setCourse] = useState(() => {
+    const cachedCourses = readBrowserState(COURSE_LIST_CACHE_KEY, []);
+    return cachedCourses.find((item) => String(item.id) === String(courseId)) || null;
+  });
   const [protectedAssets, setProtectedAssets] = useState(null);
   const [enrolled, setEnrolled] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [pageLoading, setPageLoading] = useState(true);
   const [assetsLoading, setAssetsLoading] = useState(false);
   const [driveVideoFallback, setDriveVideoFallback] = useState(false);
   const [savedVideoProgress, setSavedVideoProgress] = useState(null);
   const [resumePromptOpen, setResumePromptOpen] = useState(false);
   const [fullscreenReturnRequired, setFullscreenReturnRequired] = useState(false);
   const [demoExamPopupOpen, setDemoExamPopupOpen] = useState(false);
-  const { user, profile, isPremium, isPremiumPlus, getPlanTier } = useAuth();
+  const { user, profile, loading: authLoading, isPremium, isPremiumPlus, getPlanTier } = useAuth();
   const { popupNode, openPopup } = usePopup();
   const navigate = useNavigate();
   const premium = isPremium(profile);
   const premiumPlus = isPremiumPlus(profile);
   const planTier = getPlanTier(profile);
+  const courseAccessAllowed = Boolean(course?.is_free || premium || authLoading);
+  const effectiveEnrolled = Boolean(enrolled || course?.is_free || authLoading);
   const videoRef = useRef(null);
   const resumeAppliedRef = useRef(false);
   const resumePendingRef = useRef(false);
@@ -1232,11 +1237,11 @@ const CourseDetail = () => {
     };
 
     const beforePrintHandler = () => {
-      document.body.setAttribute('data-skillpro-print-blocked', 'true');
+      document.body.setAttribute('data-SucessKart-print-blocked', 'true');
     };
 
     const afterPrintHandler = () => {
-      document.body.removeAttribute('data-skillpro-print-blocked');
+      document.body.removeAttribute('data-SucessKart-print-blocked');
     };
 
     document.addEventListener('copy', preventDefault, true);
@@ -1259,13 +1264,12 @@ const CourseDetail = () => {
       window.removeEventListener('keydown', keyHandler, true);
       window.removeEventListener('beforeprint', beforePrintHandler);
       window.removeEventListener('afterprint', afterPrintHandler);
-      document.body.removeAttribute('data-skillpro-print-blocked');
+      document.body.removeAttribute('data-SucessKart-print-blocked');
     };
   }, [user?.id, premium, enrolled, activeTab]);
 
   const fetchCourseData = async () => {
     try {
-      setPageLoading(true);
       setProtectedAssets(null);
 
       const { data: courseData } = await supabase
@@ -1278,24 +1282,23 @@ const CourseDetail = () => {
         setCourse(courseData);
       }
 
-      let isEnrolled = false;
-      if (profile?.id) {
+      let isEnrolled = Boolean(courseData?.is_free);
+      const activeUserId = profile?.id || user?.id;
+      if (activeUserId && !courseData?.is_free) {
         const { data, error: enrollmentError } = await supabase
           .from('enrollments')
           .select('id')
-          .eq('student_id', profile.id)
+          .eq('student_id', activeUserId)
           .eq('course_id', courseId)
           .maybeSingle();
         if (enrollmentError) {
           logError({ message: 'Error checking enrollment:', source: 'CourseDetail', details: enrollmentError });
         }
         isEnrolled = !!data;
-        setEnrolled(isEnrolled);
-      } else {
-        setEnrolled(false);
       }
+      setEnrolled(isEnrolled);
 
-      if (courseData && isEnrolled && premium) {
+      if (courseData && isEnrolled && (courseData.is_free || premium)) {
         setAssetsLoading(true);
         try {
           const assets = await fetchCourseProtectedAssets(courseId);
@@ -1309,32 +1312,33 @@ const CourseDetail = () => {
       }
     } catch (error) {
       logError({ message: 'Error fetching course:', source: 'CourseDetail', details: error });
-    } finally {
-      setPageLoading(false);
     }
   };
 
   const handleEnroll = async () => {
-    if (!premium) {
+    if (!course?.is_free && !premium && !authLoading) {
       openPopup('Premium required', 'Only logged-in premium students can access course videos and notes.', 'warning');
       return;
     }
-    if (!profile?.id) {
-      openPopup('Sign in required', 'Please sign in with your premium student account.', 'warning');
+    const activeUserId = profile?.id || user?.id;
+    if (!activeUserId) {
+      openPopup('Sign in required', 'Please sign in with your student account.', 'warning');
       return;
     }
     setLoading(true);
     try {
       await supabase.from('enrollments').insert({
-        student_id: profile.id,
+        student_id: activeUserId,
         course_id: courseId,
         progress: 0,
         completed: false
       });
       setEnrolled(true);
       openPopup('Enrolled', 'You have been enrolled successfully.', 'success');
-      const assets = await fetchCourseProtectedAssets(courseId);
-      setProtectedAssets(assets);
+      if (course?.is_free || premium) {
+        const assets = await fetchCourseProtectedAssets(courseId);
+        setProtectedAssets(assets);
+      }
     } catch (error) {
       openPopup('Enroll failed', `Error enrolling: ${error.message}`, 'error');
     }
@@ -1476,7 +1480,7 @@ const CourseDetail = () => {
 
   const handleReturnToFullscreen = async () => {
     try {
-      const frame = document.querySelector('.skillpro-media-frame');
+      const frame = document.querySelector('.SucessKart-media-frame');
       await frame?.requestFullscreen?.();
       setFullscreenReturnRequired(false);
       await videoRef.current?.play?.();
@@ -1507,10 +1511,6 @@ const CourseDetail = () => {
     };
   }, [courseId, profile?.id, user?.id, savedVideoProgress?.duration]);
 
-  if (pageLoading) {
-    return <LoadingSpinner message="Loading course..." />;
-  }
-
   if (!course) {
     return (
       <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 text-center">
@@ -1524,7 +1524,7 @@ const CourseDetail = () => {
     );
   }
 
-  if (!enrolled) {
+  if (!effectiveEnrolled) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
         {popupNode}
@@ -1556,7 +1556,7 @@ const CourseDetail = () => {
                     {course.category || 'General'}
                   </span>
                   <span className="inline-block w-fit px-3 py-1 rounded-full text-xs font-bold bg-amber-500 text-white">
-                    Premium Only
+                    {course.is_free ? 'Free Course' : 'Premium Only'}
                   </span>
                 </div>
                 <h1 className="text-4xl font-bold mb-4">{course.title}</h1>
@@ -1571,7 +1571,7 @@ const CourseDetail = () => {
                   </div>
                   <div className="flex items-center">
                     <FileText size={20} className="mr-3 flex-shrink-0" />
-                    <span>Read protected notes inside SkillPro</span>
+                    <span>Read protected notes inside SucessKart</span>
                   </div>
                   <div className="flex items-center">
                     <EyeOff size={20} className="mr-3 flex-shrink-0" />
@@ -1581,7 +1581,7 @@ const CourseDetail = () => {
 
                 <button
                   onClick={() => {
-                    if (!premium) {
+                    if (!course.is_free && !premium && !authLoading) {
                       navigate(buildPlanCheckoutPath('premium'));
                       return;
                     }
@@ -1598,7 +1598,7 @@ const CourseDetail = () => {
                   ) : (
                     <>
                       <Play size={20} className="mr-2" />
-                      {premium ? 'Enroll With Premium Access' : 'Buy Premium To Enroll'}
+                      {course.is_free ? 'Enroll Free' : premium ? 'Enroll With Premium Access' : 'Buy Premium To Enroll'}
                     </>
                   )}
                 </button>
@@ -1657,35 +1657,35 @@ const CourseDetail = () => {
         </div>
       ) : null}
       {demoExamPopupOpen ? (
-        <div className="skillpro-modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 p-4">
-          <div className="skillpro-demo-pop relative w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
-            <span className="skillpro-demo-spark skillpro-demo-spark-1" />
-            <span className="skillpro-demo-spark skillpro-demo-spark-2" />
-            <span className="skillpro-demo-spark skillpro-demo-spark-3" />
-            <span className="skillpro-demo-spark skillpro-demo-spark-4" />
-            <span className="skillpro-demo-sweep" />
-            <span className="skillpro-card-logo-line skillpro-card-logo-line-1" />
-            <span className="skillpro-card-logo-line skillpro-card-logo-line-2" />
-            <span className="skillpro-card-logo-line skillpro-card-logo-line-3" />
-            <span className="skillpro-card-logo-line skillpro-card-logo-line-4" />
-            <span className="skillpro-card-logo-line skillpro-card-logo-line-5" />
-            <span className="skillpro-card-logo-line skillpro-card-logo-line-6" />
+        <div className="SucessKart-modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 p-4">
+          <div className="SucessKart-demo-pop relative w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <span className="SucessKart-demo-spark SucessKart-demo-spark-1" />
+            <span className="SucessKart-demo-spark SucessKart-demo-spark-2" />
+            <span className="SucessKart-demo-spark SucessKart-demo-spark-3" />
+            <span className="SucessKart-demo-spark SucessKart-demo-spark-4" />
+            <span className="SucessKart-demo-sweep" />
+            <span className="SucessKart-card-logo-line SucessKart-card-logo-line-1" />
+            <span className="SucessKart-card-logo-line SucessKart-card-logo-line-2" />
+            <span className="SucessKart-card-logo-line SucessKart-card-logo-line-3" />
+            <span className="SucessKart-card-logo-line SucessKart-card-logo-line-4" />
+            <span className="SucessKart-card-logo-line SucessKart-card-logo-line-5" />
+            <span className="SucessKart-card-logo-line SucessKart-card-logo-line-6" />
             <div className="pointer-events-none absolute inset-x-0 top-0 h-2 bg-gradient-to-r from-blue-500 via-amber-400 to-emerald-400" />
             <div className="relative bg-slate-950 px-6 py-7 text-white">
-              <div className="skillpro-demo-ring absolute left-1/2 top-5 h-24 w-24 -translate-x-1/2 rounded-full border border-amber-300/40" />
-              <div className="skillpro-logo-assemble mx-auto" aria-hidden="true">
-                <img src="/skillpro-logo.png" alt="" className="skillpro-assembled-logo" />
+              <div className="SucessKart-demo-ring absolute left-1/2 top-5 h-24 w-24 -translate-x-1/2 rounded-full border border-amber-300/40" />
+              <div className="SucessKart-logo-assemble mx-auto" aria-hidden="true">
+                <img src="/sucesskart-logo.svg" alt="" className="SucessKart-assembled-logo" />
               </div>
-              <h2 className="skillpro-demo-title mt-5 text-center text-2xl font-bold">Demo Course</h2>
-              <p className="skillpro-demo-subtitle mt-2 text-center text-sm text-slate-300">
+              <h2 className="SucessKart-demo-title mt-5 text-center text-2xl font-bold">Demo Course</h2>
+              <p className="SucessKart-demo-subtitle mt-2 text-center text-sm text-slate-300">
                 This course is for preview and practice only.
               </p>
             </div>
             <div className="px-6 py-6 text-center">
-              <p className="skillpro-demo-copy mx-auto max-w-sm text-sm leading-6 text-slate-600">
+              <p className="SucessKart-demo-copy mx-auto max-w-sm text-sm leading-6 text-slate-600">
                 This is a demo course. It does not include live exams or certification.
               </p>
-              <div className="skillpro-demo-chips mt-5 grid grid-cols-2 gap-3 text-xs font-semibold text-slate-600">
+              <div className="SucessKart-demo-chips mt-5 grid grid-cols-2 gap-3 text-xs font-semibold text-slate-600">
                 <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">No live exam</div>
                 <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">No certificate</div>
               </div>
@@ -1722,14 +1722,14 @@ const CourseDetail = () => {
           <div className="lg:col-span-2">
             <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-slate-100">
               <div className="bg-slate-950 aspect-video flex items-center justify-center">
-                {!premium ? (
+                {!courseAccessAllowed ? (
                   <AssetBlockedState
                     icon={Lock}
                     title="Premium membership required"
                     message="Videos and notes are available only to logged-in premium students."
                   />
                 ) : assetsLoading ? (
-                  <LoadingSpinner message="Unlocking protected content..." />
+                  <LoadingSpinner message="Unlocking protected content..." fullPage={false} />
                 ) : videoSource?.blocked ? (
                   <AssetBlockedState
                     icon={ShieldAlert}
@@ -1752,7 +1752,7 @@ const CourseDetail = () => {
                       />
                     </ProtectedMediaFrame>
                   ) : (
-                    <ProtectedMediaFrame title={`${course.title} video`} badge="SkillPro Drive player">
+                    <ProtectedMediaFrame title={`${course.title} video`} badge="SucessKart Drive player">
                       <CustomProtectedVideo
                         videoRef={videoRef}
                         src={videoSource.src}
@@ -1767,7 +1767,7 @@ const CourseDetail = () => {
                 ) : videoSource?.type === 'cloudinary-video' || videoSource?.type === 'direct-video' ? (
                   <ProtectedMediaFrame
                     title={`${course.title} video`}
-                    badge={videoSource.type === 'cloudinary-video' ? 'SkillPro video player' : 'Protected video player'}
+                    badge={videoSource.type === 'cloudinary-video' ? 'SucessKart video player' : 'Protected video player'}
                   >
                     <CustomProtectedVideo
                       videoRef={videoRef}
@@ -1868,7 +1868,7 @@ const CourseDetail = () => {
                 {activeTab === 'notes' && (
                   <div>
                     <h2 className="text-2xl font-bold text-slate-900 mb-6">Protected Course Notes</h2>
-                    {!premium ? (
+                    {!courseAccessAllowed ? (
                       <NotesUpgradeCard
                         title="Premium required"
                         message="Course notes inside this course are available with Premium access."
@@ -1876,7 +1876,7 @@ const CourseDetail = () => {
                         planTier="premium"
                       />
                     ) : assetsLoading ? (
-                      <LoadingSpinner message="Loading protected notes..." />
+                      <LoadingSpinner message="Loading protected notes..." fullPage={false} />
                     ) : activeNote?.blocked ? (
                       <div className="space-y-4">
                         {notesSources.length > 1 ? (
@@ -1906,7 +1906,7 @@ const CourseDetail = () => {
                     ) : activeNote ? (
                       <div className="space-y-4">
                         <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-                          Notes are previewed inside SkillPro only. Direct download and print actions are intentionally removed.
+                          Notes are previewed inside SucessKart only. Direct download and print actions are intentionally removed.
                         </div>
                         {notesPreviewImage ? (
                           <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -2055,7 +2055,7 @@ const CourseDetail = () => {
                   <p className="text-sm text-slate-600">
                     {course.is_free
                       ? 'Demo courses are for preview and practice. They do not include live exams or certification.'
-                      : `Protected materials are bound to this logged-in session inside ${APP_ORIGIN || 'SkillPro'}.`}
+                      : `Protected materials are bound to this logged-in session inside ${APP_ORIGIN || 'SucessKart'}.`}
                   </p>
                 </div>
               </div>

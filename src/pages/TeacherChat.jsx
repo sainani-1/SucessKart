@@ -455,7 +455,7 @@ const TeacherChat = () => {
             <div className="w-24 h-24 rounded-full bg-white flex items-center justify-center mx-auto mb-5 shadow-md">
               <MessageCircle size={44} className="text-blue-500" />
             </div>
-            <p className="text-xl font-bold text-slate-700">SkillPro Messages</p>
+            <p className="text-xl font-bold text-slate-700">SucessKart Messages</p>
             <p className="text-sm text-slate-500 mt-2">Select a conversation from the left</p>
           </div>
         </div>

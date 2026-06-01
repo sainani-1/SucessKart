@@ -1,4 +1,4 @@
-const LOGIN_STATE_KEY = 'skillpro-login-state';
+const LOGIN_STATE_KEY = 'SucessKart-login-state';
 
 const getStorage = () => {
   try {

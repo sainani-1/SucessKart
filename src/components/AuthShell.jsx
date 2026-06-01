@@ -22,12 +22,12 @@ const AuthShell = ({
           <div className="relative z-10 flex h-full flex-col">
             <div className="inline-flex w-fit items-center gap-3 rounded-full border border-white/15 bg-white/10 px-4 py-2 shadow-sm backdrop-blur">
               <img
-                src="/skillpro-logo.png"
-                alt="SkillPro logo"
-                className="h-10 w-10 rounded-full object-contain mix-blend-multiply"
+                src="/sucesskart-logo.svg"
+                alt="SucessKart logo"
+                className="h-10 w-10 rounded-full object-contain"
               />
               <div>
-                <p className="text-[11px] uppercase tracking-[0.24em] text-amber-200">SkillPro</p>
+                <p className="text-[11px] uppercase tracking-[0.24em] text-amber-200">SucessKart</p>
                 <p className="font-serif text-lg font-bold text-white">Career-first learning</p>
               </div>
             </div>

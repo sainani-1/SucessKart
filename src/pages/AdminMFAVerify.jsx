@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-const LOGO_URL = import.meta.env.VITE_CERTIFICATE_LOGO || "/skillpro-logo.png";
+const LOGO_URL = import.meta.env.VITE_CERTIFICATE_LOGO || "/sucesskart-logo.svg";
 import { supabase } from "../supabaseClient";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import AlertModal from "../components/AlertModal";
@@ -194,7 +194,7 @@ export default function AdminMFAVerify() {
                   <img src={LOGO_URL} alt="Logo" className="h-16 w-16 rounded-full object-contain" />
                 </div>
                 <div>
-                  <span className="text-2xl font-extrabold tracking-tight text-slate-900">SkillPro</span>
+                  <span className="text-2xl font-extrabold tracking-tight text-slate-900">SucessKart</span>
                   <p className="mt-1 text-sm text-slate-500">Admin verification</p>
                 </div>
               </div>

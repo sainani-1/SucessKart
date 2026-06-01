@@ -97,7 +97,7 @@ Deno.serve(async (req: Request) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: `SkillPro <${fromEmail}>`,
+        from: `SucessKart <${fromEmail}>`,
         to: validEmails,
         subject,
         html,

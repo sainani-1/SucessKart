@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { Link, useNavigate, useSearchParams, Navigate } from 'react-router-dom';
-import { BookOpenCheck, FileCheck, GraduationCap } from 'lucide-react';
+import { BookOpenCheck, FileCheck, GraduationCap, X } from 'lucide-react';
 import AlertModal from '../components/AlertModal';
 import LoadingSpinner from '../components/LoadingSpinner';
 import AuthShell from '../components/AuthShell';
@@ -9,6 +9,8 @@ import { cachePendingRegistrationAvatar, uploadAvatarForUser } from '../utils/av
 import { attachPendingReferral, savePendingReferralCode } from '../utils/referrals';
 import { useAuth } from '../context/AuthContext';
 import { logWarn } from '../utils/errorLogger';
+import { countryPhoneOptions, digitsOnly, formatPhone, getCountryPhoneOption, validatePhoneNumber } from '../utils/phoneValidation';
+import { detectFace } from '../utils/detectFace';
 
 const Register = () => {
   const { user, loading: authLoading } = useAuth();
@@ -22,6 +24,7 @@ const Register = () => {
     password: '',
     fullName: '',
     phone: '',
+    phoneCountry: '+91',
     coreSubject: 'Computer Science',
     educationLevel: '',
     studyStream: '',
@@ -29,10 +32,66 @@ const Register = () => {
     diploma: ''
   });
   const [file, setFile] = useState(null);
+  const [filePreview, setFilePreview] = useState('');
+  const [faceChecking, setFaceChecking] = useState(false);
+  const [faceStatus, setFaceStatus] = useState({ state: 'idle', message: '' });
   const [errors, setErrors] = useState({});
   const [registrationPaused, setRegistrationPaused] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [searchParams] = useSearchParams();
+  const selectedPhoneCountry = getCountryPhoneOption(formData.phoneCountry);
+
+  const trustedEmailDomains = new Set([
+    'gmail.com',
+    'googlemail.com',
+    'outlook.com',
+    'hotmail.com',
+    'live.com',
+    'msn.com',
+    'yahoo.com',
+    'ymail.com',
+    'icloud.com',
+    'me.com',
+    'mac.com',
+    'aol.com',
+    'proton.me',
+    'protonmail.com',
+    'zoho.com',
+    'zohomail.com',
+    'gmx.com',
+    'gmx.net',
+    'mail.com',
+    'rediffmail.com',
+  ]);
+
+  const blockedEmailDomains = new Set([
+    '10minutemail.com',
+    '20minutemail.com',
+    'guerrillamail.com',
+    'guerrillamail.net',
+    'mailinator.com',
+    'tempmail.com',
+    'temp-mail.org',
+    'throwawaymail.com',
+    'yopmail.com',
+    'sharklasers.com',
+    'trashmail.com',
+    'dispostable.com',
+    'getnada.com',
+    'moakt.com',
+    'emailondeck.com',
+    'fakeinbox.com',
+  ]);
+
+  const validateTrustedEmail = (rawEmail) => {
+    const emailValue = String(rawEmail || '').trim().toLowerCase();
+    if (!emailValue) return 'Email is required';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailValue)) return 'Invalid email address';
+    const domain = emailValue.split('@').pop();
+    if (blockedEmailDomains.has(domain)) return 'Temporary email addresses are not allowed';
+    if (!trustedEmailDomains.has(domain)) return 'Use a trusted email like Gmail, Outlook, Yahoo, iCloud, Proton, Zoho, or Rediffmail';
+    return '';
+  };
 
   // Stream options based on education level
   const streamOptions = {
@@ -49,6 +108,52 @@ const Register = () => {
       await cachePendingRegistrationAvatar(email, sourceFile);
     } catch (err) {
       // Ignore cache failures; registration should continue.
+    }
+  };
+
+  useEffect(() => {
+    if (!file) {
+      setFilePreview('');
+      return undefined;
+    }
+    const url = URL.createObjectURL(file);
+    setFilePreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+
+  const clearProfilePhoto = () => {
+    setFile(null);
+    setFaceStatus({ state: 'idle', message: '' });
+    setErrors((prev) => ({ ...prev, file: '' }));
+  };
+
+  const handleProfilePhotoChange = async (event) => {
+    const nextFile = event.target.files?.[0] || null;
+    event.target.value = '';
+    if (!nextFile) return;
+
+    if (!nextFile.type?.startsWith('image/')) {
+      setFile(nextFile);
+      setFaceStatus({ state: 'invalid', message: 'Upload an image file with a clear face.' });
+      setErrors((prev) => ({ ...prev, file: 'Upload an image file with a clear face.' }));
+      return;
+    }
+
+    setFile(nextFile);
+    setFaceChecking(true);
+    setFaceStatus({ state: 'checking', message: 'Checking photo for a clear face...' });
+    setErrors((prev) => ({ ...prev, file: '' }));
+    try {
+      const result = await detectFace(nextFile);
+      if (!result.detected) {
+        const message = result.error || 'No clear face detected. Upload another photo where the face is visible.';
+        setFaceStatus({ state: 'invalid', message });
+        setErrors((prev) => ({ ...prev, file: message }));
+        return;
+      }
+      setFaceStatus({ state: 'valid', message: 'Face detected. Photo approved.' });
+    } finally {
+      setFaceChecking(false);
     }
   };
 
@@ -84,7 +189,8 @@ const Register = () => {
 
     if (step === 1) {
       if (!formData.fullName.trim()) stepErrors.fullName = 'Full name is required';
-      if (!formData.phone.trim()) stepErrors.phone = 'Phone number is required';
+      const phoneError = validatePhoneNumber({ countryCode: formData.phoneCountry, phone: formData.phone });
+      if (phoneError) stepErrors.phone = phoneError;
     }
 
     if (step === 2) {
@@ -96,11 +202,8 @@ const Register = () => {
     }
 
     if (step === 3) {
-      if (!formData.email.trim()) {
-        stepErrors.email = 'Email is required';
-      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-        stepErrors.email = 'Invalid email address';
-      }
+      const emailError = validateTrustedEmail(formData.email);
+      if (emailError) stepErrors.email = emailError;
       if (!formData.password.trim()) {
         stepErrors.password = 'Password is required';
       } else if (formData.password.length < 6) {
@@ -122,14 +225,10 @@ const Register = () => {
     if (!formData.fullName.trim()) {
       newErrors.fullName = 'Full name is required';
     }
-    if (!formData.phone.trim()) {
-      newErrors.phone = 'Phone number is required';
-    }
-    if (!formData.email.trim()) {
-      newErrors.email = 'Email is required';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = 'Invalid email address';
-    }
+    const phoneError = validatePhoneNumber({ countryCode: formData.phoneCountry, phone: formData.phone });
+    if (phoneError) newErrors.phone = phoneError;
+    const emailError = validateTrustedEmail(formData.email);
+    if (emailError) newErrors.email = emailError;
     if (!formData.password.trim()) {
       newErrors.password = 'Password is required';
     } else if (formData.password.length < 6) {
@@ -146,6 +245,9 @@ const Register = () => {
     }
     if (!termsAccepted) {
       newErrors.termsAccepted = 'You must accept Terms and Conditions';
+    }
+    if (file && faceStatus.state !== 'valid') {
+      newErrors.file = faceStatus.message || 'Upload a clear face photo or remove this photo.';
     }
 
     setErrors(newErrors);
@@ -211,7 +313,7 @@ const Register = () => {
 
     setLoading(true);
     try {
-      const formattedPhone = formData.phone.trim() || null;
+      const formattedPhone = formatPhone({ countryCode: formData.phoneCountry, phone: formData.phone });
       const resolvedStudyStream =
         formData.studyStream === 'Others'
           ? formData.customStudyStream.trim()
@@ -245,7 +347,7 @@ const Register = () => {
 
       // 2. Upload Photo
       let avatarUrl = null;
-      if (file) {
+      if (file && faceStatus.state === 'valid') {
         try {
           avatarUrl = await uploadAvatarForUser(supabase, user.id, file);
           try {
@@ -320,17 +422,13 @@ const Register = () => {
     }
   };
 
-  if (authLoading) {
-    return <LoadingSpinner message="Checking session..." />;
-  }
-
   if (user?.id) {
     return <Navigate to="/app" replace />;
   }
 
   return (
     <AuthShell
-      title="Start your SkillPro journey"
+      title="Start your SucessKart journey"
       subtitle="Create your account to access classes, exams, certificates, and personalized learning updates."
       highlights={[
         { icon: GraduationCap, text: 'Education-specific setup so recommendations and assessments fit the learner profile.' },
@@ -360,7 +458,7 @@ const Register = () => {
             <div className="mb-5 rounded-2xl bg-gradient-to-r from-slate-900 via-slate-800 to-amber-700 px-4 py-4 text-white">
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-200">Registration Flow</p>
               <p className="mt-2 text-sm text-slate-100">
-                Complete each step to create your SkillPro account with the right education details.
+                Complete each step to create your SucessKart account with the right education details.
               </p>
             </div>
 
@@ -383,15 +481,38 @@ const Register = () => {
 
                       <div>
                         <label className="block text-sm text-slate-600 mb-1 font-semibold">Phone Number *</label>
-                        <input
-                          className={`w-full p-3 border rounded-xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-amber-200 focus:border-amber-300 transition ${errors.phone ? 'border-red-500' : 'border-slate-200'}`}
-                          placeholder="Phone Number"
-                          value={formData.phone}
-                          onChange={e => {
-                            setFormData({ ...formData, phone: e.target.value });
-                            if (errors.phone) setErrors({ ...errors, phone: '' });
-                          }}
-                        />
+                        <div className="flex gap-2">
+                          <select
+                            className="w-32 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm focus:border-amber-300 focus:outline-none focus:ring-2 focus:ring-amber-200"
+                            value={formData.phoneCountry}
+                            onChange={e => {
+                              const nextCountry = getCountryPhoneOption(e.target.value);
+                              setFormData({
+                                ...formData,
+                                phoneCountry: nextCountry.code,
+                                phone: digitsOnly(formData.phone).slice(0, nextCountry.max),
+                              });
+                              if (errors.phone) setErrors({ ...errors, phone: '' });
+                            }}
+                          >
+                            {countryPhoneOptions.map(option => (
+                              <option key={`${option.code}-${option.country}`} value={option.code}>
+                                {option.code} {option.country}
+                              </option>
+                            ))}
+                          </select>
+                          <input
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            className={`w-full p-3 border rounded-xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-amber-200 focus:border-amber-300 transition ${errors.phone ? 'border-red-500' : 'border-slate-200'}`}
+                            placeholder={`${selectedPhoneCountry.max} digit number`}
+                            value={formData.phone}
+                            onChange={e => {
+                              setFormData({ ...formData, phone: digitsOnly(e.target.value).slice(0, selectedPhoneCountry.max) });
+                              if (errors.phone) setErrors({ ...errors, phone: '' });
+                            }}
+                          />
+                        </div>
                         {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
                       </div>
                     </>
@@ -513,13 +634,37 @@ const Register = () => {
                         <input
                           type="file"
                           accept="image/*"
-                          onChange={e => {
-                            setFile(e.target.files?.[0] || null);
-                            if (errors.file) setErrors({ ...errors, file: '' });
-                          }}
+                          onChange={handleProfilePhotoChange}
                           className={`w-full text-sm border rounded-xl p-2 bg-slate-50 focus:outline-none ${errors.file ? 'border-red-500' : 'border-slate-200'}`}
                         />
-                        {file && <p className="text-green-600 text-xs mt-1">Selected: {file.name}</p>}
+                        {filePreview && (
+                          <div className={`mt-3 rounded-xl border p-3 ${faceStatus.state === 'invalid' ? 'border-red-200 bg-red-50' : 'border-slate-200 bg-slate-50'}`}>
+                            <div className="flex items-start gap-3">
+                              <div className="relative h-20 w-20 overflow-hidden rounded-xl border border-slate-200 bg-white">
+                                <img src={filePreview} alt="Selected profile preview" className="h-full w-full object-cover" />
+                                {faceStatus.state === 'invalid' ? (
+                                  <div className="absolute inset-0 flex items-center justify-center bg-red-950/55">
+                                    <X size={34} className="text-white" strokeWidth={3} />
+                                  </div>
+                                ) : null}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-xs font-semibold text-slate-800">{file?.name}</p>
+                                <p className={`mt-1 text-xs ${faceStatus.state === 'valid' ? 'text-emerald-600' : faceStatus.state === 'invalid' ? 'text-red-600' : 'text-slate-500'}`}>
+                                  {faceStatus.message || 'Photo selected.'}
+                                </p>
+                                <button
+                                  type="button"
+                                  onClick={clearProfilePhoto}
+                                  className="mt-2 inline-flex items-center gap-1 rounded-lg border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-white"
+                                >
+                                  <X size={13} /> Clear photo
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        {faceChecking && <p className="text-slate-500 text-xs mt-1">Checking face...</p>}
                         {errors.file && <p className="text-red-500 text-xs mt-1">{errors.file}</p>}
                       </div>
                     </>
@@ -530,7 +675,7 @@ const Register = () => {
                       <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                         <h3 className="text-sm font-bold text-slate-900 mb-2">Review</h3>
                         <p className="text-sm text-slate-700">Name: {formData.fullName || '-'}</p>
-                        <p className="text-sm text-slate-700">Phone: {formData.phone || '-'}</p>
+                        <p className="text-sm text-slate-700">Phone: {formData.phone ? formatPhone({ countryCode: formData.phoneCountry, phone: formData.phone }) : '-'}</p>
                         <p className="text-sm text-slate-700">Education: {formData.educationLevel || '-'}</p>
                         <p className="text-sm text-slate-700">
                           Stream: {formData.studyStream === 'Others' ? (formData.customStudyStream || '-') : (formData.studyStream || '-')}
@@ -574,16 +719,17 @@ const Register = () => {
                         type="button"
                         onClick={goToNextStep}
                         className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-white font-bold shadow-lg shadow-amber-200/70 hover:from-amber-600 hover:to-amber-700 transition"
+                        disabled={faceChecking}
                       >
-                        Next
+                        {faceChecking ? 'Checking Photo...' : 'Next'}
                       </button>
                     ) : (
                       <button
                         type="submit"
-                        disabled={loading}
+                        disabled={loading || faceChecking}
                         className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-white font-bold shadow-lg shadow-amber-200/70 hover:from-amber-600 hover:to-amber-700 transition disabled:opacity-60"
                       >
-                        {loading ? 'Creating Account...' : 'Register Now'}
+                        {faceChecking ? 'Checking Photo...' : loading ? 'Creating Account...' : 'Register Now'}
                       </button>
                     )}
                   </div>

@@ -13,6 +13,7 @@ import { clearTeacherAssignmentForStudent } from '../utils/teacherAssignment';
 import { clearUserPremiumPlanType } from '../utils/premiumPlanTypes';
 
 const LIFETIME_PREMIUM_DATE = '9999-12-31T23:59:59.000Z';
+const LIFETIME_LOCK_DATE = '9999-12-31T23:59:59.000Z';
 
 const AccountManagement = () => {
   const navigate = useNavigate();
@@ -26,6 +27,8 @@ const AccountManagement = () => {
   const [premiumReason, setPremiumReason] = useState('');
   const [actionReason, setActionReason] = useState('');
   const [grantLifetimePremium, setGrantLifetimePremium] = useState(false);
+  const [lockCustomDays, setLockCustomDays] = useState('');
+  const [lockType, setLockType] = useState('60d'); // 60d, custom, lifetime
   const [deleteConfirm, setDeleteConfirm] = useState(''); // For double confirmation of delete
   const [loading, setLoading] = useState(false);
   const [alertModal, setAlertModal] = useState({ show: false, title: '', message: '', type: 'info' });
@@ -33,6 +36,8 @@ const AccountManagement = () => {
   const isPremiumActive = (userProfile) => hasPremiumAccess(userProfile);
   const isLifetimePremium = (premiumUntil) =>
     Boolean(premiumUntil) && new Date(premiumUntil).getUTCFullYear() >= 9999;
+  const isLifetimeLock = (lockedUntil) =>
+    Boolean(lockedUntil) && new Date(lockedUntil).getUTCFullYear() >= 9999;
 
   useEffect(() => {
     loadUsers();
@@ -79,14 +84,37 @@ const AccountManagement = () => {
         updatePayload = { is_locked: false, locked_until: null, lock_reason: null };
         successMsg = '✅ Account unlocked successfully!';
       } else if (action === 'lock') {
-        const lockedUntil = new Date();
-        lockedUntil.setDate(lockedUntil.getDate() + 60);
+        let lockedUntil;
+        let lockLabel;
+        if (lockType === 'lifetime') {
+          lockedUntil = new Date(LIFETIME_LOCK_DATE);
+          lockLabel = 'lifetime';
+        } else if (lockType === 'custom') {
+          const days = parseInt(lockCustomDays, 10);
+          if (!days || days < 1) {
+            setAlertModal({
+              show: true,
+              title: 'Invalid Days',
+              message: 'Please enter a valid number of days.',
+              type: 'warning'
+            });
+            setLoading(false);
+            return;
+          }
+          lockedUntil = new Date();
+          lockedUntil.setDate(lockedUntil.getDate() + days);
+          lockLabel = `${days} days`;
+        } else {
+          lockedUntil = new Date();
+          lockedUntil.setDate(lockedUntil.getDate() + 60);
+          lockLabel = '60 days';
+        }
         updatePayload = {
           is_locked: true,
           locked_until: lockedUntil.toISOString(),
           lock_reason: actionReason.trim() || 'Account locked by admin.'
         };
-        successMsg = '✅ Account locked for 60 days.';
+        successMsg = `✅ Account locked for ${lockLabel}.`;
       } else if (action === 'grant-premium') {
         if (!grantLifetimePremium && !premiumDate) {
           setAlertModal({
@@ -296,6 +324,8 @@ const AccountManagement = () => {
     setPremiumReason('');
     setActionReason('');
     setGrantLifetimePremium(false);
+    setLockCustomDays('');
+    setLockType('60d');
     setDeleteConfirm('');
     setShowModal(true);
   };
@@ -381,7 +411,7 @@ const AccountManagement = () => {
                           <span className="text-sm text-red-600 font-semibold">Locked</span>
                           {user.locked_until && (
                             <span className="ml-2 text-xs text-red-500">
-                              until {new Date(user.locked_until).toLocaleDateString('en-IN')}
+                              {isLifetimeLock(user.locked_until) ? '(Lifetime)' : `until ${new Date(user.locked_until).toLocaleDateString('en-IN')}`}
                             </span>
                           )}
                           {user.lock_reason ? (
@@ -503,7 +533,7 @@ const AccountManagement = () => {
           <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
             <h2 className="text-xl font-bold mb-4">
               {action === 'unlock' && 'Unlock Account'}
-              {action === 'lock' && 'Lock Account (60 days)'}
+              {action === 'lock' && `Lock Account${lockType === 'lifetime' ? ' (Lifetime)' : lockType === 'custom' && lockCustomDays ? ` (${lockCustomDays} days)` : ' (60 days)'}`}
               {action === 'grant-premium' && 'Grant Premium Access'}
               {action === 'revoke-premium' && 'Revoke Premium Access'}
               {action === 'disable' && 'Disable Account'}
@@ -556,19 +586,71 @@ const AccountManagement = () => {
                 <p>This will unlock the account immediately.</p>
                 {selectedUser.locked_until && (
                   <p className="text-xs mt-1">
-                    Originally locked until: {new Date(selectedUser.locked_until).toLocaleDateString('en-IN')}
+                    Originally locked until: {isLifetimeLock(selectedUser.locked_until) ? 'Lifetime (manual unlock required)' : new Date(selectedUser.locked_until).toLocaleDateString('en-IN')}
                   </p>
                 )}
               </div>
             )}
 
             {action === 'lock' && (
-              <div className="mb-4 p-3 bg-red-50 rounded text-sm text-red-800">
-                <p>This will lock the account for 60 days and block all access.</p>
+              <div className="mb-4">
+                <div className="p-3 bg-red-50 rounded text-sm text-red-800">
+                  <p>This will lock the account and block all access.</p>
+                </div>
+                <div className="mt-3 space-y-3">
+                  <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-slate-50">
+                    <input
+                      type="radio"
+                      name="lockType"
+                      value="60d"
+                      checked={lockType === '60d'}
+                      onChange={() => setLockType('60d')}
+                    />
+                    <div>
+                      <span className="text-sm font-medium">Lock for 60 days</span>
+                      <p className="text-xs text-slate-500">Default lock period</p>
+                    </div>
+                  </label>
+                  <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-slate-50">
+                    <input
+                      type="radio"
+                      name="lockType"
+                      value="custom"
+                      checked={lockType === 'custom'}
+                      onChange={() => setLockType('custom')}
+                    />
+                    <div className="flex-1">
+                      <span className="text-sm font-medium">Lock for custom days</span>
+                      {lockType === 'custom' && (
+                        <input
+                          type="number"
+                          min="1"
+                          value={lockCustomDays}
+                          onChange={e => setLockCustomDays(e.target.value)}
+                          className="mt-2 w-full border rounded-lg p-2 text-sm"
+                          placeholder="Enter number of days"
+                        />
+                      )}
+                    </div>
+                  </label>
+                  <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-slate-50">
+                    <input
+                      type="radio"
+                      name="lockType"
+                      value="lifetime"
+                      checked={lockType === 'lifetime'}
+                      onChange={() => setLockType('lifetime')}
+                    />
+                    <div>
+                      <span className="text-sm font-medium">Lock until manual unlock</span>
+                      <p className="text-xs text-slate-500">Account stays locked until admin unlocks it</p>
+                    </div>
+                  </label>
+                </div>
                 <textarea
                   value={actionReason}
                   onChange={e => setActionReason(e.target.value)}
-                  className="mt-3 w-full border rounded-lg p-2 min-h-[84px] bg-white text-slate-700"
+                  className="mt-3 w-full border rounded-lg p-2 min-h-[84px] text-slate-700"
                   placeholder="Optional reason shown to the user"
                 />
               </div>
@@ -630,6 +712,8 @@ const AccountManagement = () => {
                   setPremiumReason('');
                   setActionReason('');
                   setGrantLifetimePremium(false);
+                  setLockCustomDays('');
+                  setLockType('60d');
                 }}
                 className="flex-1 px-4 py-2 border rounded-lg hover:bg-slate-50"
               >

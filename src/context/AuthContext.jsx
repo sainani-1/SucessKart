@@ -19,12 +19,14 @@ import { clearSecureAuthStorage, readStoredAuthTokens, removeLegacyLocalAuthArti
 import { refreshSessionFromHttpOnlyCookie } from '../utils/authCookieBridge';
 import { requestSessionFromOtherTabs } from '../utils/crossTabAuth';
 import { logError } from '../utils/errorLogger';
+import { clearFaceMfaVerified } from '../utils/faceAuth';
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
+  const [profileChecked, setProfileChecked] = useState(false);
   const [impersonationProfile, setImpersonationProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const conflictStateRef = useRef({ strikes: 0, lastAt: 0 });
@@ -90,8 +92,10 @@ export const AuthProvider = ({ children }) => {
       setSingleSessionNotice(notice);
     }
     clearStoredSessionKey(userId);
+    clearFaceMfaVerified(userId);
     setUser(null);
     setProfile(null);
+    setProfileChecked(true);
     setImpersonationProfile(null);
     clearProfileCache();
     clearImpersonation();
@@ -142,17 +146,22 @@ export const AuthProvider = ({ children }) => {
     const cachedImpersonation = readImpersonation();
     if (cachedProfile?.profile) {
       setProfile(cachedProfile.profile);
+      setProfileChecked(true);
       setImpersonationProfile(cachedImpersonation);
     }
 
-    // Wait for Supabase to restore the tab-scoped secure session.
+    const maxLoaderTimer = setTimeout(() => {
+      if (isMounted) setLoading(false);
+    }, 1000);
+
+    // Wait briefly for Supabase to restore the tab-scoped secure session.
     const restoreSession = async () => {
       if (typeof navigator !== 'undefined' && !navigator.onLine) {
         if (isMounted) setLoading(false);
+        if (isMounted) setProfileChecked(true);
         initialAuthRestoreRef.current = false;
         return;
       }
-      const forceTimeout = setTimeout(() => { if (isMounted) setLoading(false); }, 500);
       try {
         let tries = 0;
         let session = null;
@@ -192,36 +201,48 @@ export const AuthProvider = ({ children }) => {
         if (session?.user) {
           const allowed = await validateSessionOwnership(session.user.id);
           if (!isMounted || !allowed) {
+            setProfileChecked(true);
             setLoading(false);
             return;
           }
         }
         setUser(session?.user ?? null);
         if (session?.user) {
+          setProfileChecked(false);
           fetchProfile(session.user.id, { background: true });
         } else {
           setProfile(null);
+          setProfileChecked(true);
           setImpersonationProfile(null);
           clearProfileCache();
           clearImpersonation();
           setLoading(false);
         }
       } finally {
-        clearTimeout(forceTimeout);
+        clearTimeout(maxLoaderTimer);
+        if (isMounted) setLoading(false);
         initialAuthRestoreRef.current = false;
       }
     };
 
     restoreSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'TOKEN_REFRESHED') {
+        setUser(session?.user ?? null);
+        return;
+      }
       if (!session?.user && initialAuthRestoreRef.current) {
         return;
       }
       setUser(session?.user ?? null);
-      if (session?.user) fetchProfile(session.user.id, { background: true });
+      if (session?.user) {
+        setProfileChecked(false);
+        fetchProfile(session.user.id, { background: true });
+      }
       else {
         setProfile(null);
+        setProfileChecked(true);
         setImpersonationProfile(null);
         clearProfileCache();
         clearImpersonation();
@@ -231,6 +252,7 @@ export const AuthProvider = ({ children }) => {
 
     return () => {
       isMounted = false;
+      clearTimeout(maxLoaderTimer);
       subscription.unsubscribe();
     };
   }, []);
@@ -287,7 +309,10 @@ export const AuthProvider = ({ children }) => {
         if (!mounted || !allowed) return;
 
         setUser(session.user);
-        fetchProfile(session.user.id, { background: true });
+        if (!profileChecked) {
+          setProfileChecked(false);
+          fetchProfile(session.user.id, { background: true });
+        }
       } finally {
         resuming = false;
       }
@@ -413,22 +438,11 @@ export const AuthProvider = ({ children }) => {
     };
 
     refreshProfileState();
-    const interval = setInterval(refreshProfileState, 15000);
-    const onFocus = () => refreshProfileState();
-    const onVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        refreshProfileState();
-      }
-    };
-
-    window.addEventListener('focus', onFocus);
-    document.addEventListener('visibilitychange', onVisibility);
+    const interval = setInterval(refreshProfileState, 60000);
 
     return () => {
       cancelled = true;
       clearInterval(interval);
-      window.removeEventListener('focus', onFocus);
-      document.removeEventListener('visibilitychange', onVisibility);
     };
   }, [user?.id]);
 
@@ -470,6 +484,7 @@ export const AuthProvider = ({ children }) => {
       }
 
       setProfile(hydratedProfile);
+      setLoading(false);
       writeProfileCache({ userId: hydratedProfile.id, profile: hydratedProfile });
       setImpersonationProfile((prev) => {
         if (!prev) return null;
@@ -491,6 +506,7 @@ export const AuthProvider = ({ children }) => {
         setImpersonationProfile(null);
       }
     } finally {
+      setProfileChecked(true);
       if (!background) setLoading(false);
     }
   };
@@ -517,10 +533,12 @@ export const AuthProvider = ({ children }) => {
     await supabase.auth.signOut();
     setUser(null);
     setProfile(null);
+    setProfileChecked(true);
     setImpersonationProfile(null);
     clearProfileCache();
     clearImpersonation();
     clearStoredSessionKey(currentUserId);
+    clearFaceMfaVerified(currentUserId);
     clearDailyLoginState();
     clearSecureAuthStorage();
     try {
@@ -553,6 +571,7 @@ export const AuthProvider = ({ children }) => {
         realUser: user,
         profile: effectiveProfile,
         realProfile: profile,
+        profileChecked,
         impersonationProfile,
         isImpersonating,
         loading,

@@ -20,7 +20,7 @@ const LoadingSpinner = ({ message = 'Loading...', fullPage = true }) => {
               {/* Center icon */}
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="w-8 h-8 bg-slate-900 rounded-full flex items-center justify-center">
-                  <span className="text-gold-400 text-xl font-bold">N</span>
+                  <span className="text-gold-400 text-xl font-bold">S</span>
                 </div>
               </div>
             </div>

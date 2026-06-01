@@ -9,10 +9,12 @@ export function PresenceProvider({ children }) {
   const { profile } = useAuth();
   const [onlineUserIds, setOnlineUserIds] = useState(new Set());
   const [onlineProfiles, setOnlineProfiles] = useState([]);
+  const [presenceStates, setPresenceStates] = useState({});
   const prevIdsRef = useRef('');
 
-  const onPresence = useCallback((userIds) => {
+  const onPresence = useCallback((userIds, states) => {
     setOnlineUserIds(new Set(userIds));
+    if (states) setPresenceStates(states);
   }, []);
 
   const { updatePresence } = usePresence(profile?.id, { onPresence });
@@ -44,8 +46,12 @@ export function PresenceProvider({ children }) {
 
   const isOnline = useCallback((id) => id && onlineUserIds.has(String(id)), [onlineUserIds]);
 
+  const getPresenceState = useCallback((userId) => {
+    return presenceStates[String(userId)] || {};
+  }, [presenceStates]);
+
   return (
-    <PresenceContext.Provider value={{ onlineUserIds, onlineProfiles, isOnline }}>
+    <PresenceContext.Provider value={{ onlineUserIds, onlineProfiles, isOnline, presenceStates, getPresenceState }}>
       {children}
     </PresenceContext.Provider>
   );
@@ -53,6 +59,6 @@ export function PresenceProvider({ children }) {
 
 export function usePresenceContext() {
   const ctx = useContext(PresenceContext);
-  if (!ctx) return { onlineUserIds: new Set(), onlineProfiles: [], isOnline: () => false };
+  if (!ctx) return { onlineUserIds: new Set(), onlineProfiles: [], isOnline: () => false, presenceStates: {}, getPresenceState: () => ({}) };
   return ctx;
 }

@@ -24,7 +24,7 @@ const formatCertificateId = (cert) => {
   const m = String(date.getMonth() + 1).padStart(2, '0');
   const d = String(date.getDate()).padStart(2, '0');
   const random = generateDeterministicCode(String(cert?.id ?? `${y}${m}${d}`));
-  return `SkillPro-${y}-${m}-${d}-${random}`;
+  return `SucessKart-${y}-${m}-${d}-${random}`;
 };
 
 const CertificatePreview = () => {
@@ -42,7 +42,7 @@ const CertificatePreview = () => {
       }
       try {
         const decodedId = decodeURIComponent(id);
-        const match = decodedId.match(/^SkillPro-(\d{4})-(\d{2})-(\d{2})-([A-Za-z0-9]{12})$/);
+        const match = decodedId.match(/^SucessKart-(\d{4})-(\d{2})-(\d{2})-([A-Za-z0-9]{12})$/);
         if (!match) throw new Error('Invalid certificate format.');
         const [, y, m, d] = match;
         const baseDate = new Date(`${y}-${m}-${d}T00:00:00.000Z`);

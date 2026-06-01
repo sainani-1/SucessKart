@@ -45,7 +45,7 @@ export default function AdminChooseMeet() {
         .upsert({ key: SETTING_KEY, value: nextProvider }, { onConflict: 'key' });
 
       if (saveError) throw saveError;
-      setInfo(`Class meetings will now use ${nextProvider === 'livekit' ? 'LiveKit' : 'Jitsi'} inside SkillPro.`);
+      setInfo(`Class meetings will now use ${nextProvider === 'livekit' ? 'LiveKit' : 'Jitsi'} inside SucessKart.`);
     } catch (err) {
       setError(err.message || 'Failed to save meeting provider.');
     } finally {
@@ -66,7 +66,7 @@ export default function AdminChooseMeet() {
           </div>
           <div>
             <h1 className="text-2xl font-bold">Choose Meet</h1>
-            <p className="mt-1 text-sm text-slate-200">Select which meeting engine SkillPro will use for built-in live classes.</p>
+            <p className="mt-1 text-sm text-slate-200">Select which meeting engine SucessKart will use for built-in live classes.</p>
           </div>
         </div>
       </div>
@@ -76,7 +76,7 @@ export default function AdminChooseMeet() {
 
       <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
         <h2 className="text-lg font-semibold text-slate-900">Class Meeting Provider</h2>
-        <p className="mt-1 text-sm text-slate-500">Only admins choose the engine here. Teachers and students will still see the built-in meeting branded as SkillPro.</p>
+        <p className="mt-1 text-sm text-slate-500">Only admins choose the engine here. Teachers and students will still see the built-in meeting branded as SucessKart.</p>
 
         <div className="mt-5 grid gap-4 md:grid-cols-2">
           <button
@@ -89,7 +89,7 @@ export default function AdminChooseMeet() {
             }`}
           >
             <p className="text-sm font-semibold text-slate-900">Jitsi</p>
-            <p className="mt-1 text-xs text-slate-500">Uses the built-in SkillPro meeting flow powered by Jitsi.</p>
+            <p className="mt-1 text-xs text-slate-500">Uses the built-in SucessKart meeting flow powered by Jitsi.</p>
           </button>
 
           <button
@@ -102,7 +102,7 @@ export default function AdminChooseMeet() {
             }`}
           >
             <p className="text-sm font-semibold text-slate-900">LiveKit</p>
-            <p className="mt-1 text-xs text-slate-500">Uses the built-in SkillPro room integration powered by LiveKit.</p>
+            <p className="mt-1 text-xs text-slate-500">Uses the built-in SucessKart room integration powered by LiveKit.</p>
           </button>
         </div>
 

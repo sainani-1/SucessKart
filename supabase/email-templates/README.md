@@ -1,4 +1,4 @@
-# SkillPro Supabase Auth Email Templates
+# SucessKart Supabase Auth Email Templates
 
 These templates are for Supabase Auth emails such as password reset, signup confirmation, magic link, invite, and email change.
 

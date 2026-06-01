@@ -5,7 +5,7 @@ import AdminChangeCourse from './pages/AdminChangeCourse';
 import AdminScoreboard from './logicBuilding/AdminScoreboard';
 import LogicBuildingLeaderboard from './logicBuilding/LogicBuildingLeaderboard';
 import React, { useEffect, useState } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import Layout from './components/Layout';
 import LoadingSpinner from './components/LoadingSpinner';
@@ -90,11 +90,14 @@ import CertificatePreview from './pages/CertificatePreview';
 import AdminDeletedAccounts from './pages/AdminDeletedAccounts';
 import TermsAndConditions from './pages/TermsAndConditions';
 import CompleteGoogleProfile from './pages/CompleteGoogleProfile';
-import GoogleOnboarding from './pages/GoogleOnboarding';
+import FaceAuthSettings from './pages/FaceAuthSettings';
+import FaceMfaVerify from './pages/FaceMfaVerify';
+
 
 import AdminSupportContact from './pages/AdminSupportContact';
 import AdminActivityLogs from './pages/AdminActivityLogs';
 import AdminOnline from './pages/AdminOnline';
+import AdminVisitors from './pages/AdminVisitors';
 import StudentWriteTest from './pages/StudentWriteTest';
 import ResumeBuilder from './pages/ResumeBuilder';
 import ReportIssue from './pages/ReportIssue';
@@ -108,6 +111,8 @@ import AdminPaymentResponses from './pages/AdminPaymentResponses';
 import AdminSendEmail from './pages/AdminSendEmail';
 import CodingPlayground from './pages/CodingPlayground';
 import DiscussionForum from './pages/DiscussionForum';
+import InternshipBoard from './pages/InternshipBoard';
+import ProjectShowcase from './pages/ProjectShowcase';
 import SkillBadges from './pages/SkillBadges';
 import AdminWebsiteProtection from './pages/AdminWebsiteProtection';
 import UniversalAssistant from './pages/UniversalAssistant';
@@ -138,6 +143,9 @@ import PortfolioBuilder from './pages/PortfolioBuilder';
 import PublicPortfolio from './pages/PublicPortfolio';
 import AdminLoginOtpSettings from './pages/AdminLoginOtpSettings';
 import AdminErrorLogs from './pages/AdminErrorLogs';
+import { isProfileComplete } from './utils/profileCompletion';
+import { getFaceAuthSettings, isFaceMfaVerified } from './utils/faceAuth';
+import { useVisitorTracking } from './hooks/useVisitorTracking';
 import {
   AchievementTimeline,
   AdminAtRiskStudents,
@@ -152,7 +160,8 @@ import {
 
 const ProtectedRoute = ({ children }) => {
   const auth = useAuth();
-  const { user, profile, realProfile, isImpersonating, loading } = auth || {};
+  const { user, profile, realProfile, isImpersonating, loading, profileChecked } = auth || {};
+  const location = useLocation();
   const [supportContactEmail, setSupportContactEmail] = useState('');
 
   const handleBlockedAccountLogout = async () => {
@@ -181,19 +190,32 @@ const ProtectedRoute = ({ children }) => {
     };
   }, [realProfile?.is_disabled, realProfile?.is_locked]);
 
-  if (loading || !auth) return <LoadingSpinner message="Initializing your account..." />;
+  if (loading || !auth || (user && !profileChecked)) {
+    return <LoadingSpinner message="Loading profile..." />;
+  }
   if (!user) return <Navigate to="/login" />;
-  const isGoogleAuth = user?.app_metadata?.provider === 'google' || profile?.auth_provider === 'google';
-  const googleProfileIncomplete =
-    isGoogleAuth && (!profile?.google_profile_completed || !profile?.terms_accepted);
-  if (googleProfileIncomplete) return <Navigate to="/google-onboarding" />;
+  if (!isImpersonating && !profile) {
+    return <Navigate to="/complete-profile" replace />;
+  }
+  if (!isImpersonating && profile && profile.role !== 'admin' && !isProfileComplete(profile)) {
+    return <Navigate to="/complete-profile" replace />;
+  }
+  const faceSettings = getFaceAuthSettings(profile);
+  if (
+    !isImpersonating &&
+    faceSettings.mfaEnabled &&
+    !isFaceMfaVerified(profile.id) &&
+    location.pathname !== '/face-verify'
+  ) {
+    return <Navigate to="/face-verify" replace state={{ next: location.pathname.startsWith('/app') ? location.pathname : '/app' }} />;
+  }
 
   // Check if user is disabled
   if (realProfile?.is_disabled && !isImpersonating) {
     return (
       <div className="h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-red-950 text-white p-6 flex items-center justify-center relative overflow-hidden">
         <img
-          src="/skillpro-logo.png"
+          src="/sucesskart-logo.svg"
           alt=""
           aria-hidden="true"
           className="absolute inset-0 m-auto w-72 h-72 object-contain opacity-15 mix-blend-multiply pointer-events-none select-none"
@@ -203,10 +225,10 @@ const ProtectedRoute = ({ children }) => {
           <p className="text-red-100">
             {realProfile?.disabled_reason
               ? `Reason: ${realProfile.disabled_reason}`
-              : 'Your account has been disabled by the SkillPro team due to suspicious activity.'}
+              : 'Your account has been disabled by the SucessKart team due to suspicious activity.'}
           </p>
           <div className="rounded-xl bg-red-500/10 border border-red-300/30 p-4">
-            <p className="text-sm text-red-100">Please contact the SkillPro team for reactivation.</p>
+            <p className="text-sm text-red-100">Please contact the SucessKart team for reactivation.</p>
             {supportContactEmail ? (
               <a className="inline-block mt-2 text-sm font-semibold underline text-red-200" href={`mailto:${supportContactEmail}`}>
                 {supportContactEmail}
@@ -233,7 +255,7 @@ const ProtectedRoute = ({ children }) => {
       return (
         <div className="h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-red-950 text-white p-6 flex items-center justify-center relative overflow-hidden">
           <img
-            src="/skillpro-logo.png"
+            src="/sucesskart-logo.svg"
             alt=""
             aria-hidden="true"
             className="absolute inset-0 m-auto w-72 h-72 object-contain opacity-15 mix-blend-multiply pointer-events-none select-none"
@@ -245,7 +267,7 @@ const ProtectedRoute = ({ children }) => {
               {lockedUntil ? (
                 <p>Lock expires on: {lockedUntil.toLocaleDateString('en-IN')}</p>
               ) : (
-                <p>Your account is locked until the SkillPro team reviews it.</p>
+                <p>Your account is locked until the SucessKart team reviews it.</p>
               )}
               {supportContactEmail ? (
                 <p className="mt-2">Need help? Contact <a className="font-semibold underline text-red-200" href={`mailto:${supportContactEmail}`}>{supportContactEmail}</a>.</p>
@@ -271,8 +293,7 @@ const AdminRoute = ({ children }) => {
   const auth = useAuth();
   const { realProfile, loading } = auth || {};
 
-  if (loading || !auth)
-    return <LoadingSpinner message="Loading dashboard..." />;
+  if (loading || !auth) return children;
 
   if (realProfile?.role !== "admin")
     return <Navigate to="/app" />;
@@ -284,7 +305,7 @@ const TeacherRoute = ({ children }) => {
   const auth = useAuth();
   const { profile, loading } = auth || {};
 
-  if (loading || !auth) return <LoadingSpinner message="Loading dashboard..." />;
+  if (loading || !auth) return children;
   if (!profile || profile.role !== "teacher")
     return <Navigate to="/app" />;
 
@@ -295,7 +316,7 @@ const InstructorRoute = ({ children }) => {
   const auth = useAuth();
   const { profile, loading } = auth || {};
 
-  if (loading || !auth) return <LoadingSpinner message="Loading dashboard..." />;
+  if (loading || !auth) return children;
   if (!profile || profile.role !== "instructor")
     return <Navigate to="/app" />;
 
@@ -306,7 +327,7 @@ const VerifierRoute = ({ children }) => {
   const auth = useAuth();
   const { profile, loading } = auth || {};
 
-  if (loading || !auth) return <LoadingSpinner message="Loading verifier panel..." />;
+  if (loading || !auth) return children;
   if (!profile || profile.role !== "verifier") return <Navigate to="/app" />;
 
   return children;
@@ -317,7 +338,7 @@ const StaffAllInOneRoute = ({ children }) => {
   const { realProfile, profile, loading } = auth || {};
   const activeRole = realProfile?.role || profile?.role;
 
-  if (loading || !auth) return <LoadingSpinner message="Loading live monitoring..." />;
+  if (loading || !auth) return children;
   if (!['admin', 'teacher', 'instructor'].includes(activeRole)) {
     return <Navigate to="/app" />;
   }
@@ -326,6 +347,7 @@ const StaffAllInOneRoute = ({ children }) => {
 };
 
 function App() {
+  useVisitorTracking();
   return (
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <Routes>
@@ -337,7 +359,7 @@ function App() {
         <Route path="/plans" element={<Plans />} />
         <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
         <Route path="/complete-profile" element={<CompleteGoogleProfile />} />
-        <Route path="/google-onboarding" element={<GoogleOnboarding />} />
+        <Route path="/face-verify" element={<FaceMfaVerify />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/reset-password-confirm" element={<ResetPassword />} />
         <Route path="/register-admin" element={<RegisterAdmin />} />
@@ -382,6 +404,7 @@ function App() {
           <Route path="course/:courseId" element={<CourseDetail />} />
           <Route path="profile" element={<Profile />} />
           <Route path="settings" element={<Settings />} />
+          <Route path="face-auth" element={<FaceAuthSettings />} />
           <Route path="payment" element={<Payment />} />
           <Route path="guidance" element={<CareerGuidance />} />
           <Route path="guidance-sessions" element={<GuidanceSessions />} />
@@ -413,6 +436,8 @@ function App() {
           <Route path="verify-id" element={<StudentIdVerification />} />
           <Route path="verifymyid" element={<StudentIdVerification />} />
           <Route path="offers" element={<Offers />} />
+          <Route path="internships" element={<InternshipBoard />} />
+          <Route path="project-showcase" element={<ProjectShowcase />} />
           <Route path="coding-playground" element={<CodingPlayground />} />
           <Route path="discussion-forum" element={<DiscussionForum />} />
           <Route path="skill-badges" element={<SkillBadges />} />
@@ -487,6 +512,7 @@ function App() {
           <Route path="admin/activity-logs" element={<AdminRoute><AdminActivityLogs /></AdminRoute>} />
           <Route path="admin/error-logs" element={<AdminRoute><AdminErrorLogs /></AdminRoute>} />
           <Route path="admin/online" element={<AdminRoute><AdminOnline /></AdminRoute>} />
+          <Route path="admin/visitors" element={<AdminRoute><AdminVisitors /></AdminRoute>} />
           <Route path="admin/growth-analytics" element={<AdminRoute><AdminGrowthAnalytics /></AdminRoute>} />
           <Route path="admin/lead-inbox" element={<AdminRoute><AdminLeadInbox /></AdminRoute>} />
           <Route path="admin/payment-attempts" element={<AdminRoute><AdminPaymentAttempts /></AdminRoute>} />

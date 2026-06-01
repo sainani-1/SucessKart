@@ -3,8 +3,8 @@ import { supabase } from "../supabaseClient";
 import { useNavigate } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
 import usePopup from '../hooks/usePopup.jsx';
-const LOGO_URL = import.meta.env.VITE_CERTIFICATE_LOGO || "/skillpro-logo.png";
-const MFA_ISSUER = "SkillPro";
+const LOGO_URL = import.meta.env.VITE_CERTIFICATE_LOGO || "/sucesskart-logo.svg";
+const MFA_ISSUER = "SucessKart";
 
 export default function AdminMFASetup() {
   const navigate = useNavigate();
@@ -36,7 +36,7 @@ export default function AdminMFASetup() {
     checkExistingFactors();
   }, []);
 
-  const buildSkillProOtpUri = (uri, selectedLabel) => {
+  const buildSucessKartOtpUri = (uri, selectedLabel) => {
     if (!uri) return null;
     try {
       const otpUrl = new URL(uri);
@@ -82,7 +82,7 @@ export default function AdminMFASetup() {
       return;
     }
 
-    const otpUri = buildSkillProOtpUri(data?.totp?.uri, selectedName);
+    const otpUri = buildSucessKartOtpUri(data?.totp?.uri, selectedName);
     setQr(otpUri || data?.totp?.qr_code || null);
     setFactorId(data.id);
     setStep("qr");

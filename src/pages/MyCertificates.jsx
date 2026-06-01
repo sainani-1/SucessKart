@@ -12,16 +12,16 @@ import { logError } from '../utils/errorLogger';
 /**
  * MyCertificates Component
  * ========================
- * Displays user certificates with the official SkillPro branding
+ * Displays user certificates with the official SucessKart branding
  * Features:
  * - View certificates in browser
  * - Download certificates as PDF
  * - Share certificates via URL
  * - Verify certificates using UUID or formatted ID
  * 
- * Certificate Format: SkillPro-YYYY-MM-DD-RANDOM12
+ * Certificate Format: SucessKart-YYYY-MM-DD-RANDOM12
  * Canvas Size: 1200x900px
- * Logo: Loaded from public/skillpro-logo.png
+ * Logo: Loaded from public/sucesskart-logo.svg
  */
 
 let jsPdfLoader;
@@ -63,13 +63,13 @@ const generateDeterministicCode = (seed) => {
 /**
  * formatCertificateId()
  * ====================
- * Formats certificate ID in official SkillPro format
- * Format: SkillPro-YYYY-MM-DD-RANDOM12
+ * Formats certificate ID in official SucessKart format
+ * Format: SucessKart-YYYY-MM-DD-RANDOM12
  * 
- * Example: SkillPro-2026-01-04-PJEEZAML9K2X
+ * Example: SucessKart-2026-01-04-PJEEZAML9K2X
  * 
  * Components:
- * - Prefix: "SkillPro" (branding)
+ * - Prefix: "SucessKart" (branding)
  * - Date: Year-Month-Day when certificate was issued
  * - Random: 12-character unique code (deterministic based on certificate ID)
  */
@@ -79,7 +79,7 @@ const formatCertificateId = (cert) => {
   const m = String(date.getMonth() + 1).padStart(2, '0');
   const d = String(date.getDate()).padStart(2, '0');
   const random = generateDeterministicCode(String(cert?.id ?? `${y}${m}${d}`));
-  return `SkillPro-${y}-${m}-${d}-${random}`;
+  return `SucessKart-${y}-${m}-${d}-${random}`;
 };
 
 const resolveCertificateCourseTitle = (cert) =>
@@ -119,7 +119,7 @@ const MyCertificates = () => {
    * 1. Awaits buildCertificateDataUrl to generate canvas
    * 2. Loads jsPDF library from CDN
    * 3. Creates PDF from canvas data URL
-  * 4. Sets filename: SkillPro_Certificate_[FormattedID].pdf
+  * 4. Sets filename: SucessKart_Certificate_[FormattedID].pdf
    * 5. Triggers browser download
    * 
    * File format: PDF (landscape, 1200x900pt)
@@ -134,7 +134,7 @@ const MyCertificates = () => {
       pdf.addImage(dataUrl, 'PNG', 0, 0, 2400, 1800);
       const userName = toSafeFilePart(certificateDisplayName || 'User');
       const courseName = toSafeFilePart(resolveCertificateCourseTitle(cert) || 'Course');
-      const fileName = `SkillPro Certificate ${userName} ${courseName}.pdf`;
+      const fileName = `SucessKart Certificate ${userName} ${courseName}.pdf`;
       pdf.save(fileName);
       setDownloading(null);
     } catch (err) {
@@ -161,7 +161,7 @@ const MyCertificates = () => {
     try {
       const certId = formatCertificateId(cert);
       const verifyUrl = `${window.location.origin}/verify/${encodeURIComponent(certId)}`;
-      const text = `My SkillPro certificate is verified here: ${verifyUrl}. Join SkillPro to build yours too.`;
+      const text = `My SucessKart certificate is verified here: ${verifyUrl}. Join SucessKart to build yours too.`;
       trackPremiumEvent('certificate_share_whatsapp', 'my_certificates', { certId }, profile?.id || null);
       window.open(buildWhatsAppShareUrl(text), '_blank', 'noopener,noreferrer');
     } catch (err) {

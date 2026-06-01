@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, BookOpen, User, GraduationCap, Video, Users, CheckSquare, LogOut, FileBadge, ShieldCheck, ClipboardList, Sparkles, MessageCircle, Calendar, Award, UserPlus, Lock, Unlock, Bell, Clock, Briefcase, ChevronLeft, ChevronRight, Settings, Gift, Trash2, Mail, FileText, Wrench, BarChart3, Code2, MessageSquare, KeyRound, MonitorUp, ShieldAlert, CreditCard, X, Download, ListChecks, Globe2, Trophy, Wifi, QrCode, AlertTriangle } from 'lucide-react';
+import { LayoutDashboard, BookOpen, User, GraduationCap, Video, Users, CheckSquare, LogOut, FileBadge, ShieldCheck, ClipboardList, Sparkles, MessageCircle, Calendar, Award, UserPlus, Lock, Unlock, Bell, Clock, Briefcase, ChevronLeft, ChevronRight, Settings, Gift, Trash2, Mail, FileText, Wrench, BarChart3, Code2, MessageSquare, KeyRound, MonitorUp, ShieldAlert, CreditCard, X, Download, ListChecks, Globe2, Trophy, Wifi, QrCode, AlertTriangle, Eye } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabaseClient';
 import { useNotifications } from '../context/NotificationContext';
@@ -455,10 +455,10 @@ const Sidebar = ({ isMobile = false, mobileOpen = false, onClose = () => {}, onR
           className={`flex items-center ${isMobile ? 'gap-3' : isCollapsed && !isHovered ? 'justify-center' : 'space-x-2'} cursor-pointer hover:opacity-80 transition-opacity`}
           onClick={() => requestNavigation('/app')}
         >
-          <img src="/skillpro-logo.png" alt="SkillPro logo" className={`${isMobile ? 'w-11 h-11' : 'w-10 h-10'} rounded-full object-contain`} />
+          <img src="/sucesskart-logo.svg" alt="SucessKart logo" className={`${isMobile ? 'w-11 h-11' : 'w-10 h-10'} rounded-full object-contain`} />
           {shouldShowText && (
             <div className="min-w-0">
-              <span className="block truncate font-bold text-xl tracking-tight">SkillPro</span>
+              <span className="block truncate font-bold text-xl tracking-tight">SucessKart</span>
               {isMobile ? <span className="block text-xs text-slate-400">Learning Panel</span> : null}
             </div>
           )}
@@ -674,6 +674,14 @@ const Sidebar = ({ isMobile = false, mobileOpen = false, onClose = () => {}, onR
               <Gift size={28} />
               {shouldShowText && <span className="truncate text-sm font-medium">Discounts & Offers</span>}
             </NavLink>
+            <NavLink to="/app/internships" className={navItemClass} title="Internships">
+              <Briefcase size={28} />
+              {shouldShowText && <span className="truncate text-sm font-medium">Internships</span>}
+            </NavLink>
+            <NavLink to="/app/project-showcase" className={navItemClass} title="Project Showcase">
+              <Trophy size={28} />
+              {shouldShowText && <span className="truncate text-sm font-medium">Project Showcase</span>}
+            </NavLink>
             <NavLink to="/app/resume-builder" className={navItemClass} title="Resume Builder">
               <FileText size={28} />
               {shouldShowText && <span className="truncate text-sm font-medium">Resume Builder</span>}
@@ -789,6 +797,10 @@ const Sidebar = ({ isMobile = false, mobileOpen = false, onClose = () => {}, onR
               <Sparkles size={28} />
               {shouldShowText && <span className="truncate text-sm font-medium">Personal Roadmap</span>}
             </NavLink>
+            <NavLink to="/app/internships" className={navItemClass} title="Internships">
+              <Briefcase size={28} />
+              {shouldShowText && <span className="truncate text-sm font-medium">Internships</span>}
+            </NavLink>
             <NavLink to="/app/clear-doubts" className={navItemClass} title="Clear Doubts">
               <MessageCircle size={28} />
               {shouldShowText && <span className="truncate text-sm font-medium">Clear Doubts</span>}
@@ -860,6 +872,10 @@ const Sidebar = ({ isMobile = false, mobileOpen = false, onClose = () => {}, onR
             <NavLink to="/app/admin/online" className={navItemClass} title="Online">
               <Wifi size={28} />
               {shouldShowText && <span className="truncate text-sm font-medium">Online</span>}
+            </NavLink>
+            <NavLink to="/app/admin/visitors" className={navItemClass} title="Visiting Website">
+              <Eye size={28} />
+              {shouldShowText && <span className="truncate text-sm font-medium">Visiting Website</span>}
             </NavLink>
             <NavLink to="/app/all-in-one" className={navItemClass} title="All In One">
               <MonitorUp size={28} />
@@ -1170,9 +1186,22 @@ const Sidebar = ({ isMobile = false, mobileOpen = false, onClose = () => {}, onR
               <Users size={28} />
               {shouldShowText && <span className="truncate text-sm font-medium">Startup Collabs</span>}
             </NavLink>
+            <NavLink to="/app/internships" className={navItemClass} title="Internships">
+              <Briefcase size={28} />
+              {shouldShowText && <span className="truncate text-sm font-medium">Internships</span>}
+            </NavLink>
+            <NavLink to="/app/project-showcase" className={navItemClass} title="Project Showcase">
+              <Trophy size={28} />
+              {shouldShowText && <span className="truncate text-sm font-medium">Project Showcase</span>}
+            </NavLink>
             {/* Send Gift - Admin only (single entry) */}
           </>
         )}
+
+        <NavLink to="/app/face-auth" className={navItemClass} title="Face Auth">
+          <ShieldCheck size={28} />
+          {shouldShowText && <span className="truncate text-sm font-medium">Face Auth</span>}
+        </NavLink>
 
         {role !== 'instructor' ? (
           <NavLink to="/app/settings" className={navItemClass} title="Settings">

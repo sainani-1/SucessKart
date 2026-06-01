@@ -97,7 +97,7 @@ const NotesLibrary = () => {
     <div className="space-y-6">
       <div className="rounded-2xl bg-gradient-to-r from-slate-900 via-blue-900 to-slate-800 p-6 text-white">
         <h1 className="text-2xl font-bold">Premium Plus Notes Library</h1>
-        <p className="mt-1 text-sm text-slate-200">Advanced notes are previewed inside SkillPro only.</p>
+        <p className="mt-1 text-sm text-slate-200">Advanced notes are previewed inside SucessKart only.</p>
       </div>
 
       {items.length === 0 ? (
@@ -143,7 +143,7 @@ const NotesLibrary = () => {
             ) : null}
 
             <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-              Notes stay inside SkillPro preview. Download links and visible source links are not shown.
+              Notes stay inside SucessKart preview. Download links and visible source links are not shown.
             </div>
 
             {activePreview?.type === 'blocked' ? (

@@ -16,7 +16,7 @@ body::before {
   content: '';
   position: fixed;
   inset: 0;
-  background-image: url('/skillpro-logo.png');
+  background-image: url('/sucesskart-logo.svg');
   background-repeat: no-repeat;
   background-position: center;
   background-size: min(42vmin, 360px);
@@ -71,27 +71,27 @@ aside nav::-webkit-scrollbar-thumb:hover {
   position: relative;
 }
 
-.skillpro-fullscreen-idle,
-.skillpro-fullscreen-idle * {
+.SucessKart-fullscreen-idle,
+.SucessKart-fullscreen-idle * {
   cursor: none !important;
 }
 
-.skillpro-player-chrome {
+.SucessKart-player-chrome {
   transition: opacity 180ms ease;
 }
 
-.skillpro-fullscreen-idle .skillpro-player-chrome {
+.SucessKart-fullscreen-idle .SucessKart-player-chrome {
   opacity: 0;
   pointer-events: none;
 }
 
-.skillpro-media-frame:fullscreen {
+.SucessKart-media-frame:fullscreen {
   height: 100vh;
   width: 100vw;
   background: #000;
 }
 
-.skillpro-media-frame:fullscreen .skillpro-frame-header {
+.SucessKart-media-frame:fullscreen .SucessKart-frame-header {
   position: absolute;
   top: 0;
   left: 0;
@@ -101,23 +101,23 @@ aside nav::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(to bottom, rgba(2, 6, 23, 0.96), rgba(2, 6, 23, 0));
 }
 
-.skillpro-media-frame:fullscreen .skillpro-frame-body,
-.skillpro-media-frame:fullscreen .skillpro-custom-video,
-.skillpro-media-frame:fullscreen .skillpro-video-stage {
+.SucessKart-media-frame:fullscreen .SucessKart-frame-body,
+.SucessKart-media-frame:fullscreen .SucessKart-custom-video,
+.SucessKart-media-frame:fullscreen .SucessKart-video-stage {
   height: 100%;
   width: 100%;
 }
 
-.skillpro-media-frame:fullscreen .skillpro-custom-video {
+.SucessKart-media-frame:fullscreen .SucessKart-custom-video {
   display: flex;
   position: relative;
 }
 
-.skillpro-media-frame:fullscreen .skillpro-video-stage {
+.SucessKart-media-frame:fullscreen .SucessKart-video-stage {
   padding-bottom: 116px;
 }
 
-.skillpro-media-frame:fullscreen .skillpro-video-controls {
+.SucessKart-media-frame:fullscreen .SucessKart-video-controls {
   position: absolute;
   left: 0;
   right: 0;
@@ -126,32 +126,32 @@ aside nav::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(to top, rgba(2, 6, 23, 0.98), rgba(2, 6, 23, 0.82));
 }
 
-.skillpro-video-3d {
+.SucessKart-video-3d {
   transform: perspective(1200px) rotateX(1.5deg) scale(0.985);
   filter: saturate(1.08) contrast(1.04);
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
   transition: transform 180ms ease, filter 180ms ease;
 }
 
-.skillpro-pop-in {
-  animation: skillpro-pop-in 220ms ease-out;
+.SucessKart-pop-in {
+  animation: SucessKart-pop-in 220ms ease-out;
 }
 
-.skillpro-modal-backdrop {
-  animation: skillpro-fade-in 220ms ease-out;
+.SucessKart-modal-backdrop {
+  animation: SucessKart-fade-in 220ms ease-out;
   backdrop-filter: blur(6px);
 }
 
-.skillpro-demo-pop {
-  animation: skillpro-demo-pop 520ms cubic-bezier(0.16, 1, 0.3, 1);
+.SucessKart-demo-pop {
+  animation: SucessKart-demo-pop 520ms cubic-bezier(0.16, 1, 0.3, 1);
   transform-origin: 50% 60%;
 }
 
-.skillpro-demo-ring {
-  animation: skillpro-demo-ring 1300ms ease-out infinite;
+.SucessKart-demo-ring {
+  animation: SucessKart-demo-ring 1300ms ease-out infinite;
 }
 
-.skillpro-logo-assemble {
+.SucessKart-logo-assemble {
   position: relative;
   width: 82px;
   height: 82px;
@@ -160,10 +160,10 @@ aside nav::-webkit-scrollbar-thumb:hover {
   border-radius: 999px;
   background: radial-gradient(circle, rgba(251, 191, 36, 0.24), rgba(59, 130, 246, 0.08) 58%, transparent 70%);
   overflow: hidden;
-  animation: skillpro-logo-orbit-glow 1800ms ease-in-out infinite alternate;
+  animation: SucessKart-logo-orbit-glow 1800ms ease-in-out infinite alternate;
 }
 
-.skillpro-card-logo-line {
+.SucessKart-card-logo-line {
   position: absolute;
   left: 0;
   top: 0;
@@ -178,31 +178,31 @@ aside nav::-webkit-scrollbar-thumb:hover {
   pointer-events: none;
 }
 
-.skillpro-card-logo-line-1 {
-  animation: skillpro-logo-line-1 2400ms cubic-bezier(0.18, 0.9, 0.2, 1) both;
+.SucessKart-card-logo-line-1 {
+  animation: SucessKart-logo-line-1 2400ms cubic-bezier(0.18, 0.9, 0.2, 1) both;
 }
 
-.skillpro-card-logo-line-2 {
-  animation: skillpro-logo-line-2 2400ms cubic-bezier(0.18, 0.9, 0.2, 1) 70ms both;
+.SucessKart-card-logo-line-2 {
+  animation: SucessKart-logo-line-2 2400ms cubic-bezier(0.18, 0.9, 0.2, 1) 70ms both;
 }
 
-.skillpro-card-logo-line-3 {
-  animation: skillpro-logo-line-3 2400ms cubic-bezier(0.18, 0.9, 0.2, 1) 140ms both;
+.SucessKart-card-logo-line-3 {
+  animation: SucessKart-logo-line-3 2400ms cubic-bezier(0.18, 0.9, 0.2, 1) 140ms both;
 }
 
-.skillpro-card-logo-line-4 {
-  animation: skillpro-logo-line-4 2400ms cubic-bezier(0.18, 0.9, 0.2, 1) 210ms both;
+.SucessKart-card-logo-line-4 {
+  animation: SucessKart-logo-line-4 2400ms cubic-bezier(0.18, 0.9, 0.2, 1) 210ms both;
 }
 
-.skillpro-card-logo-line-5 {
-  animation: skillpro-logo-line-5 2400ms cubic-bezier(0.18, 0.9, 0.2, 1) 280ms both;
+.SucessKart-card-logo-line-5 {
+  animation: SucessKart-logo-line-5 2400ms cubic-bezier(0.18, 0.9, 0.2, 1) 280ms both;
 }
 
-.skillpro-card-logo-line-6 {
-  animation: skillpro-logo-line-6 2400ms cubic-bezier(0.18, 0.9, 0.2, 1) 350ms both;
+.SucessKart-card-logo-line-6 {
+  animation: SucessKart-logo-line-6 2400ms cubic-bezier(0.18, 0.9, 0.2, 1) 350ms both;
 }
 
-.skillpro-assembled-logo {
+.SucessKart-assembled-logo {
   position: relative;
   z-index: 2;
   width: 58px;
@@ -211,20 +211,20 @@ aside nav::-webkit-scrollbar-thumb:hover {
   border-radius: 999px;
   opacity: 0;
   filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.35));
-  animation: skillpro-logo-reveal 560ms ease-out 2100ms both, skillpro-logo-float 1400ms ease-in-out 2700ms infinite alternate;
+  animation: SucessKart-logo-reveal 560ms ease-out 2100ms both, SucessKart-logo-float 1400ms ease-in-out 2700ms infinite alternate;
 }
 
-.skillpro-demo-sweep {
+.SucessKart-demo-sweep {
   position: absolute;
   inset: -40%;
   z-index: 2;
   pointer-events: none;
   background: linear-gradient(115deg, transparent 35%, rgba(255, 255, 255, 0.32) 48%, transparent 61%);
   transform: translateX(-70%) rotate(8deg);
-  animation: skillpro-demo-sweep 900ms ease-out 260ms both;
+  animation: SucessKart-demo-sweep 900ms ease-out 260ms both;
 }
 
-.skillpro-demo-spark {
+.SucessKart-demo-spark {
   position: absolute;
   z-index: 3;
   width: 9px;
@@ -236,47 +236,47 @@ aside nav::-webkit-scrollbar-thumb:hover {
   opacity: 0;
 }
 
-.skillpro-demo-spark-1 {
+.SucessKart-demo-spark-1 {
   left: 12%;
   top: 18%;
-  animation: skillpro-demo-spark-1 900ms ease-out 180ms both;
+  animation: SucessKart-demo-spark-1 900ms ease-out 180ms both;
 }
 
-.skillpro-demo-spark-2 {
+.SucessKart-demo-spark-2 {
   right: 14%;
   top: 21%;
-  animation: skillpro-demo-spark-2 900ms ease-out 230ms both;
+  animation: SucessKart-demo-spark-2 900ms ease-out 230ms both;
 }
 
-.skillpro-demo-spark-3 {
+.SucessKart-demo-spark-3 {
   left: 19%;
   bottom: 25%;
-  animation: skillpro-demo-spark-3 900ms ease-out 300ms both;
+  animation: SucessKart-demo-spark-3 900ms ease-out 300ms both;
 }
 
-.skillpro-demo-spark-4 {
+.SucessKart-demo-spark-4 {
   right: 21%;
   bottom: 22%;
-  animation: skillpro-demo-spark-4 900ms ease-out 340ms both;
+  animation: SucessKart-demo-spark-4 900ms ease-out 340ms both;
 }
 
-.skillpro-demo-title {
-  animation: skillpro-demo-content-up 420ms ease-out 210ms both;
+.SucessKart-demo-title {
+  animation: SucessKart-demo-content-up 420ms ease-out 210ms both;
 }
 
-.skillpro-demo-subtitle {
-  animation: skillpro-demo-content-up 420ms ease-out 280ms both;
+.SucessKart-demo-subtitle {
+  animation: SucessKart-demo-content-up 420ms ease-out 280ms both;
 }
 
-.skillpro-demo-copy {
-  animation: skillpro-demo-content-up 420ms ease-out 340ms both;
+.SucessKart-demo-copy {
+  animation: SucessKart-demo-content-up 420ms ease-out 340ms both;
 }
 
-.skillpro-demo-chips {
-  animation: skillpro-demo-content-up 420ms ease-out 410ms both;
+.SucessKart-demo-chips {
+  animation: SucessKart-demo-content-up 420ms ease-out 410ms both;
 }
 
-@keyframes skillpro-fade-in {
+@keyframes SucessKart-fade-in {
   from {
     opacity: 0;
   }
@@ -285,7 +285,7 @@ aside nav::-webkit-scrollbar-thumb:hover {
   }
 }
 
-@keyframes skillpro-pop-in {
+@keyframes SucessKart-pop-in {
   from {
     opacity: 0;
     transform: translateY(12px) scale(0.96);
@@ -296,7 +296,7 @@ aside nav::-webkit-scrollbar-thumb:hover {
   }
 }
 
-@keyframes skillpro-demo-pop {
+@keyframes SucessKart-demo-pop {
   0% {
     opacity: 0;
     transform: translateY(34px) scale(0.82) rotateX(12deg);
@@ -311,7 +311,7 @@ aside nav::-webkit-scrollbar-thumb:hover {
   }
 }
 
-@keyframes skillpro-logo-float {
+@keyframes SucessKart-logo-float {
   from {
     transform: translateY(0) rotate(-2deg);
   }
@@ -320,7 +320,7 @@ aside nav::-webkit-scrollbar-thumb:hover {
   }
 }
 
-@keyframes skillpro-demo-ring {
+@keyframes SucessKart-demo-ring {
   0% {
     opacity: 0.65;
     transform: translateX(-50%) scale(0.72);
@@ -331,7 +331,7 @@ aside nav::-webkit-scrollbar-thumb:hover {
   }
 }
 
-@keyframes skillpro-demo-sweep {
+@keyframes SucessKart-demo-sweep {
   from {
     opacity: 0;
     transform: translateX(-70%) rotate(8deg);
@@ -345,7 +345,7 @@ aside nav::-webkit-scrollbar-thumb:hover {
   }
 }
 
-@keyframes skillpro-demo-content-up {
+@keyframes SucessKart-demo-content-up {
   from {
     opacity: 0;
     transform: translateY(14px);
@@ -356,31 +356,31 @@ aside nav::-webkit-scrollbar-thumb:hover {
   }
 }
 
-@keyframes skillpro-demo-spark-1 {
+@keyframes SucessKart-demo-spark-1 {
   0% { opacity: 0; transform: translate(0, 0) scale(0.4); }
   35% { opacity: 1; }
   100% { opacity: 0; transform: translate(-28px, -22px) scale(1.4); }
 }
 
-@keyframes skillpro-demo-spark-2 {
+@keyframes SucessKart-demo-spark-2 {
   0% { opacity: 0; transform: translate(0, 0) scale(0.4); }
   35% { opacity: 1; }
   100% { opacity: 0; transform: translate(30px, -18px) scale(1.35); }
 }
 
-@keyframes skillpro-demo-spark-3 {
+@keyframes SucessKart-demo-spark-3 {
   0% { opacity: 0; transform: translate(0, 0) scale(0.4); }
   35% { opacity: 1; }
   100% { opacity: 0; transform: translate(-24px, 24px) scale(1.25); }
 }
 
-@keyframes skillpro-demo-spark-4 {
+@keyframes SucessKart-demo-spark-4 {
   0% { opacity: 0; transform: translate(0, 0) scale(0.4); }
   35% { opacity: 1; }
   100% { opacity: 0; transform: translate(26px, 24px) scale(1.3); }
 }
 
-@keyframes skillpro-logo-orbit-glow {
+@keyframes SucessKart-logo-orbit-glow {
   from {
     box-shadow: 0 0 0 rgba(251, 191, 36, 0);
   }
@@ -389,7 +389,7 @@ aside nav::-webkit-scrollbar-thumb:hover {
   }
 }
 
-@keyframes skillpro-logo-reveal {
+@keyframes SucessKart-logo-reveal {
   0% {
     opacity: 0;
     transform: scale(0.55) rotate(-18deg);
@@ -407,7 +407,7 @@ aside nav::-webkit-scrollbar-thumb:hover {
   }
 }
 
-@keyframes skillpro-logo-line-1 {
+@keyframes SucessKart-logo-line-1 {
   0% { opacity: 0; transform: translate(-90px, 42px) rotate(0deg) scaleX(0.28); }
   18% { opacity: 1; transform: translate(330px, 312px) rotate(28deg) scaleX(1.1); }
   38% { opacity: 1; transform: translate(-48px, 248px) rotate(-18deg) scaleX(0.9); }
@@ -416,7 +416,7 @@ aside nav::-webkit-scrollbar-thumb:hover {
   100% { opacity: 0.18; transform: translate(178px, 63px) rotate(18deg) scaleX(0.62); }
 }
 
-@keyframes skillpro-logo-line-2 {
+@keyframes SucessKart-logo-line-2 {
   0% { opacity: 0; transform: translate(320px, 34px) rotate(8deg) scaleX(0.28); }
   18% { opacity: 1; transform: translate(-48px, 330px) rotate(-34deg) scaleX(1.05); }
   38% { opacity: 1; transform: translate(338px, 262px) rotate(18deg) scaleX(0.95); }
@@ -425,7 +425,7 @@ aside nav::-webkit-scrollbar-thumb:hover {
   100% { opacity: 0.16; transform: translate(180px, 75px) rotate(-22deg) scaleX(0.68); }
 }
 
-@keyframes skillpro-logo-line-3 {
+@keyframes SucessKart-logo-line-3 {
   0% { opacity: 0; transform: translate(-110px, 192px) rotate(0deg) scaleX(0.3); }
   18% { opacity: 1; transform: translate(350px, 48px) rotate(12deg) scaleX(1.18); }
   38% { opacity: 1; transform: translate(-26px, 74px) rotate(-16deg) scaleX(1); }
@@ -434,7 +434,7 @@ aside nav::-webkit-scrollbar-thumb:hover {
   100% { opacity: 0.2; transform: translate(178px, 87px) rotate(0deg) scaleX(0.72); }
 }
 
-@keyframes skillpro-logo-line-4 {
+@keyframes SucessKart-logo-line-4 {
   0% { opacity: 0; transform: translate(350px, 344px) rotate(0deg) scaleX(0.24); }
   18% { opacity: 1; transform: translate(-54px, 52px) rotate(42deg) scaleX(1.08); }
   38% { opacity: 1; transform: translate(330px, 120px) rotate(-22deg) scaleX(0.92); }
@@ -443,7 +443,7 @@ aside nav::-webkit-scrollbar-thumb:hover {
   100% { opacity: 0.16; transform: translate(178px, 99px) rotate(24deg) scaleX(0.66); }
 }
 
-@keyframes skillpro-logo-line-5 {
+@keyframes SucessKart-logo-line-5 {
   0% { opacity: 0; transform: translate(-82px, 350px) rotate(0deg) scaleX(0.22); }
   18% { opacity: 1; transform: translate(350px, 210px) rotate(-38deg) scaleX(1.05); }
   38% { opacity: 1; transform: translate(18px, 36px) rotate(24deg) scaleX(0.94); }
@@ -452,7 +452,7 @@ aside nav::-webkit-scrollbar-thumb:hover {
   100% { opacity: 0.14; transform: translate(178px, 111px) rotate(-18deg) scaleX(0.6); }
 }
 
-@keyframes skillpro-logo-line-6 {
+@keyframes SucessKart-logo-line-6 {
   0% { opacity: 0; transform: translate(360px, 168px) rotate(90deg) scaleX(0.25); }
   18% { opacity: 1; transform: translate(-64px, 52px) rotate(116deg) scaleX(1.1); }
   38% { opacity: 1; transform: translate(322px, 336px) rotate(70deg) scaleX(0.95); }

@@ -2,7 +2,7 @@ import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 
 const loginOtpApiPlugin = () => ({
-  name: 'skillpro-login-otp-api',
+  name: 'SucessKart-login-otp-api',
   configureServer(server) {
     let handlerPromise = null;
 

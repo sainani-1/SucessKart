@@ -1,4 +1,4 @@
-const AUTH_STORAGE_KEY = 'skillpro-auth';
+const AUTH_STORAGE_KEY = 'SucessKart-auth';
 const LEGACY_AUTH_STORAGE_KEYS = [
   AUTH_STORAGE_KEY,
   'supabase.auth.token',
@@ -10,7 +10,7 @@ const getSessionStorage = () => {
   if (!isBrowser) return null;
   try {
     const storage = window.sessionStorage;
-    const probe = '__skillpro_session_storage_probe__';
+    const probe = '__SucessKart_session_storage_probe__';
     storage.setItem(probe, '1');
     storage.removeItem(probe);
     return storage;
@@ -23,7 +23,7 @@ const getLocalStorage = () => {
   if (!isBrowser) return null;
   try {
     const storage = window.localStorage;
-    const probe = '__skillpro_local_storage_probe__';
+    const probe = '__SucessKart_local_storage_probe__';
     storage.setItem(probe, '1');
     storage.removeItem(probe);
     return storage;
@@ -74,7 +74,7 @@ export const removeLegacyLocalAuthArtifacts = () => {
       .filter((key) => key.startsWith('single_session_key_'))
       .forEach((key) => window.localStorage.removeItem(key));
     window.localStorage.removeItem('single_session_device_id');
-    window.localStorage.removeItem('skillpro-login-state');
+    window.localStorage.removeItem('SucessKart-login-state');
   } catch {
     // Ignore cleanup failures.
   }

@@ -117,7 +117,7 @@ const getMonitoringSessionForBooking = (booking, sessionByBookingId, latestUsabl
 };
 
 const roomNameForSlot = (slot, exam) =>
-  slot?.monitor_room_name || `SkillPro_Exam_${exam?.id || slot?.exam_id || 'slot'}_${slot?.id || Date.now()}`;
+  slot?.monitor_room_name || `SucessKart_Exam_${exam?.id || slot?.exam_id || 'slot'}_${slot?.id || Date.now()}`;
 
 const getExamDisplayName = (exam, course) => {
   const examName = String(exam?.test_name || '').trim();
@@ -2895,7 +2895,7 @@ export default function LiveExamProctoring({ forcedPanel = '' }) {
           : actionType === 'resume'
             ? await askPrompt('Resume Exam', 'Resume message?', 'Exam resumed by invigilator.', 'Resume Exam', 'Back')
           : actionType === 'terminate'
-            ? await askPrompt('Terminate Exam', 'Termination reason?', 'Unusual activity detected. Your exam has been cancelled by SkillPro team.', 'Terminate Exam', 'Back')
+            ? await askPrompt('Terminate Exam', 'Termination reason?', 'Unusual activity detected. Your exam has been cancelled by SucessKart team.', 'Terminate Exam', 'Back')
             : await askPrompt('Lock Account', 'Lock reason?', `Account locked by ${role}.`, 'Lock Account', 'Back');
     if (message === null) return;
 
@@ -2937,7 +2937,7 @@ export default function LiveExamProctoring({ forcedPanel = '' }) {
       if (actionType === 'terminate') {
         sessionPatch.status = 'terminated';
         sessionPatch.ended_at = nowIso();
-        sessionPatch.termination_reason = message || 'Unusual activity detected. Your exam has been cancelled by SkillPro team.';
+        sessionPatch.termination_reason = message || 'Unusual activity detected. Your exam has been cancelled by SucessKart team.';
         bookingPatch.status = 'terminated';
         const { error: failResultError } = await supabase
           .from('exam_submissions')

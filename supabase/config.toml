@@ -3,3 +3,6 @@ verify_jwt = false
 
 [functions.live-exam-feed]
 verify_jwt = false
+
+[functions.log-visit]
+verify_jwt = false

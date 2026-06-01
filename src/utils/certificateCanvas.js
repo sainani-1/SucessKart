@@ -7,7 +7,7 @@ import { getCertificateDisplayName } from './identityVerification';
 export const CERTIFICATE_CANVAS_SIZE = { width: 1600, height: 2200 };
 const CERTIFICATE_VERIFY_BASE_URL = import.meta.env.VITE_CERTIFICATE_VERIFY_BASE_URL || 'https://skillingpro.vercel.app';
 
-const LOGO_URL = import.meta.env.VITE_CERTIFICATE_LOGO || '/skillpro-logo.png';
+const LOGO_URL = import.meta.env.VITE_CERTIFICATE_LOGO || '/sucesskart-logo.svg';
 const FOUNDER_SIGNATURE_URL = '/nani-signature-cropped.png';
 
 const loadImage = async (src) => {
@@ -186,7 +186,7 @@ export const buildCertificateDataUrl = async (cert, formattedId, options = {}) =
     ctx.fillStyle = '#1f4c63';
     ctx.font = 'bold 82px Arial';
     ctx.textAlign = 'center';
-    ctx.fillText('SkillPro', 800, 270);
+    ctx.fillText('SucessKart', 800, 270);
     ctx.fillStyle = '#334155';
     ctx.font = '24px Arial';
     ctx.fillText('GLOBAL EDUCATION PLATFORM', 800, 315);
@@ -238,7 +238,7 @@ export const buildCertificateDataUrl = async (cert, formattedId, options = {}) =
   ctx.font = 'bold italic 38px Arial';
   ctx.fillText('Nani', 395, 1870);
   ctx.font = '34px Arial';
-  ctx.fillText('Issued by SkillPro', 310, 2045);
+  ctx.fillText('Issued by SucessKart', 310, 2045);
 
   drawVerifiedSeal(ctx, 1125, 1740);
 

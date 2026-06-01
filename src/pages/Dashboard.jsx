@@ -7,7 +7,7 @@ import TeacherDashboard from './TeacherDashboard';
 const Dashboard = () => {
   const { profile } = useAuth();
 
-  if (!profile) return <div>Loading dashboard...</div>;
+  if (!profile) return <StudentDashboard />;
 
   if (profile.role === 'admin') return <AdminDashboard />;
   if (profile.role === 'teacher') return <TeacherDashboard />;

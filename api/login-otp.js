@@ -7,7 +7,7 @@ const SMTP_HOST = process.env.SMTP_HOST || 'smtp.gmail.com';
 const SMTP_PORT = Number(process.env.SMTP_PORT || 465);
 const SMTP_EMAIL = process.env.SMTP_EMAIL || process.env.GMAIL_EMAIL || '';
 const SMTP_APP_PASSWORD = process.env.SMTP_APP_PASSWORD || process.env.GMAIL_APP_PASSWORD || '';
-const OTP_FROM_NAME = process.env.OTP_FROM_NAME || 'SkillPro';
+const OTP_FROM_NAME = process.env.OTP_FROM_NAME || 'SucessKart';
 const OTP_SECRET = process.env.LOGIN_OTP_SECRET || SMTP_APP_PASSWORD;
 
 const json = (res, status, body) => {
@@ -130,7 +130,7 @@ const sendSmtpMail = async ({ to, subject, text, html }) => {
 
   const fromName = escapeHeader(OTP_FROM_NAME);
   const safeSubject = escapeHeader(subject);
-  const boundary = `skillpro-${crypto.randomBytes(12).toString('hex')}`;
+  const boundary = `SucessKart-${crypto.randomBytes(12).toString('hex')}`;
   const encodedUser = Buffer.from(SMTP_EMAIL).toString('base64');
   const encodedPassword = Buffer.from(SMTP_APP_PASSWORD).toString('base64');
   const message = [
@@ -212,14 +212,14 @@ const buildOtpEmail = (otp) => {
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <style>
       @media (prefers-reduced-motion: no-preference) {
-        .otp-card { animation: skillproFadeUp 520ms ease-out both; }
-        .otp-badge { animation: skillproPulse 1800ms ease-in-out infinite; }
+        .otp-card { animation: SucessKartFadeUp 520ms ease-out both; }
+        .otp-badge { animation: SucessKartPulse 1800ms ease-in-out infinite; }
       }
-      @keyframes skillproFadeUp {
+      @keyframes SucessKartFadeUp {
         from { opacity: 0; transform: translateY(14px); }
         to { opacity: 1; transform: translateY(0); }
       }
-      @keyframes skillproPulse {
+      @keyframes SucessKartPulse {
         0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(16,185,129,0.32); }
         50% { transform: scale(1.04); box-shadow: 0 0 0 10px rgba(16,185,129,0); }
       }
@@ -343,7 +343,7 @@ export default async function handler(req, res) {
       const emailContent = buildOtpEmail(otp);
       await sendSmtpMail({
         to: email,
-        subject: 'Your SkillPro login OTP',
+        subject: 'Your SucessKart login OTP',
         text: emailContent.text,
         html: emailContent.html,
       });

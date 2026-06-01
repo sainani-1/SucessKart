@@ -27,7 +27,7 @@ const formatCertificateId = (cert) => {
   const m = String(date.getMonth() + 1).padStart(2, '0');
   const d = String(date.getDate()).padStart(2, '0');
   const random = generateDeterministicCode(String(cert?.id ?? `${y}${m}${d}`));
-  return `SkillPro-${y}-${m}-${d}-${random}`;
+  return `SucessKart-${y}-${m}-${d}-${random}`;
 };
 
 const formatFallbackCertificateId = (submission) => {
@@ -37,7 +37,7 @@ const formatFallbackCertificateId = (submission) => {
   const d = String(issuedAt.getDate()).padStart(2, '0');
   const seed = `fallback-${submission?.id ?? `${y}${m}${d}`}`;
   const random = generateDeterministicCode(seed);
-  return `SkillPro-${y}-${m}-${d}-${random}`;
+  return `SucessKart-${y}-${m}-${d}-${random}`;
 };
 
 const isPermissionError = (error) => {
@@ -72,7 +72,7 @@ const VerifyCertificate = () => {
     setPreviewUrl('');
     try {
       const trimmedId = trimmedSource.trim();
-      const formattedMatch = trimmedId.match(/^SkillPro-(\d{4})-(\d{2})-(\d{2})-([A-Za-z0-9]{12})$/);
+      const formattedMatch = trimmedId.match(/^SucessKart-(\d{4})-(\d{2})-(\d{2})-([A-Za-z0-9]{12})$/);
 
       let data = null;
       let error = null;
@@ -169,7 +169,7 @@ const VerifyCertificate = () => {
       }
       
       if (error || !data) {
-        setResult({ valid: false, message: 'Certificate ID not found. This certificate was not issued by SkillPro.' });
+        setResult({ valid: false, message: 'Certificate ID not found. This certificate was not issued by SucessKart.' });
       } else if (data.revoked_at) {
         const { data: generatedMeta } = await supabase
           .from('generated_certificates')
@@ -206,7 +206,7 @@ const VerifyCertificate = () => {
         }
       }
     } catch (err) {
-      setResult({ valid: false, message: 'Certificate not present in our records. Not issued by SkillPro.' });
+      setResult({ valid: false, message: 'Certificate not present in our records. Not issued by SucessKart.' });
     } finally {
       setLoading(false);
     }
@@ -270,7 +270,7 @@ const VerifyCertificate = () => {
               type="text"
               value={certId}
               onChange={(e) => setCertId(e.target.value)}
-              placeholder="Enter Certificate ID (SkillPro-YYYY-MM-DD-XXXXXXXXXXXX or UUID)"
+              placeholder="Enter Certificate ID (SucessKart-YYYY-MM-DD-XXXXXXXXXXXX or UUID)"
               className="w-full p-4 pr-12 border-2 border-slate-200 rounded-xl focus:border-gold-400 focus:outline-none"
               required
             />
@@ -309,10 +309,10 @@ const VerifyCertificate = () => {
                 {result.data.generated?.award_type && <p><strong>Type:</strong> {result.data.generated.award_type}</p>}
                 {result.data.generated?.reason && <p><strong>Reason:</strong> {result.data.generated.reason}</p>}
                 <div className="mt-4 rounded-xl border border-green-200 bg-white p-4">
-                  <p className="font-semibold text-slate-900">Build yours on SkillPro</p>
+                  <p className="font-semibold text-slate-900">Build yours on SucessKart</p>
                   <p className="mt-1 text-sm text-slate-600">Courses, mentorship, verified exams, resume builder, and shareable certificates are available from one account.</p>
                   <Link to="/register" className="mt-3 inline-flex items-center rounded-lg bg-green-600 px-4 py-2 font-semibold text-white hover:bg-green-700">
-                    Join SkillPro
+                    Join SucessKart
                   </Link>
                 </div>
               </div>

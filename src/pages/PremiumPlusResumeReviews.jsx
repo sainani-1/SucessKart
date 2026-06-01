@@ -261,7 +261,7 @@ const PremiumPlusResumeReviews = () => {
       await notifyCareerTeacher({
         teacherId,
         title: 'Resume review request needs your review',
-        message: `${profile.full_name || profile.email || 'A student'} submitted a ${selectedSource === 'builder' ? 'SkillPro Resume Builder' : 'uploaded'} resume for review. Open Resume Reviews to view the full resume and add feedback.`,
+        message: `${profile.full_name || profile.email || 'A student'} submitted a ${selectedSource === 'builder' ? 'SucessKart Resume Builder' : 'uploaded'} resume for review. Open Resume Reviews to view the full resume and add feedback.`,
         source: 'resume_review',
       });
     } catch (submitError) {
@@ -430,7 +430,7 @@ const PremiumPlusResumeReviews = () => {
             >
               <FileText />
               <p className="mt-3 font-bold">Use Resume Builder</p>
-              <p className="mt-1 text-sm opacity-80">Submit the resume already saved inside SkillPro.</p>
+              <p className="mt-1 text-sm opacity-80">Submit the resume already saved inside SucessKart.</p>
             </button>
             <button
               type="button"

@@ -41,12 +41,12 @@ export const supabase = createClient(supabaseUrl, supabaseKey, {
     autoRefreshToken: true,
     detectSessionInUrl: true,
     storage: secureSessionStorage,
-    storageKey: 'skillpro-auth',
+    storageKey: 'SucessKart-auth',
     flowType: 'pkce',
   },
   global: {
     headers: {
-      'x-client-info': 'skillpro-web'
+      'x-client-info': 'SucessKart-web'
     }
   }
 });

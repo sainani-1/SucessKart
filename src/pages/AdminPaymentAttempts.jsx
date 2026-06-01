@@ -87,7 +87,7 @@ const AdminPaymentAttempts = () => {
     <div className="space-y-6">
       <div className="rounded-2xl bg-gradient-to-r from-slate-900 to-slate-700 p-6 text-white">
         <h1 className="text-2xl font-bold">Payment Attempts</h1>
-        <p className="mt-1 text-sm text-slate-200">View all payment tries, including SkillPro UPI requests and successful payments.</p>
+        <p className="mt-1 text-sm text-slate-200">View all payment tries, including SucessKart UPI requests and successful payments.</p>
       </div>
 
       <div className="rounded-xl border bg-white p-5">
@@ -123,8 +123,8 @@ const AdminPaymentAttempts = () => {
         ) : (
           filteredAttempts.map((attempt) => {
             const user = profilesById[attempt.user_id] || {};
-            const isSkillProUpi = attempt.metadata?.payment_method === 'skillpro_upi';
-            const canReview = isSkillProUpi && !['success', 'failed'].includes(attempt.status);
+            const isSucessKartUpi = attempt.metadata?.payment_method === 'skillpro_upi';
+            const canReview = isSucessKartUpi && !['success', 'failed'].includes(attempt.status);
 
             return (
               <div key={attempt.id} className="rounded-xl border bg-white p-5 shadow-sm">

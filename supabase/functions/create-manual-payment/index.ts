@@ -182,9 +182,9 @@ Deno.serve(async (req: Request) => {
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              from: `SkillPro <${fromEmail}>`,
+              from: `SucessKart <${fromEmail}>`,
               to: [adminEmail],
-              subject: `SkillPro - Manual Payment Response from ${userName}`,
+              subject: `SucessKart - Manual Payment Response from ${userName}`,
               html: `
                 <div style="font-family:Inter, Arial, sans-serif; max-width:600px; margin:0 auto; background:#ffffff; border-radius:12px; overflow:hidden; border:1px solid #e2e8f0;">
                   <div style="background:linear-gradient(135deg,#1e293b,#334155); padding:24px 32px; text-align:center;">
@@ -229,11 +229,11 @@ Deno.serve(async (req: Request) => {
                     </div>
                     ` : ""}
                     <div style="text-align:center; margin-top:8px;">
-                      <a href="${Deno.env.get("APP_URL") || "https://skillpro.app"}/app/admin/payment-responses" target="_blank" style="display:inline-block; background:#1e293b; color:#ffffff; padding:12px 32px; border-radius:8px; text-decoration:none; font-size:14px; font-weight:600;">Review in Admin Panel</a>
+                      <a href="${Deno.env.get("APP_URL") || "https://SucessKart.app"}/app/admin/payment-responses" target="_blank" style="display:inline-block; background:#1e293b; color:#ffffff; padding:12px 32px; border-radius:8px; text-decoration:none; font-size:14px; font-weight:600;">Review in Admin Panel</a>
                     </div>
                   </div>
                   <div style="background:#f8fafc; padding:16px 32px; text-align:center; border-top:1px solid #e2e8f0;">
-                    <p style="color:#94a3b8; font-size:12px; margin:0;">SkillPro &bull; This is an automated notification from the payment system.</p>
+                    <p style="color:#94a3b8; font-size:12px; margin:0;">SucessKart &bull; This is an automated notification from the payment system.</p>
                   </div>
                 </div>
               `,

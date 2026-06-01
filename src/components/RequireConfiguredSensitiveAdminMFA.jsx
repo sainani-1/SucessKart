@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabaseClient';
-import LoadingSpinner from './LoadingSpinner';
 import {
   ADMIN_SENSITIVE_MFA_SETTINGS_KEY,
   normalizeAdminSensitivePaths,
@@ -51,9 +50,7 @@ const RequireConfiguredSensitiveAdminMFA = ({ children }) => {
     };
   }, [realProfile?.role, location.pathname]);
 
-  if (loading || configLoading) {
-    return <LoadingSpinner message="Checking secure access..." />;
-  }
+  if (loading || configLoading) return children;
 
   if (realProfile?.role !== 'admin') {
     return children;

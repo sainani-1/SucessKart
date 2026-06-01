@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="SucessKart">
+  <defs>
+    <clipPath id="circle"><circle cx="64" cy="64" r="60"/></clipPath>
+    <linearGradient id="blue" x1="24" x2="90" y1="22" y2="95" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#18aeea"/>
+      <stop offset=".55" stop-color="#0866c8"/>
+      <stop offset="1" stop-color="#061f63"/>
+    </linearGradient>
+    <linearGradient id="green" x1="74" x2="106" y1="72" y2="91" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#75d51f"/>
+      <stop offset="1" stop-color="#17a457"/>
+    </linearGradient>
+  </defs>
+  <circle cx="64" cy="64" r="62" fill="#e5ebf3"/>
+  <g clip-path="url(#circle)">
+    <rect width="128" height="128" fill="#fff"/>
+    <path d="M31 74c14 1 25 5 33 14 8-9 19-13 33-14l9 22c-17-1-31 4-42 14-11-10-25-15-42-14l9-22Z" fill="#082f78"/>
+    <path d="M34 69c12 1 22 5 30 12v11c-9-8-20-13-34-13l4-10Z" fill="#129ee8"/>
+    <path d="M94 69c-12 1-22 5-30 12v11c9-8 20-13 34-13l-4-10Z" fill="url(#green)"/>
+    <path d="M33 75c-6-19-2-38 10-53 12-15 30-21 50-16-22 0-41 11-50 30-6 12-7 25-4 38l-6 1Z" fill="#16a7e7"/>
+    <path d="M90 29c5 19-2 41-22 66l-8-22c14-9 24-24 30-44Z" fill="#0b7cd5"/>
+    <path d="M64 27 91 38 64 49 37 38l27-11Z" fill="#062661"/>
+    <circle cx="65" cy="48" r="7" fill="url(#blue)"/>
+    <path d="M45 58c7 1 13 4 18 10-2 6-5 12-8 18-6-11-15-18-27-20 5-4 11-7 17-8Z" fill="#08337f"/>
+    <path d="M84 15c4 9 10 15 19 19-9 4-15 10-19 19-4-9-10-15-19-19 9-4 15-10 19-19Z" fill="#f7b915"/>
+    <path d="M103 35c2 5 6 9 11 11-5 2-9 6-11 11-2-5-6-9-11-11 5-2 9-6 11-11Z" fill="#66cb1f"/>
+  </g>
+</svg>

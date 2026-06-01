@@ -1,9 +1,52 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { usePresenceContext } from '../context/PresenceContext';
-import { Wifi, WifiOff } from 'lucide-react';
+import { Wifi, WifiOff, Monitor, Smartphone, Tablet, Globe2 } from 'lucide-react';
+
+const deviceIcon = (type) => {
+  switch (type?.toLowerCase()) {
+    case 'mobile': return <Smartphone size={14} className="text-blue-500" />;
+    case 'tablet': return <Tablet size={14} className="text-purple-500" />;
+    default: return <Monitor size={14} className="text-slate-500" />;
+  }
+};
 
 const AdminOnline = () => {
-  const { onlineProfiles, onlineUserIds } = usePresenceContext();
+  const { onlineProfiles, onlineUserIds, presenceStates } = usePresenceContext();
+  const [search, setSearch] = useState('');
+
+  const getDeviceInfo = (userId) => {
+    const state = presenceStates[String(userId)];
+    if (!state) return { browser: '—', os: '—', device_type: '—' };
+    return {
+      browser: state.browser || '—',
+      os: state.os || '—',
+      device_type: state.device_type || '—',
+    };
+  };
+
+  const getOnlineAt = (userId) => {
+    const state = presenceStates[String(userId)];
+    if (!state?.online_at) return null;
+    return new Date(state.online_at).toLocaleString('en-IN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      day: 'numeric',
+      month: 'short',
+    });
+  };
+
+  const enrichedProfiles = onlineProfiles
+    .map(p => ({ ...p, ...getDeviceInfo(p.id), onlineSince: getOnlineAt(p.id) }))
+    .filter(p => {
+      if (!search.trim()) return true;
+      const q = search.toLowerCase();
+      return (p.full_name || '').toLowerCase().includes(q)
+        || (p.email || '').toLowerCase().includes(q)
+        || (p.role || '').toLowerCase().includes(q)
+        || p.browser.toLowerCase().includes(q)
+        || p.os.toLowerCase().includes(q)
+        || p.device_type.toLowerCase().includes(q);
+    });
 
   return (
     <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
@@ -19,9 +62,18 @@ const AdminOnline = () => {
             </p>
           </div>
         </div>
+        <div className="mt-4 relative max-w-xs">
+          <input
+            type="text"
+            placeholder="Search online users..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="w-full pl-3 pr-4 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-gold-400 outline-none"
+          />
+        </div>
       </div>
 
-      {onlineProfiles.length === 0 ? (
+      {enrichedProfiles.length === 0 ? (
         <div className="p-12 text-center">
           <WifiOff size={48} className="mx-auto mb-3 text-slate-300" />
           <p className="text-slate-500 font-medium">No users online</p>
@@ -35,11 +87,15 @@ const AdminOnline = () => {
                 <th className="px-6 py-3">User</th>
                 <th className="px-6 py-3">Email</th>
                 <th className="px-6 py-3">Role</th>
+                <th className="px-6 py-3">Device</th>
+                <th className="px-6 py-3">Browser</th>
+                <th className="px-6 py-3">OS</th>
+                <th className="px-6 py-3">Online Since</th>
                 <th className="px-6 py-3">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {onlineProfiles.map(profile => (
+              {enrichedProfiles.map(profile => (
                 <tr key={profile.id} className="hover:bg-slate-50">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
@@ -59,6 +115,15 @@ const AdminOnline = () => {
                       {profile.role || 'student'}
                     </span>
                   </td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-2">
+                      {deviceIcon(profile.device_type)}
+                      <span className="text-xs text-slate-600">{profile.device_type || '—'}</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-xs text-slate-600">{profile.browser || '—'}</td>
+                  <td className="px-6 py-4 text-xs text-slate-600">{profile.os || '—'}</td>
+                  <td className="px-6 py-4 text-xs text-slate-500">{profile.onlineSince || '—'}</td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />

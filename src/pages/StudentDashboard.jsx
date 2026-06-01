@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabaseClient';
 import { Link } from 'react-router-dom';
-import { PlayCircle, Clock, Award, Zap, Calendar, MessageCircle, CheckCircle, AlertCircle, RotateCcw, FileText, Copy, Share2 } from 'lucide-react';
+import { PlayCircle, Clock, Award, Zap, Calendar, MessageCircle, CheckCircle, AlertCircle, RotateCcw, FileText, Copy, Share2, ExternalLink, Trophy, User } from 'lucide-react';
 import { useChatOverlay } from '../context/ChatOverlayContext';
 import { format, addDays } from 'date-fns';
 import PremiumGiftCelebration from '../components/PremiumGiftCelebration';
@@ -25,6 +25,7 @@ const OfferCongrats = ({ offer }) => (
 
 const StudentDashboard = () => {
   const { profile, isPremium } = useAuth();
+  const safeProfile = profile || { id: '', full_name: 'Student', premium_until: null };
   const { openChat } = useChatOverlay();
   const [courses, setCourses] = useState([]);
   const [teacher, setTeacher] = useState(null);
@@ -62,6 +63,7 @@ const StudentDashboard = () => {
   const inProgressCourses = Math.max(courses.length - completedCourses, 0);
 
   useEffect(() => {
+    if (!profile?.id) return;
     checkFirstLogin();
     checkPremiumGift();
     fetchData();
@@ -217,6 +219,7 @@ const StudentDashboard = () => {
   };
 
   const checkFirstLogin = async () => {
+    if (!profile?.id) return;
     const key = `welcomed_${profile.id}`;
     const welcomed = localStorage.getItem(key);
     if (!welcomed && profile.assigned_teacher_id) {
@@ -226,6 +229,7 @@ const StudentDashboard = () => {
   };
 
   const checkPremiumGift = () => {
+    if (!profile?.id) return;
     if (profile.premium_until && isPremium(profile)) {
       const premiumDate = new Date(profile.premium_until);
       const today = new Date();
@@ -320,7 +324,7 @@ const StudentDashboard = () => {
   const shareReferralWhatsApp = () => {
     if (!referralLink) return;
     trackPremiumEvent('referral_link_shared_whatsapp', 'student_dashboard', { referralCode }, profile?.id);
-    window.open(`https://wa.me/?text=${encodeURIComponent(`Join SkillPro with my link: ${referralLink}. When you buy premium, I get 7 bonus premium days.`)}`, '_blank', 'noopener,noreferrer');
+    window.open(`https://wa.me/?text=${encodeURIComponent(`Join SucessKart with my link: ${referralLink}. When you buy premium, I get 7 bonus premium days.`)}`, '_blank', 'noopener,noreferrer');
   };
 
   return (
@@ -407,12 +411,12 @@ const StudentDashboard = () => {
       {/* Welcome Banner */}
       <div className="bg-gradient-to-r from-nani-dark to-nani-accent rounded-2xl p-8 text-white flex justify-between items-center shadow-lg">
         <div>
-          <h1 className="text-3xl font-bold mb-2">Welcome back, {profile.full_name}! 👋</h1>
+          <h1 className="text-3xl font-bold mb-2">Welcome back, {safeProfile.full_name}! 👋</h1>
           <p className="text-slate-200 opacity-90">
             {isPremium(profile)
               ? isLifetimePremium(profile?.premium_until)
                 ? 'You have Lifetime Premium Access.'
-                : `You have Premium Access valid until ${format(new Date(profile.premium_until || new Date()), 'MMM dd, yyyy')}`
+                : `You have Premium Access valid until ${format(new Date(safeProfile.premium_until || new Date()), 'MMM dd, yyyy')}`
               : "Upgrade to Premium to access all courses, exams, and guidance."}
           </p>
           {!isPremium(profile) && (
@@ -491,6 +495,9 @@ const StudentDashboard = () => {
           {copyFeedback ? <p className="mt-3 text-sm font-medium text-emerald-700">{copyFeedback}</p> : null}
         </div>
       </div>
+
+      {/* Student Project Showcase */}
+      <ProjectShowcaseSection userId={safeProfile.id} />
 
       {isPremium(profile) ? (
         <StudentExperienceHub
@@ -671,6 +678,66 @@ const StudentDashboard = () => {
 };
 
 const UserBadge = () => <div className="w-4 h-4 bg-gold-400 rounded-full inline-block"></div>;
+
+const ProjectShowcaseSection = () => {
+  const [projects, setProjects] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    const fetch = async () => {
+      const { data } = await supabase
+        .from('project_showcase')
+        .select('id, student_name, title, description, project_url, image_url, created_at')
+        .order('created_at', { ascending: false })
+        .limit(6);
+      if (mounted && data) setProjects(data);
+      setLoading(false);
+    };
+    fetch();
+    return () => { mounted = false; };
+  }, []);
+
+  if (loading || projects.length === 0) return null;
+
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="flex items-center justify-between bg-gradient-to-r from-amber-50 to-orange-50 px-5 py-4 border-b border-slate-200">
+        <div className="flex items-center gap-2">
+          <Trophy size={20} className="text-amber-600" />
+          <h2 className="text-lg font-bold text-slate-900">Student Project Showcase</h2>
+        </div>
+        <Link to="/app/project-showcase" className="text-sm font-semibold text-amber-700 hover:text-amber-800">
+          View All
+        </Link>
+      </div>
+      <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3">
+        {projects.map((p) => (
+          <div key={p.id} className="rounded-xl border border-slate-100 bg-slate-50 p-4 transition hover:shadow-md">
+            <div className="flex items-center gap-1.5 text-xs text-slate-500">
+              <User size={12} />
+              <span className="font-medium text-slate-700">{p.student_name}</span>
+            </div>
+            <h3 className="mt-1.5 font-bold text-slate-900">{p.title}</h3>
+            {p.description && (
+              <p className="mt-1 text-xs leading-5 text-slate-500 line-clamp-2">{p.description}</p>
+            )}
+            {p.project_url && (
+              <a
+                href={p.project_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-700"
+              >
+                View <ExternalLink size={12} />
+              </a>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 export default StudentDashboard;
 

@@ -242,6 +242,7 @@ const Layout = () => {
       { label: 'Activity Logs', path: '/app/admin/activity-logs' },
       { label: 'Error Logs', path: '/app/admin/error-logs' },
       { label: 'Lead Inbox', path: '/app/admin/lead-inbox' },
+      { label: 'Visiting Website', path: '/app/admin/visitors' },
       { label: 'Growth Analytics', path: '/app/admin/growth-analytics' },
       { label: 'Payment QR', path: '/app/admin/payment-qr' },
       { label: 'Payment Responses', path: '/app/admin/payment-responses' },
@@ -847,7 +848,7 @@ const Layout = () => {
         </main>
         {/* Footer */}
         <footer className="text-center py-4 text-xs text-slate-400">
-           &copy; {new Date().getFullYear()} SkillPro. All rights reserved. 
+           &copy; {new Date().getFullYear()} SucessKart. All rights reserved. 
         </footer>
       </div>
     </div>

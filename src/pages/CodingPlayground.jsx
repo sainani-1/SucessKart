@@ -11,27 +11,27 @@ const LANGUAGE_CONFIG = {
   python: {
     label: 'Python',
     monaco: 'python',
-    template: `print("Hello from SkillPro")\nname = input()\nprint(f"Welcome, {name}!")\n`,
+    template: `print("Hello from SucessKart")\nname = input()\nprint(f"Welcome, {name}!")\n`,
   },
   java: {
     label: 'Java',
     monaco: 'java',
-    template: `import java.util.*;\n\npublic class Main {\n  public static void main(String[] args) {\n    Scanner scanner = new Scanner(System.in);\n    String name = scanner.hasNextLine() ? scanner.nextLine() : "SkillPro";\n    System.out.println("Welcome, " + name + "!");\n  }\n}\n`,
+    template: `import java.util.*;\n\npublic class Main {\n  public static void main(String[] args) {\n    Scanner scanner = new Scanner(System.in);\n    String name = scanner.hasNextLine() ? scanner.nextLine() : "SucessKart";\n    System.out.println("Welcome, " + name + "!");\n  }\n}\n`,
   },
   javascript: {
     label: 'JavaScript',
     monaco: 'javascript',
-    template: `const fs = require("fs");\nconst input = fs.readFileSync(0, "utf8").trim() || "SkillPro";\nconsole.log(\`Welcome, \${input}!\`);\n`,
+    template: `const fs = require("fs");\nconst input = fs.readFileSync(0, "utf8").trim() || "SucessKart";\nconsole.log(\`Welcome, \${input}!\`);\n`,
   },
   c: {
     label: 'C',
     monaco: 'c',
-    template: `#include <stdio.h>\n#include <string.h>\n\nint main() {\n  char name[200];\n  if (!fgets(name, sizeof(name), stdin) || name[0] == '\\n') {\n    strcpy(name, "SkillPro");\n  } else {\n    name[strcspn(name, "\\n")] = 0;\n  }\n  printf("Welcome, %s!\\n", name);\n  return 0;\n}\n`,
+    template: `#include <stdio.h>\n#include <string.h>\n\nint main() {\n  char name[200];\n  if (!fgets(name, sizeof(name), stdin) || name[0] == '\\n') {\n    strcpy(name, "SucessKart");\n  } else {\n    name[strcspn(name, "\\n")] = 0;\n  }\n  printf("Welcome, %s!\\n", name);\n  return 0;\n}\n`,
   },
   cpp: {
     label: 'C++',
     monaco: 'cpp',
-    template: `#include <iostream>\n#include <string>\nusing namespace std;\n\nint main() {\n  string name;\n  getline(cin, name);\n  if (name.empty()) name = "SkillPro";\n  cout << "Welcome, " << name << "!" << endl;\n  return 0;\n}\n`,
+    template: `#include <iostream>\n#include <string>\nusing namespace std;\n\nint main() {\n  string name;\n  getline(cin, name);\n  if (name.empty()) name = "SucessKart";\n  cout << "Welcome, " << name << "!" << endl;\n  return 0;\n}\n`,
   },
 };
 

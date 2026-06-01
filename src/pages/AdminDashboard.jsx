@@ -120,10 +120,10 @@ const AdminDashboard = () => {
       <div className="space-y-5 sm:space-y-6">
         <div className="rounded-2xl bg-gradient-to-r from-purple-600 to-blue-700 p-4 text-white sm:p-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <img src="/skillpro-logo.png" alt="SkillPro logo" className="h-10 w-10 rounded-full object-contain mix-blend-multiply sm:h-12 sm:w-12" />
+            <img src="/sucesskart-logo.svg" alt="SucessKart logo" className="h-10 w-10 rounded-full object-contain mix-blend-multiply sm:h-12 sm:w-12" />
             <div>
               <h1 className="text-xl font-bold sm:text-2xl">Admin Control Panel</h1>
-              <p className="text-sm text-purple-100 sm:text-base">Manage the entire SkillPro platform</p>
+              <p className="text-sm text-purple-100 sm:text-base">Manage the entire SucessKart platform</p>
             </div>
           </div>
         </div>

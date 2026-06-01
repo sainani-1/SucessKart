@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
 
-const DEFAULT_SUPPORT_EMAIL = 'support@skillpro.com';
+const DEFAULT_SUPPORT_EMAIL = 'support@SucessKart.com';
 
 const AdminResetPassword = () => {
   const [supportEmail, setSupportEmail] = useState(DEFAULT_SUPPORT_EMAIL);
@@ -74,7 +74,7 @@ const AdminResetPassword = () => {
           className="w-full border rounded-lg px-3 py-2"
           value={supportEmail}
           onChange={(e) => setSupportEmail(e.target.value)}
-          placeholder="support@skillpro.com"
+          placeholder="support@SucessKart.com"
           required
         />
         <button

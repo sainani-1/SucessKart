@@ -1,7 +1,6 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import LoadingSpinner from './LoadingSpinner';
 
 const SENSITIVE_MFA_TTL_MS = 10 * 60 * 1000;
 
@@ -10,9 +9,7 @@ const RequireSensitiveAdminMFA = ({ children }) => {
   const location = useLocation();
   const currentTarget = `${location.pathname}${location.search}`;
 
-  if (loading) {
-    return <LoadingSpinner message="Checking secure access..." />;
-  }
+  if (loading) return children;
 
   if (realProfile?.role !== 'admin') {
     return <Navigate to="/app" replace />;

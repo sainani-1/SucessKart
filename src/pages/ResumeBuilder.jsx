@@ -330,7 +330,7 @@ const ResumeBuilder = () => {
     );
   }
 
-  const resumeShareText = `I built my resume on SkillPro. Create yours here: ${window.location.origin}/register`;
+  const resumeShareText = `I built my resume on SucessKart. Create yours here: ${window.location.origin}/register`;
   const resumeWhatsAppUrl = buildWhatsAppShareUrl(resumeShareText);
 
   return (

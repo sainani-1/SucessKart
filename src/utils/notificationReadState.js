@@ -1,5 +1,5 @@
 const buildReadKey = (userId) => `localNotificationReads_${userId}`;
-export const NOTIFICATION_READS_UPDATED_EVENT = 'skillpro:notification-reads-updated';
+export const NOTIFICATION_READS_UPDATED_EVENT = 'SucessKart:notification-reads-updated';
 
 export const getLocalNotificationReadIds = (userId) => {
   if (!userId) return new Set();

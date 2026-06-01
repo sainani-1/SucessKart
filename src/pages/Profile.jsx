@@ -117,12 +117,22 @@ const Profile = () => {
     }
 
     if (error) {
-      setAlertModal({
-        show: true,
-        title: 'Error',
-        message: error.message,
-        type: 'error'
-      });
+      const msg = error.message || '';
+      if (msg.includes('AAL2') || msg.includes('aal2') || msg.includes('MFA') || msg.includes('mfa')) {
+        setAlertModal({
+          show: true,
+          title: 'MFA Required',
+          message: 'To change your password while MFA is enabled, please first complete MFA verification at /admin-mfa-verify, or use the Forgot Password option on the login page.',
+          type: 'warning'
+        });
+      } else {
+        setAlertModal({
+          show: true,
+          title: 'Error',
+          message: msg,
+          type: 'error'
+        });
+      }
     } else {
       setAlertModal({
         show: true,
@@ -381,7 +391,7 @@ const Profile = () => {
               placeholder="Your username"
             />
             <p className="mt-1 text-xs text-slate-500">
-              Unique username. Example: SkillPro-Name-A1B2-260418
+              Unique username. Example: SucessKart-Name-A1B2-260418
             </p>
           </div>
           <div>

@@ -1,9 +1,9 @@
-const CHANNEL_NAME = 'skillpro-auth-sync';
+const CHANNEL_NAME = 'SucessKart-auth-sync';
 const REQUEST_EVENT = 'request-session';
 const SESSION_EVENT = 'session';
 const SIGNED_OUT_EVENT = 'signed-out';
-const REQUEST_STORAGE_KEY = 'skillpro-auth-sync-request';
-const RESPONSE_STORAGE_KEY = 'skillpro-auth-sync-response';
+const REQUEST_STORAGE_KEY = 'SucessKart-auth-sync-request';
+const RESPONSE_STORAGE_KEY = 'SucessKart-auth-sync-response';
 
 const isBrowser = typeof window !== 'undefined';
 

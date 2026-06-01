@@ -178,7 +178,7 @@ const ResetPassword = () => {
       subtitle={
         isRecoveryMode
           ? 'Recovery session verified. Set a strong new password and continue securely.'
-          : 'Enter your email and SkillPro will send a secure reset link to start recovery.'
+          : 'Enter your email and SucessKart will send a secure reset link to start recovery.'
       }
       highlights={[
         { icon: ShieldCheck, text: 'Secure token-based reset flow with verified recovery sessions.' },

@@ -15,7 +15,7 @@ const defaultContent = (profile) => ({
   headline: profile?.full_name ? `${profile.full_name} Portfolio` : 'My Portfolio',
   role: profile?.core_subject || 'Student Developer',
   location: '',
-  summary: 'I am building practical skills through SkillPro courses, projects, exams, and mentorship.',
+  summary: 'I am building practical skills through SucessKart courses, projects, exams, and mentorship.',
   about: '',
   goals: '',
   resumeUrl: '',
@@ -27,12 +27,12 @@ const defaultContent = (profile) => ({
   skills: ['Communication', 'Problem Solving', 'Learning'],
   projects: [
     {
-      title: 'SkillPro Learning Journey',
-      description: 'A collection of courses, certificates, and practical work completed through SkillPro.',
+      title: 'SucessKart Learning Journey',
+      description: 'A collection of courses, certificates, and practical work completed through SucessKart.',
       link: '',
     },
   ],
-  achievements: ['SkillPro learner'],
+  achievements: ['SucessKart learner'],
   caseStudies: [],
   testimonials: [],
   visuals: [],
@@ -207,7 +207,7 @@ const PortfolioBuilder = () => {
             </div>
             <h1 className="mt-4 text-3xl font-black tracking-tight sm:text-4xl">Build and publish your portfolio</h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">
-              Create a public portfolio website hosted inside SkillPro. Share it as your SkillPro profile link.
+              Create a public portfolio website hosted inside SucessKart. Share it as your SucessKart profile link.
             </p>
           </div>
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4">

@@ -242,7 +242,7 @@ const Settings = () => {
                     required
                   />
                   <p className="mt-1 text-xs text-slate-500">
-                    Unique username. Example: SkillPro-Name-A1B2-260418
+                    Unique username. Example: SucessKart-Name-A1B2-260418
                   </p>
                 </div>
 

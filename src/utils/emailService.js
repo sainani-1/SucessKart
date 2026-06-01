@@ -9,7 +9,7 @@ export const sendSessionReminder = async (userEmail, userName, sessionTitle, ses
   // sgMail.setApiKey(process.env.SENDGRID_API_KEY);
   // await sgMail.send({
   //   to: userEmail,
-  //   from: 'noreply@skillpro.com',
+  //   from: 'noreply@SucessKart.com',
   //   subject: `Reminder: ${sessionTitle} starts in 20 minutes`,
   //   html: `<p>Hi ${userName},</p><p>Your session starts soon!</p>`
   // });

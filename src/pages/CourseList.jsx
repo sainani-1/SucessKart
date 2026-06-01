@@ -97,10 +97,13 @@ const normalizeNotesDraft = (value) => {
 };
 
 const CourseList = () => {
-        const { profile, isPremium } = useAuth();
+        const { profile, loading: authLoading, isPremium } = useAuth();
   const { popupNode, openPopup } = usePopup();
           const premium = isPremium(profile);
-        const [courses, setCourses] = useState(() => readBrowserState(COURSES_CACHE_KEY, []));
+        const [courses, setCourses] = useState(() => {
+          const cachedCourses = readBrowserState(COURSES_CACHE_KEY, []);
+          return cachedCourses.length > 0 ? cachedCourses : MOCK_COURSES;
+        });
         const [examResults, setExamResults] = useState({});
         const [searchQuery, setSearchQuery] = useState('');
         const [selectedCategory, setSelectedCategory] = useState('All');
@@ -108,7 +111,7 @@ const CourseList = () => {
         const [editingCourse, setEditingCourse] = useState(null);
         const [showEditModal, setShowEditModal] = useState(false);
         const [deleteConfirm, setDeleteConfirm] = useState(null);
-        const [loading, setLoading] = useState(true);
+        const [loading, setLoading] = useState(false);
         const [newCourse, setNewCourse] = useState(() => {
           const savedDraft = readBrowserState(COURSE_FORM_DRAFT_KEY, {});
           return {
@@ -162,6 +165,7 @@ const CourseList = () => {
         useEffect(() => {
           const fetchCourses = async () => {
             try {
+              setLoading(false);
               const { data } = await supabase
                 .from('courses')
                 .select('*')
@@ -587,7 +591,7 @@ const CourseList = () => {
   return (
     <div>
        {popupNode}
-       {!premium && (
+       {!premium && !authLoading && (
          <div className="bg-gradient-to-r from-gold-400 to-gold-600 p-6 rounded-xl mb-6 flex items-center justify-between text-white">
            <div>
              <h2 className="text-xl font-bold mb-1">Unlock All 50+ Courses</h2>
@@ -649,20 +653,12 @@ const CourseList = () => {
           </div>
        </div>
 
-       {/* Loading State */}
-       {loading && (
-         <div className="text-center py-12">
-           <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-           <p className="mt-4 text-slate-600">Loading courses...</p>
-         </div>
-       )}
-
        {/* Courses Grid */}
-       {!loading && filteredCourses.length > 0 ? (
+       {filteredCourses.length > 0 ? (
          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {filteredCourses.map(course => {
                   const isFree = !!course.is_free;
-                  const canAccess = premium || isFree;
+                  const canAccess = premium || isFree || authLoading;
                   return (
                     <div key={course.id} className="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-all group relative">
                       {/* Course Image */}
@@ -827,7 +823,7 @@ const CourseList = () => {
                    className="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
                  />
                  <p className="text-xs text-slate-500 mt-1">
-                   Use a Google Drive file link or embed code. Avoid YouTube here because it can expose the original video outside SkillPro.
+                   Use a Google Drive file link or embed code. Avoid YouTube here because it can expose the original video outside SucessKart.
                  </p>
                </div>
 
@@ -922,7 +918,7 @@ const CourseList = () => {
                    className="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
                  />
                  <p className="text-xs text-slate-500 mt-1">
-                   Use a Google Drive file link or embed code. Avoid YouTube here because it can expose the original video outside SkillPro.
+                   Use a Google Drive file link or embed code. Avoid YouTube here because it can expose the original video outside SucessKart.
                  </p>
                </div>
 

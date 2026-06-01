@@ -24,7 +24,7 @@ const AdminSettings = () => {
   const [paymentUrgencyDate, setPaymentUrgencyDate] = useState('2026-04-15');
   const [paymentUrgencyLabel, setPaymentUrgencyLabel] = useState('April 15, 2026');
   const [paymentGatewayMode, setPaymentGatewayMode] = useState('razorpay');
-  const [skillproUpiId, setSkillproUpiId] = useState('');
+  const [SucessKartUpiId, setSucessKartUpiId] = useState('');
   const [manualPaymentAdminEmail, setManualPaymentAdminEmail] = useState('');
   const [paymentAdminPhone, setPaymentAdminPhone] = useState('');
   const [paymentAdminEmail, setPaymentAdminEmail] = useState('');
@@ -88,7 +88,7 @@ const AdminSettings = () => {
         if (setting.key === 'public_plans') setPlans(parsePlans(setting.value));
         if (setting.key === 'support_contact_email') setSupportContactEmail(setting.value || '');
         if (setting.key === 'payment_gateway_mode') setPaymentGatewayMode(setting.value === 'skillpro_upi' ? 'skillpro_upi' : setting.value === 'manual' ? 'manual' : 'razorpay');
-        if (setting.key === 'skillpro_upi_id') setSkillproUpiId(setting.value || '');
+        if (setting.key === 'skillpro_upi_id') setSucessKartUpiId(setting.value || '');
         if (setting.key === 'payment_admin_phone') setPaymentAdminPhone(setting.value || '');
         if (setting.key === 'payment_admin_email') setPaymentAdminEmail(setting.value || '');
         if (setting.key === 'payment_request_admin_email_enabled') setPaymentRequestAdminEmailEnabled(setting.value !== 'false');
@@ -129,7 +129,7 @@ const AdminSettings = () => {
       await saveSetting('min_questions', minQuestions);
       await saveSetting('support_contact_email', supportContactEmail.trim());
       await saveSetting('payment_gateway_mode', paymentGatewayMode);
-      await saveSetting('skillpro_upi_id', skillproUpiId.trim());
+      await saveSetting('skillpro_upi_id', SucessKartUpiId.trim());
       await saveSetting('manual_payment_admin_email', manualPaymentAdminEmail.trim());
       await saveSetting('payment_admin_phone', paymentAdminPhone.trim());
       await saveSetting('payment_admin_email', paymentAdminEmail.trim());
@@ -362,7 +362,7 @@ const AdminSettings = () => {
                     : 'bg-slate-100 text-slate-700'
                 }`}
               >
-                SkillPro UPI
+                SucessKart UPI
               </button>
               <button
                 type="button"
@@ -377,20 +377,20 @@ const AdminSettings = () => {
               </button>
             </div>
             <p className="mt-2 text-xs text-slate-500">
-              Razorpay uses the current checkout flow. SkillPro UPI creates fixed-amount UPI requests/manual review records. Manual shows admin-set QR codes on the payment page.
+              Razorpay uses the current checkout flow. SucessKart UPI creates fixed-amount UPI requests/manual review records. Manual shows admin-set QR codes on the payment page.
             </p>
           </div>
           <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-1">SkillPro UPI ID</label>
+            <label className="block text-sm font-semibold text-slate-700 mb-1">SucessKart UPI ID</label>
             <input
               type="text"
               className="w-full p-3 border border-slate-300 rounded-lg"
               placeholder="example@upi"
-              value={skillproUpiId}
-              onChange={(e) => setSkillproUpiId(e.target.value)}
+              value={SucessKartUpiId}
+              onChange={(e) => setSucessKartUpiId(e.target.value)}
             />
             <p className="mt-1 text-xs text-slate-500">
-              Used only when payment gateway mode is set to SkillPro UPI.
+              Used only when payment gateway mode is set to SucessKart UPI.
             </p>
           </div>
           <div className="md:col-span-2">

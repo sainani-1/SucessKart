@@ -196,12 +196,12 @@ const Home = () => {
         <div className="flex items-center gap-3">
           <div className="h-12 w-12 rounded-full shadow-sm overflow-hidden">
             <img
-              src="/skillpro-logo.png"
-              alt="SkillPro logo"
+              src="/sucesskart-logo.svg"
+              alt="SucessKart logo"
               className="h-full w-full rounded-full object-contain mix-blend-multiply"
             />
           </div>
-          <div className="font-serif font-bold text-2xl text-nani-dark">SkillPro</div>
+          <div className="font-serif font-bold text-2xl text-nani-dark">SucessKart</div>
         </div>
         <div className="space-x-4">
           <Link to="/login" className="text-slate-600 hover:text-nani-dark font-medium">Login</Link>
@@ -376,7 +376,7 @@ const Home = () => {
               <LeadCard
                 icon={ShieldCheck}
                 title="Certificate Verification"
-                description="Public verification already creates trust. Push a clear Join SkillPro CTA beside it."
+                description="Public verification already creates trust. Push a clear Join SucessKart CTA beside it."
               />
               <LeadCard
                 icon={Users}
@@ -512,10 +512,10 @@ const Home = () => {
             <div>
               <div className="flex items-center gap-3">
                 <div className="h-11 w-11 overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm">
-                  <img src="/skillpro-logo.png" alt="SkillPro logo" className="h-full w-full object-contain mix-blend-multiply" />
+                  <img src="/sucesskart-logo.svg" alt="SucessKart logo" className="h-full w-full object-contain mix-blend-multiply" />
                 </div>
                 <div>
-                  <p className="font-serif text-2xl font-bold text-nani-dark">SkillPro</p>
+                  <p className="font-serif text-2xl font-bold text-nani-dark">SucessKart</p>
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">Career-first learning</p>
                 </div>
               </div>
@@ -545,7 +545,7 @@ const Home = () => {
             <div>
               <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-900">Contact</p>
               <div className="mt-4 space-y-3 text-sm text-slate-600">
-                <p>Support email set by SkillPro team:</p>
+                <p>Support email set by SucessKart team:</p>
                 {supportEmail ? (
                   <a href={`mailto:${supportEmail}`} className="block font-semibold text-amber-700 hover:text-amber-800">
                     {supportEmail}
@@ -561,7 +561,7 @@ const Home = () => {
           </div>
 
           <div className="mt-8 flex flex-col gap-3 border-t border-slate-200 pt-5 text-xs text-slate-500 md:flex-row md:items-center md:justify-between">
-            <p>SkillPro public website and student access portal.</p>
+            <p>SucessKart public website and student access portal.</p>
             <p>Built for guided learning, assessments, and verified outcomes.</p>
           </div>
         </div>

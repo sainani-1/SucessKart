@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { useNavigate, Link, Navigate } from 'react-router-dom';
-import { ArrowLeft, KeyRound, MailCheck, ShieldCheck, UserRoundCheck } from 'lucide-react';
+import { ArrowLeft, Camera, KeyRound, MailCheck, ShieldCheck, UserCheck, UserRoundCheck, X } from 'lucide-react';
 import AlertModal from '../components/AlertModal';
 import Toast from '../components/Toast';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -13,6 +13,8 @@ import { clearAdminVerificationState } from '../utils/adminPasskey';
 import { getPendingAvatarKey } from '../utils/avatarUpload';
 import { reportMultiSessionViolation } from '../utils/sessionSecurity';
 import { logError, logWarn } from '../utils/errorLogger';
+import { isProfileComplete } from '../utils/profileCompletion';
+import { getFaceAuthSettings, clearFaceMfaVerified, extractFaceDescriptorFromVideo, faceDistance, getStoredFaceLoginData } from '../utils/faceAuth';
 
 const Login = () => {
   const { user, loading: authLoading } = useAuth();
@@ -36,10 +38,117 @@ const Login = () => {
   const takeoverResolverRef = useRef(null);
   const otpInputRefs = useRef([]);
   const googleAuthStartedRef = useRef(false);
+  const faceVideoRef = useRef(null);
+  const faceStreamRef = useRef(null);
   const navigate = useNavigate();
   const currentDeviceLabel = 'Web Login';
   const loginOtpEndpoint = import.meta.env.VITE_LOGIN_OTP_ENDPOINT || '/api/login-otp';
+  const faceLoginEndpoint = import.meta.env.VITE_FACE_LOGIN_ENDPOINT || `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/face-login`;
   const otpResendCooldownSeconds = 60;
+  const [faceLoginOpen, setFaceLoginOpen] = useState(false);
+  const [faceLoginEmail, setFaceLoginEmail] = useState('');
+  const [faceCameraLoading, setFaceCameraLoading] = useState(false);
+  const [faceCameraReady, setFaceCameraReady] = useState(false);
+  const [faceLoginLoading, setFaceLoginLoading] = useState(false);
+  const [faceLoginError, setFaceLoginError] = useState('');
+
+  const withTimeout = (promise, fallback, timeoutMs = 1800) =>
+    Promise.race([
+      promise,
+      new Promise((resolve) => window.setTimeout(() => resolve(fallback), timeoutMs)),
+    ]);
+
+  const stopFaceCamera = () => {
+    if (faceStreamRef.current) {
+      faceStreamRef.current.getTracks().forEach((track) => track.stop());
+      faceStreamRef.current = null;
+    }
+    setFaceCameraReady(false);
+  };
+
+  useEffect(() => () => stopFaceCamera(), []);
+
+  const startFaceCamera = async () => {
+    setFaceLoginError('');
+    setFaceCameraLoading(true);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user' },
+        audio: false,
+      });
+      faceStreamRef.current = stream;
+      if (faceVideoRef.current) {
+        faceVideoRef.current.srcObject = stream;
+        await faceVideoRef.current.play();
+      }
+      setFaceCameraReady(true);
+    } catch (error) {
+      setFaceLoginError(error?.message || 'Unable to access camera.');
+    } finally {
+      setFaceCameraLoading(false);
+    }
+  };
+
+  const openFaceLogin = () => {
+    setFaceLoginEmail(email || '');
+    setFaceLoginError('');
+    setFaceLoginOpen(true);
+  };
+
+  const closeFaceLogin = () => {
+    stopFaceCamera();
+    setFaceLoginOpen(false);
+    setFaceLoginLoading(false);
+    setFaceLoginError('');
+  };
+
+  const submitFaceLogin = async () => {
+    const targetEmail = String(faceLoginEmail || '').trim().toLowerCase();
+    if (!targetEmail) {
+      setFaceLoginError('Enter your registered email first.');
+      return;
+    }
+    if (!faceCameraReady) {
+      setFaceLoginError('Start camera and face it clearly.');
+      return;
+    }
+
+    setFaceLoginLoading(true);
+    setFaceLoginError('');
+    try {
+      const { descriptor } = await extractFaceDescriptorFromVideo(faceVideoRef.current);
+      const stored = getStoredFaceLoginData();
+      if (!stored?.descriptor || !stored?.email) {
+        throw new Error('No face registered on this device. Register your face in the Face Auth settings first.');
+      }
+      if (stored.email.toLowerCase() !== targetEmail) {
+        throw new Error('Face does not match this email. Register this email for face auth in settings.');
+      }
+      const dist = faceDistance(descriptor, stored.descriptor);
+      if (dist > 0.52) {
+        throw new Error('Face does not match. Please try again or use password login.');
+      }
+
+      await supabase.auth.signOut();
+      const { error: otpError } = await supabase.auth.signInWithOtp({
+        email: targetEmail,
+        options: { shouldCreateUser: false },
+      });
+      if (otpError) throw otpError;
+
+      closeFaceLogin();
+      setFaceLoginEmail('');
+      setToast({
+        show: true,
+        message: 'Face verified! Check your email for the login link.',
+        type: 'success',
+      });
+    } catch (error) {
+      setFaceLoginError(error?.message || 'Face login failed. Please try again.');
+    } finally {
+      setFaceLoginLoading(false);
+    }
+  };
 
   const applyPendingAvatarIfAny = async (userId, userEmail) => {
     if (!userId || !userEmail) return null;
@@ -119,6 +228,9 @@ const Login = () => {
 
   useEffect(() => {
     let mounted = true;
+    const fallbackTimer = window.setTimeout(() => {
+      if (mounted) setRestoringStoredSession(false);
+    }, 2000);
     const restoreBeforeShowingLogin = async () => {
       try {
         const { data } = await supabase.auth.getSession();
@@ -127,6 +239,7 @@ const Login = () => {
           return;
         }
       } finally {
+        window.clearTimeout(fallbackTimer);
         if (mounted) setRestoringStoredSession(false);
       }
     };
@@ -134,6 +247,7 @@ const Login = () => {
     restoreBeforeShowingLogin();
     return () => {
       mounted = false;
+      window.clearTimeout(fallbackTimer);
     };
   }, [navigate]);
 
@@ -312,40 +426,44 @@ const Login = () => {
     return { allowed: false, message: 'Could not validate active session. Please try again.' };
   };
 
+  const loadFaceSettingsForLogin = async (userProfile) => {
+    const fallback = getFaceAuthSettings(userProfile);
+    if (!userProfile?.id) return fallback;
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('face_auth_enabled, face_mfa_enabled, face_image_url, face_registered_at')
+        .eq('id', userProfile.id)
+        .maybeSingle();
+      if (error) throw error;
+      return getFaceAuthSettings({ ...userProfile, ...(data || {}) });
+    } catch {
+      return fallback;
+    }
+  };
+
   const routeGoogleUser = async (oauthUser) => {
     let { data: profile } = await supabase
       .from('profiles')
-      .select('id, role, is_disabled, is_locked, locked_until, lock_reason, disabled_reason, terms_accepted, google_profile_completed, auth_provider, full_name, email, phone, session_violation_count')
+      .select('id, role, is_disabled, is_locked, locked_until, lock_reason, disabled_reason, terms_accepted, google_profile_completed, auth_provider, full_name, email, phone, education_level, study_stream, core_subject, session_violation_count')
       .eq('id', oauthUser.id)
       .maybeSingle();
 
-    if (!profile) {
-      const meta = oauthUser.user_metadata || {};
-      const bootstrapProfile = {
-        id: oauthUser.id,
-        auth_user_id: oauthUser.id,
-        role: 'student',
-        email: oauthUser.email || null,
-        full_name: meta.full_name || meta.name || '',
-        avatar_url: meta.avatar_url || meta.picture || null,
-        auth_provider: 'google',
-        terms_accepted: false,
-        google_profile_completed: false,
-        updated_at: new Date().toISOString()
-      };
-      const { error: upsertError } = await supabase.from('profiles').upsert(bootstrapProfile, { onConflict: 'id' });
-      if (upsertError) throw upsertError;
-      profile = bootstrapProfile;
-    }
-
-    if (!profile.terms_accepted || !profile.google_profile_completed) {
-      navigate('/google-onboarding');
+    if (!profile || !isProfileComplete(profile)) {
+      setGoogleSigningIn(false);
+      setProcessingOAuth(false);
+      navigate('/complete-profile', { replace: true });
       return;
     }
 
-    const sessionCheck = await ensureSingleActiveSession(oauthUser.id, profile);
+    const sessionCheck = await withTimeout(
+      ensureSingleActiveSession(oauthUser.id, profile),
+      { allowed: true, message: '' }
+    );
     if (!sessionCheck.allowed) {
       await supabase.auth.signOut();
+      setGoogleSigningIn(false);
+      setProcessingOAuth(false);
       setAlertModal({
         show: true,
         title: 'Login Blocked',
@@ -355,7 +473,7 @@ const Login = () => {
       return;
     }
 
-    navigate('/app');
+    navigate('/app', { replace: true });
   };
 
   useEffect(() => {
@@ -366,7 +484,6 @@ const Login = () => {
       if (event !== 'SIGNED_IN') return;
       const provider = session?.user?.app_metadata?.provider;
       if (provider === 'google' && session?.user) {
-        // Routing handled in GIS callback after success delay
         return;
       }
     });
@@ -380,7 +497,7 @@ const Login = () => {
   useEffect(() => {
     const handleFocus = () => {
       if (googleAuthStartedRef.current) {
-        const checkId = setTimeout(() => {
+        setTimeout(() => {
           if (googleAuthStartedRef.current) {
             googleAuthStartedRef.current = false;
             setGoogleSigningIn(false);
@@ -398,6 +515,18 @@ const Login = () => {
     window.addEventListener('focus', handleFocus);
     return () => window.removeEventListener('focus', handleFocus);
   }, []);
+
+  useEffect(() => {
+    if (!processingOAuth) return undefined;
+    const timer = window.setTimeout(() => {
+      setProcessingOAuth(false);
+      setGoogleSigningIn(false);
+      if (user?.id) {
+        navigate('/app', { replace: true });
+      }
+    }, 2000);
+    return () => window.clearTimeout(timer);
+  }, [navigate, processingOAuth, user?.id]);
 
   useEffect(() => {
     const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -440,22 +569,37 @@ const Login = () => {
             return;
           }
 
-          const safetyTimeout = setTimeout(() => {
-            setProcessingOAuth(false);
-            setGoogleSigningIn(false);
-          }, 25000);
-
           supabase.auth.signInWithIdToken({ provider: 'google', token: response.credential })
             .then(async () => {
-              clearTimeout(safetyTimeout);
-              await new Promise(resolve => setTimeout(resolve, 2000));
               const { data: { session } } = await supabase.auth.getSession();
-              if (session?.user) {
-                await routeGoogleUser(session.user);
+              if (!session?.user) {
+                setProcessingOAuth(false);
+                setGoogleSigningIn(false);
+                setAlertModal({
+                  show: true,
+                  title: 'Google Login Failed',
+                  message: 'No session returned from sign-in.',
+                  type: 'error',
+                });
+                return;
               }
+
+              const { data: profile } = await supabase
+                .from('profiles')
+                .select('id, role, terms_accepted, google_profile_completed, auth_provider, full_name, email, phone, education_level, study_stream, core_subject')
+                .eq('id', session.user.id)
+                .maybeSingle();
+
+              if (!profile || !isProfileComplete(profile)) {
+                setProcessingOAuth(false);
+                setGoogleSigningIn(false);
+                navigate('/complete-profile', { replace: true });
+                return;
+              }
+
+              await routeGoogleUser(session.user);
             })
             .catch((err) => {
-              clearTimeout(safetyTimeout);
               setProcessingOAuth(false);
               setGoogleSigningIn(false);
               setAlertModal({
@@ -488,6 +632,73 @@ const Login = () => {
 
     return () => {
       if (renderInterval) clearInterval(renderInterval);
+    };
+  }, []);
+
+  const handleGoogleLogin = () => {
+    setGoogleSigningIn(true);
+    googleAuthStartedRef.current = true;
+
+    const tryClick = () => {
+      const container = document.getElementById('google-gsi-container');
+      if (!container) {
+        setTimeout(tryClick, 300);
+        return;
+      }
+      const btn = container.querySelector('button, div[role="button"]');
+      if (!btn) {
+        setTimeout(tryClick, 300);
+        return;
+      }
+      btn.click();
+    };
+
+    tryClick();
+  };
+
+  const handleOAuthReturnRef = useRef(false);
+  useEffect(() => {
+    if (handleOAuthReturnRef.current) return;
+    handleOAuthReturnRef.current = true;
+    let isMounted = true;
+    const searchParams = new URLSearchParams(window.location.search);
+    const hasOAuthError = !!searchParams.get('error');
+
+    const handleOAuthReturn = async () => {
+      try {
+        if (hasOAuthError) {
+          const description = searchParams.get('error_description') || searchParams.get('error');
+          setAlertModal({
+            show: true,
+            title: 'Google Sign-in Error',
+            message: decodeURIComponent(description || 'OAuth sign-in failed.'),
+            type: 'error'
+          });
+          return;
+        }
+
+        const { data: { session } } = await supabase.auth.getSession();
+        const provider = session?.user?.app_metadata?.provider;
+        if (!session?.user || provider !== 'google') return;
+        setProcessingOAuth(true);
+        await routeGoogleUser(session.user);
+      } catch (error) {
+        if (!isMounted) return;
+        setAlertModal({
+          show: true,
+          title: 'Google Sign-in Error',
+          message: error.message || 'Unable to complete Google sign-in.',
+          type: 'error'
+        });
+      } finally {
+        if (isMounted) setProcessingOAuth(false);
+      }
+    };
+
+    handleOAuthReturn();
+
+    return () => {
+      isMounted = false;
     };
   }, []);
 
@@ -677,6 +888,7 @@ const Login = () => {
       } catch (referralError) {
         logWarn({ message: 'Referral attach failed after login:', source: 'Login', details: referralError.message || referralError })
       }
+      clearFaceMfaVerified(signInData.user.id);
 
       // Check for admin role and MFA
       const sessionCheck = await ensureSingleActiveSession(signInData.user.id, userProfile);
@@ -689,17 +901,21 @@ const Login = () => {
 
       if (userProfile.role === 'admin') {
         clearAdminVerificationState();
+        const faceSettings = await loadFaceSettingsForLogin(userProfile);
         setLoggingIn(false);
         setToast({
           show: true,
           message: sessionCheck.message || 'Logged in successfully!',
           type: 'success'
         });
-        navigate('/admin-auth-choice');
+        navigate(faceSettings.mfaEnabled ? '/face-verify' : '/admin-auth-choice', {
+          state: { next: '/admin-auth-choice' }
+        });
         return;
       }
 
       // Account is active, proceed to app
+      const faceSettings = await loadFaceSettingsForLogin(userProfile);
       setLoggingIn(false);
       setToast({
         show: true,
@@ -707,7 +923,9 @@ const Login = () => {
         type: 'success'
       });
       setInlineNotice('');
-      navigate('/app');
+      navigate(faceSettings.mfaEnabled ? '/face-verify' : '/app', {
+        state: { next: '/app' }
+      });
     } catch (error) {
       logError({ message: 'Error during login:', source: 'Login', details: error })
       setAlertModal({
@@ -802,76 +1020,6 @@ const Login = () => {
     }
   };
 
-  const handleGoogleLogin = () => {
-    setGoogleSigningIn(true);
-    googleAuthStartedRef.current = true;
-
-    const tryClick = () => {
-      const container = document.getElementById('google-gsi-container');
-      if (!container) {
-        setTimeout(tryClick, 300);
-        return;
-      }
-      const btn = container.querySelector('button, div[role="button"]');
-      if (!btn) {
-        setTimeout(tryClick, 300);
-        return;
-      }
-      btn.click();
-    };
-
-    tryClick();
-  };
-
-  const handleOAuthReturnRef = useRef(false);
-  useEffect(() => {
-    if (handleOAuthReturnRef.current) return;
-    handleOAuthReturnRef.current = true;
-    let isMounted = true;
-    const searchParams = new URLSearchParams(window.location.search);
-    const hasOAuthError = !!searchParams.get('error');
-
-    const handleOAuthReturn = async () => {
-      try {
-        if (hasOAuthError) {
-          const description = searchParams.get('error_description') || searchParams.get('error');
-          setAlertModal({
-            show: true,
-            title: 'Google Sign-in Error',
-            message: decodeURIComponent(description || 'OAuth sign-in failed.'),
-            type: 'error'
-          });
-          return;
-        }
-
-        const { data: { session } } = await supabase.auth.getSession();
-        const provider = session?.user?.app_metadata?.provider;
-        if (!session?.user || provider !== 'google') return;
-        await routeGoogleUser(session.user);
-      } catch (error) {
-        if (!isMounted) return;
-        setAlertModal({
-          show: true,
-          title: 'Google Sign-in Error',
-          message: error.message || 'Unable to complete Google sign-in.',
-          type: 'error'
-        });
-      } finally {
-        if (isMounted) setProcessingOAuth(false);
-      }
-    };
-
-    handleOAuthReturn();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  if (authLoading || restoringStoredSession) {
-    return <LoadingSpinner message="Checking session..." />;
-  }
-
   if (processingOAuth) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 via-white to-amber-50">
@@ -892,7 +1040,7 @@ const Login = () => {
     );
   }
 
-  if (user?.id && !loggingIn && !takeoverModalOpen && !otpStep) {
+  if (user?.id && !loggingIn && !takeoverModalOpen && !otpStep && !googleSigningIn && !processingOAuth) {
     return <Navigate to="/app" replace />;
   }
 
@@ -905,14 +1053,14 @@ const Login = () => {
         onClose={() => setToast({ show: false, message: '', type: 'success' })}
       />
       <AuthShell
-        title="Continue your SkillPro learning"
+        title="Continue your SucessKart learning"
         subtitle="Sign in to access courses, exams, certificates, mentor support, and your full student dashboard."
         highlights={[
           { icon: UserRoundCheck, text: 'Resume your learning from the same account across courses and assessments.' },
           { icon: ShieldCheck, text: 'Protected login flow with session checks and account safety controls.' },
           { icon: KeyRound, text: 'Reset your password anytime if you lose access to your email login.' },
         ]}
-        footerLabel="New to SkillPro?"
+        footerLabel="New to SucessKart?"
         footerLinkTo="/register"
         footerLinkText="Create your account"
         rightTitle="Welcome Back"
@@ -1079,6 +1227,15 @@ const Login = () => {
             </svg>
             {googleSigningIn ? 'Connecting...' : 'Continue with Google'}
           </button>
+
+          <button
+            type="button"
+            onClick={openFaceLogin}
+            className="mt-3 inline-flex w-full items-center justify-center gap-3 rounded-xl border border-cyan-200 bg-cyan-50 px-4 py-3 font-semibold text-cyan-800 shadow-sm transition hover:bg-cyan-100"
+          >
+            <Camera size={18} />
+            Login with Face
+          </button>
         </div>
 
         <div className="mt-5 grid gap-3 sm:grid-cols-2">
@@ -1147,6 +1304,71 @@ const Login = () => {
           </div>
         </div>
       )}
+
+      {faceLoginOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-cyan-100">
+                  <Camera className="text-cyan-600" size={20} />
+                </div>
+                <h3 className="text-lg font-bold text-slate-900">Login with Face</h3>
+              </div>
+              <button
+                type="button"
+                onClick={closeFaceLogin}
+                className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-slate-600">Email</label>
+                <input
+                  type="email"
+                  placeholder="Enter your registered email"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 focus:border-cyan-300 focus:outline-none focus:ring-2 focus:ring-cyan-200"
+                  value={faceLoginEmail}
+                  onChange={(e) => setFaceLoginEmail(e.target.value)}
+                />
+              </div>
+              {!faceCameraReady ? (
+                <button
+                  type="button"
+                  onClick={startFaceCamera}
+                  disabled={faceCameraLoading || faceLoginLoading}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-cyan-600 px-4 py-3 font-semibold text-white hover:bg-cyan-700 disabled:opacity-60"
+                >
+                  <Camera size={18} />
+                  {faceCameraLoading ? 'Starting Camera...' : 'Start Camera'}
+                </button>
+              ) : (
+                <div className="overflow-hidden rounded-xl bg-slate-950">
+                  <video ref={faceVideoRef} autoPlay muted playsInline className="h-64 w-full object-cover" />
+                </div>
+              )}
+              {faceLoginError ? (
+                <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">
+                  {faceLoginError}
+                </div>
+              ) : null}
+              {faceCameraReady ? (
+                <button
+                  type="button"
+                  onClick={submitFaceLogin}
+                  disabled={faceLoginLoading}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+                >
+                  <UserCheck size={18} />
+                  {faceLoginLoading ? 'Checking Face...' : 'Login with Face'}
+                </button>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </>
   );
 };

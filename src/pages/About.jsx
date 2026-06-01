@@ -27,7 +27,7 @@ const About = () => {
     {
       icon: BookOpen,
       title: 'Learning Platform',
-      description: 'SkillPro brings courses, guided practice, assessments, and certificates into one structured student flow.',
+      description: 'SucessKart brings courses, guided practice, assessments, and certificates into one structured student flow.',
     },
     {
       icon: Users,
@@ -47,12 +47,12 @@ const About = () => {
         <Link to="/" className="flex items-center gap-3">
           <div className="h-12 w-12 overflow-hidden rounded-full shadow-sm">
             <img
-              src="/skillpro-logo.png"
-              alt="SkillPro logo"
+              src="/sucesskart-logo.svg"
+              alt="SucessKart logo"
               className="h-full w-full rounded-full object-contain mix-blend-multiply"
             />
           </div>
-          <div className="font-serif text-2xl font-bold text-nani-dark">SkillPro</div>
+          <div className="font-serif text-2xl font-bold text-nani-dark">SucessKart</div>
         </Link>
       </nav>
 
@@ -67,10 +67,10 @@ const About = () => {
               Back to Home
             </Link>
           </div>
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-amber-700">About SkillPro</p>
+          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-amber-700">About SucessKart</p>
           <h1 className="mt-4 font-serif text-4xl font-bold text-nani-dark md:text-5xl">Career-first learning with guidance, practice, and proof.</h1>
           <p className="mt-5 max-w-3xl text-base leading-7 text-slate-600">
-            SkillPro is built for students who want more than just video lessons. The platform combines learning paths,
+            SucessKart is built for students who want more than just video lessons. The platform combines learning paths,
             teacher support, assessments, certificate verification, and growth tools in one account experience.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
