@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../context/AuthContext';
 
@@ -46,43 +46,63 @@ function parseUserAgent(ua) {
   return result;
 }
 
-const loggedKeys = new Set();
-
-async function insertVisit(userId) {
-  const url = window.location.href;
-  const key = `${userId || 'anon'}_${url}`;
-  if (loggedKeys.has(key)) return;
-  loggedKeys.add(key);
-
+function getVisitorFingerprint() {
   try {
-    const ua = navigator.userAgent;
-    const p = parseUserAgent(ua);
-    await supabase.from('visitor_logs').insert({
-      user_agent: ua,
-      device_type: p.device_type,
-      browser: p.browser,
-      browser_version: p.browser_version,
-      os: p.os,
-      os_version: p.os_version,
-      referrer: document.referrer || '',
-      page_url: url,
-      user_id: userId || null,
-    });
-  } catch (err) {
-    // non-critical - log to console for debugging
-    console.warn('Visitor log insert failed:', err);
+    const parts = [
+      navigator.userAgent,
+      screen.width,
+      screen.height,
+      navigator.language,
+    ];
+    return parts.join('||');
+  } catch {
+    return navigator.userAgent || 'unknown';
   }
 }
 
 export function useVisitorTracking() {
   const { user, profile } = useAuth();
+  const latestRef = useRef({ user, profile });
+  latestRef.current = { user, profile };
 
   useEffect(() => {
-    const timer = setTimeout(() => insertVisit(user?.id || profile?.id || null), 2000);
-    return () => clearTimeout(timer);
-  }, []); // run once on mount regardless of StrictMode
-}
+    const { user: u, profile: p } = latestRef.current;
+    const userId = u?.id || p?.id || null;
+    const fingerprint = userId || getVisitorFingerprint();
+    const storageKey = `visitor_logged_${fingerprint}`;
 
-export function logPageView() {
-  return insertVisit(null);
+    // Only log unique visitors — skip if already logged from this device
+    if (localStorage.getItem(storageKey)) return;
+
+    const timer = setTimeout(async () => {
+      try {
+        const { user: u, profile: p } = latestRef.current;
+        const uid = u?.id || p?.id || null;
+        const ua = navigator.userAgent;
+        const parsed = parseUserAgent(ua);
+
+        await supabase.functions.invoke('log-visit', {
+          body: {
+            user_agent: ua,
+            device_type: parsed.device_type,
+            browser: parsed.browser,
+            browser_version: parsed.browser_version,
+            os: parsed.os,
+            os_version: parsed.os_version,
+            referrer: document.referrer || '',
+            user_id: uid,
+            username: p?.username || null,
+            email: p?.email || null,
+          },
+        });
+
+        const logKey = `visitor_logged_${uid || getVisitorFingerprint()}`;
+        localStorage.setItem(logKey, '1');
+      } catch (err) {
+        console.warn('Visitor log failed:', err);
+      }
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, []); // run once on mount
 }

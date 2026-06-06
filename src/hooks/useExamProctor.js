@@ -13,6 +13,8 @@ export function useExamProctor({
   const noFaceSeconds = useRef(0);
   const fsTimer = useRef(null);
   const faceInterval = useRef(null);
+  const tabSwitchWarnings = useRef(0);
+  const blurWarnings = useRef(0);
 
   useEffect(() => {
     activeRef.current = examPhase === "RUNNING";
@@ -57,20 +59,32 @@ export function useExamProctor({
 
     document.addEventListener("fullscreenchange", handleFullscreen);
 
-    /* TAB CHANGE → ACCOUNT BLOCK */
+    /* TAB CHANGE → WARNING THEN ACCOUNT BLOCK */
     function handleVisibility() {
       if (!activeRef.current) return;
       if (document.hidden) {
-        onTerminate("tab_block_account");
+        tabSwitchWarnings.current++;
+        if (tabSwitchWarnings.current >= 3) {
+          onTerminate("tab_block_account");
+        } else {
+          onPause();
+        }
+      } else {
+        onResume();
       }
     }
 
     document.addEventListener("visibilitychange", handleVisibility);
 
-    /* APP SWITCH → ACCOUNT BLOCK */
+    /* APP SWITCH → WARNING THEN ACCOUNT BLOCK */
     function handleBlur() {
       if (!activeRef.current) return;
-      onTerminate("app_switch_block_account");
+      blurWarnings.current++;
+      if (blurWarnings.current >= 3) {
+        onTerminate("app_switch_block_account");
+      } else {
+        onPause();
+      }
     }
 
     window.addEventListener("blur", handleBlur);

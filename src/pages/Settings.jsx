@@ -181,6 +181,27 @@ const Settings = () => {
     }
   };
 
+  const handleDeleteAccount = async () => {
+    if (!profile?.id) return;
+    const confirmed = window.confirm('Are you sure you want to delete your account? This cannot be undone.');
+    if (!confirmed) return;
+    setLoading(true);
+    try {
+      const reason = window.prompt('Please provide a reason for deletion (optional):');
+      const { error } = await supabase.rpc('delete_self_account', {
+        user_id: profile.id,
+        deletion_reason: reason || null,
+      });
+      if (error) throw error;
+      await supabase.auth.signOut();
+      window.location.href = '/';
+    } catch (error) {
+      openPopup('Error', error.message || 'Failed to delete account', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const tabs = [
     { id: 'profile', label: 'Profile', icon: User },
     { id: 'password', label: 'Password', icon: Lock },

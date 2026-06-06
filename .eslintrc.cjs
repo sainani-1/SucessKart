@@ -20,11 +20,9 @@ module.exports = {
   plugins: ["react-hooks"],
   ignorePatterns: ["dist", "node_modules"],
   rules: {
-    // Keep lint permissive for the current codebase baseline.
-    "no-unused-vars": "off",
-    "no-undef": "off",
-    "react-hooks/rules-of-hooks": "off",
-    "react-hooks/exhaustive-deps": "off",
+    "no-unused-vars": ["warn", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
+    "no-undef": "error",
+    "react-hooks/rules-of-hooks": "error",
+    "react-hooks/exhaustive-deps": "warn",
   },
 };
-

@@ -575,6 +575,8 @@ const LeaveRequests = () => {
   const [showReassignModal, setShowReassignModal] = useState(null);
   const [selectedTeacher, setSelectedTeacher] = useState('');
   const [reassignLoading, setReassignLoading] = useState(false);
+  const [alertModal, setAlertModal] = useState({ show: false, title: '', message: '', type: 'info' });
+  const [confirmModal, setConfirmModal] = useState({ show: false, title: '', message: '', onConfirm: null });
 
   useEffect(() => {
     loadTeachers();

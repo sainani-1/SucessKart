@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { CalendarClock, CheckCircle, Clock, FileText } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { CalendarClock, CheckCircle, Clock, FileText, Play } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabaseClient';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -26,8 +26,10 @@ const getStatusTone = (status, startsAt) => {
 
 const MyRegisteredExams = () => {
   const { profile } = useAuth();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [timedOutSlots, setTimedOutSlots] = useState(new Set());
   const [bookings, setBookings] = useState([]);
   const [slotsById, setSlotsById] = useState({});
   const [examsById, setExamsById] = useState({});
@@ -95,6 +97,40 @@ const MyRegisteredExams = () => {
     loadRegisteredExams();
   }, [profile?.id]);
 
+  const getPrepTimeMinutes = (slot) => {
+    const prepTime = slot.prep_time_minutes;
+    return (prepTime != null && !isNaN(Number(prepTime))) ? Number(prepTime) : 5;
+  };
+
+  const getJoinDeadline = (slot) => {
+    if (!slot?.starts_at) return null;
+    const prepTime = getPrepTimeMinutes(slot);
+    return new Date(new Date(slot.starts_at).getTime() + prepTime * 60000);
+  };
+
+  const isJoinTimedOut = (slot) => {
+    const deadline = getJoinDeadline(slot);
+    if (!deadline) return false;
+    const now = Date.now();
+    const startsAt = new Date(slot.starts_at).getTime();
+    const endsAt = new Date(slot.ends_at).getTime();
+    return now >= startsAt && now >= deadline && now <= endsAt;
+  };
+
+  const isExamExpired = (slot) => {
+    if (!slot?.ends_at) return true;
+    return new Date(slot.ends_at).getTime() <= Date.now();
+  };
+
+  const canStart = (slot) => {
+    if (!slot?.starts_at) return false;
+    const now = Date.now();
+    const startsAt = new Date(slot.starts_at).getTime();
+    const deadline = getJoinDeadline(slot);
+    const nowMs = now;
+    return nowMs >= startsAt && (!deadline || nowMs < deadline.getTime());
+  };
+
   const upcomingRows = useMemo(() => {
     const now = Date.now();
     return bookings
@@ -120,6 +156,14 @@ const MyRegisteredExams = () => {
       .filter((row) => row.slot?.starts_at && new Date(row.slot.starts_at).getTime() < now)
       .sort((a, b) => new Date(b.slot.starts_at).getTime() - new Date(a.slot.starts_at).getTime());
   }, [bookings, slotsById, examsById, coursesById]);
+
+  const handleStartExam = (exam, course) => {
+    if (exam?.course_id) {
+      navigate(`/exam/${exam.course_id}`);
+    } else {
+      navigate(`/live-test/${exam?.id || ''}`);
+    }
+  };
 
   if (loading) return <LoadingSpinner message="Loading your registered exams..." />;
 
@@ -156,23 +200,47 @@ const MyRegisteredExams = () => {
           </div>
         ) : (
           <div className="grid gap-4">
-            {upcomingRows.map(({ booking, slot, exam, course }) => (
-              <div key={booking.id} className="rounded-xl border border-slate-200 p-4">
-                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                  <div>
-                    <h3 className="text-lg font-bold text-slate-900">{getExamName(exam, course)}</h3>
-                    <p className="mt-1 text-sm text-slate-500">{slot.title || course?.category || 'Live exam slot'}</p>
-                    <div className="mt-3 grid gap-2 text-sm text-slate-600 sm:grid-cols-2">
-                      <span className="inline-flex items-center gap-2"><Clock size={16} /> Starts: {formatDateTime(slot.starts_at)}</span>
-                      <span className="inline-flex items-center gap-2"><CheckCircle size={16} /> Ends: {formatDateTime(slot.ends_at)}</span>
+            {upcomingRows.map(({ booking, slot, exam, course }) => {
+              const prepTime = getPrepTimeMinutes(slot);
+              const deadline = getJoinDeadline(slot);
+              const timedOut = isJoinTimedOut(slot);
+              const expired = isExamExpired(slot);
+              const startable = canStart(slot);
+
+              return (
+                <div key={booking.id} className="rounded-xl border border-slate-200 p-4">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                    <div>
+                      <h3 className="text-lg font-bold text-slate-900">{getExamName(exam, course)}</h3>
+                      <p className="mt-1 text-sm text-slate-500">{slot.title || course?.category || 'Live exam slot'}</p>
+                      <div className="mt-3 grid gap-2 text-sm text-slate-600 sm:grid-cols-2">
+                        <span className="inline-flex items-center gap-2"><Clock size={16} /> Starts: {formatDateTime(slot.starts_at)}</span>
+                        <span className="inline-flex items-center gap-2"><CheckCircle size={16} /> Ends: {formatDateTime(slot.ends_at)}</span>
+                        <span className="inline-flex items-center gap-2 text-amber-600"><Clock size={16} /> Join within {prepTime} min of start</span>
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-2">
+                      <span className={`w-fit rounded-full border px-3 py-1 text-xs font-bold ${getStatusTone(booking.status, slot.starts_at)}`}>
+                        {String(booking.status || 'booked').toUpperCase()}
+                      </span>
+                      {timedOut && !expired ? (
+                        <span className="rounded-lg bg-red-100 px-3 py-1.5 text-xs font-bold text-red-700">
+                          Exam join time out — deadline was {formatDateTime(deadline)}
+                        </span>
+                      ) : null}
+                      {startable && !expired ? (
+                        <button
+                          onClick={() => handleStartExam(exam, course)}
+                          className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+                        >
+                          <Play size={16} /> Start Exam
+                        </button>
+                      ) : null}
                     </div>
                   </div>
-                  <span className={`w-fit rounded-full border px-3 py-1 text-xs font-bold ${getStatusTone(booking.status, slot.starts_at)}`}>
-                    {String(booking.status || 'booked').toUpperCase()}
-                  </span>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>

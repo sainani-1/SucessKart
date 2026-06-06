@@ -18,7 +18,8 @@ import {
   Minimize2,
   Settings,
   Volume2,
-  VolumeX
+  VolumeX,
+  Loader2
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabaseClient';
@@ -657,6 +658,7 @@ const CustomProtectedVideo = ({
 }) => {
   const pendingQualityTimeRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [buffering, setBuffering] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(1);
@@ -691,6 +693,8 @@ const CustomProtectedVideo = ({
       setVolume(element.volume);
       setMuted(element.muted);
     };
+    const handleWaiting = () => setBuffering(true);
+    const handleCanPlay = () => setBuffering(false);
 
     syncTime();
     syncVolume();
@@ -699,6 +703,9 @@ const CustomProtectedVideo = ({
     element.addEventListener('timeupdate', syncTime);
     element.addEventListener('durationchange', syncTime);
     element.addEventListener('volumechange', syncVolume);
+    element.addEventListener('waiting', handleWaiting);
+    element.addEventListener('canplay', handleCanPlay);
+    element.addEventListener('playing', handleCanPlay);
 
     return () => {
       element.removeEventListener('play', syncPlayback);
@@ -706,6 +713,9 @@ const CustomProtectedVideo = ({
       element.removeEventListener('timeupdate', syncTime);
       element.removeEventListener('durationchange', syncTime);
       element.removeEventListener('volumechange', syncVolume);
+      element.removeEventListener('waiting', handleWaiting);
+      element.removeEventListener('canplay', handleCanPlay);
+      element.removeEventListener('playing', handleCanPlay);
     };
   }, [videoRef, displaySrc]);
 
@@ -860,6 +870,21 @@ const CustomProtectedVideo = ({
           <span className="SucessKart-player-chrome absolute inset-0 flex items-center justify-center bg-black/20 text-white">
             <span className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-white/15 backdrop-blur">
               <Play size={26} />
+            </span>
+          </span>
+        ) : null}
+        {buffering && isPlaying ? (
+          <span className="SucessKart-player-chrome absolute inset-0 flex items-center justify-center bg-black/10 text-white">
+            <span className="relative inline-flex h-24 w-24 items-center justify-center">
+              <span className="absolute inset-0 animate-ping rounded-full border-2 border-blue-400/60" />
+              <span className="absolute inset-2 animate-spin rounded-full border-2 border-t-transparent border-blue-300/80" style={{ animationDuration: '1.2s' }} />
+              <span className="absolute inset-4 animate-spin rounded-full border-2 border-b-transparent border-cyan-400/60" style={{ animationDuration: '0.8s', animationDirection: 'reverse' }} />
+              <span className="absolute inset-6 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center">
+                <Loader2 size={20} className="animate-spin text-blue-300" style={{ animationDuration: '0.6s' }} />
+              </span>
+              <span className="absolute -bottom-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-slate-950/80 px-2 py-0.5 text-[10px] font-semibold text-blue-200">
+                Slow internet? Please wait, we'll load soon...
+              </span>
             </span>
           </span>
         ) : null}
@@ -1072,6 +1097,7 @@ const CourseDetail = () => {
   const [protectedAssets, setProtectedAssets] = useState(null);
   const [enrolled, setEnrolled] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [checkingEnrollment, setCheckingEnrollment] = useState(true);
   const [assetsLoading, setAssetsLoading] = useState(false);
   const [driveVideoFallback, setDriveVideoFallback] = useState(false);
   const [savedVideoProgress, setSavedVideoProgress] = useState(null);
@@ -1090,6 +1116,7 @@ const CourseDetail = () => {
   const resumeAppliedRef = useRef(false);
   const resumePendingRef = useRef(false);
   const lastSavedTimeRef = useRef(0);
+  const enrollmentRef = useRef(null);
   const videoSource = useMemo(() => parseVideoSource(protectedAssets?.video_url), [protectedAssets?.video_url]);
 
   useEffect(() => {
@@ -1270,6 +1297,7 @@ const CourseDetail = () => {
 
   const fetchCourseData = async () => {
     try {
+      setCheckingEnrollment(true);
       setProtectedAssets(null);
 
       const { data: courseData } = await supabase
@@ -1287,7 +1315,7 @@ const CourseDetail = () => {
       if (activeUserId && !courseData?.is_free) {
         const { data, error: enrollmentError } = await supabase
           .from('enrollments')
-          .select('id')
+          .select('id, progress, completed')
           .eq('student_id', activeUserId)
           .eq('course_id', courseId)
           .maybeSingle();
@@ -1295,6 +1323,7 @@ const CourseDetail = () => {
           logError({ message: 'Error checking enrollment:', source: 'CourseDetail', details: enrollmentError });
         }
         isEnrolled = !!data;
+        enrollmentRef.current = data;
       }
       setEnrolled(isEnrolled);
 
@@ -1312,6 +1341,8 @@ const CourseDetail = () => {
       }
     } catch (error) {
       logError({ message: 'Error fetching course:', source: 'CourseDetail', details: error });
+    } finally {
+      setCheckingEnrollment(false);
     }
   };
 
@@ -1327,13 +1358,14 @@ const CourseDetail = () => {
     }
     setLoading(true);
     try {
-      await supabase.from('enrollments').insert({
+      const { data: enrollData } = await supabase.from('enrollments').insert({
         student_id: activeUserId,
         course_id: courseId,
         progress: 0,
         completed: false
-      });
+      }).select('id').maybeSingle();
       setEnrolled(true);
+      enrollmentRef.current = { id: enrollData?.id, progress: 0, completed: false };
       openPopup('Enrolled', 'You have been enrolled successfully.', 'success');
       if (course?.is_free || premium) {
         const assets = await fetchCourseProtectedAssets(courseId);
@@ -1376,23 +1408,25 @@ const CourseDetail = () => {
     };
     writeVideoProgress(profile?.id || user?.id, courseId, progress);
     setSavedVideoProgress(progress);
+    const currentEnrollment = enrollmentRef.current;
     if (
       ['cloudinary-video', 'direct-video'].includes(videoSource?.type) &&
       profile?.id &&
       courseId &&
-      percent > Number(enrollment?.progress || 0)
+      percent > Number(currentEnrollment?.progress || 0)
     ) {
       supabase
         .from('enrollments')
         .update({
           progress: percent,
-          completed: percent >= 100 || Boolean(enrollment?.completed),
+          completed: percent >= 100 || Boolean(currentEnrollment?.completed),
         })
         .eq('student_id', profile.id)
         .eq('course_id', courseId)
         .then(({ error: progressError }) => {
           if (progressError) logError({ message: 'Course video progress sync failed.', source: 'CourseDetail', details: progressError.message || progressError });
         });
+      enrollmentRef.current = { ...currentEnrollment, progress: percent, completed: percent >= 100 || Boolean(currentEnrollment?.completed) };
     }
   };
 
@@ -1522,6 +1556,10 @@ const CourseDetail = () => {
         </Link>
       </div>
     );
+  }
+
+  if (checkingEnrollment) {
+    return <LoadingSpinner message="Checking enrollment..." fullPage={false} />;
   }
 
   if (!effectiveEnrolled) {

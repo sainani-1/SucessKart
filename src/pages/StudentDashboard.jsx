@@ -380,11 +380,7 @@ const StudentDashboard = () => {
               <p className="text-green-100">
                 You've been assigned to <span className="font-semibold">{teacher.full_name}</span> as your teacher! 
                 You can now chat with them and attend live classes.
-                                      </p>
-                                      <p className="mt-1 text-xs text-slate-500">
-                                        Video completed: {progressPercent}%
-                                        {hasResumePoint ? ` • Resume from ${formatVideoResumeLabel(savedVideoProgress.currentTime)}` : ''}
-                                      </p>
+              </p>
             </div>
           </div>
         </div>

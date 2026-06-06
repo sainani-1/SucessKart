@@ -200,6 +200,7 @@ export const isPasskeySupported = () =>
 export const clearAdminVerificationState = () => {
   sessionStorage.removeItem('admin_mfa_verified');
   sessionStorage.removeItem('admin_mfa_verified_user');
+  sessionStorage.removeItem('admin_mfa_verified_at');
   sessionStorage.removeItem('admin_face_verified');
   sessionStorage.removeItem(PASSKEY_VERIFIED_KEY);
   sessionStorage.removeItem(PASSKEY_VERIFIED_USER_KEY);
@@ -211,6 +212,7 @@ export const markAdminPasskeyVerified = (userId) => {
   // Keep existing guards and sensitive flows compatible.
   sessionStorage.setItem('admin_mfa_verified', 'true');
   sessionStorage.setItem('admin_mfa_verified_user', userId);
+  sessionStorage.setItem('admin_mfa_verified_at', String(Date.now()));
 };
 
 export const isAdminPasskeyVerifiedForUser = (userId) =>

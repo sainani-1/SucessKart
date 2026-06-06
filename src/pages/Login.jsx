@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { useNavigate, Link, Navigate } from 'react-router-dom';
-import { ArrowLeft, Camera, KeyRound, MailCheck, ShieldCheck, UserCheck, UserRoundCheck, X } from 'lucide-react';
+import { ArrowLeft, KeyRound, MailCheck, ShieldCheck, UserRoundCheck, X } from 'lucide-react';
 import AlertModal from '../components/AlertModal';
 import Toast from '../components/Toast';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -12,9 +12,10 @@ import { useAuth } from '../context/AuthContext';
 import { clearAdminVerificationState } from '../utils/adminPasskey';
 import { getPendingAvatarKey } from '../utils/avatarUpload';
 import { reportMultiSessionViolation } from '../utils/sessionSecurity';
+import { clearFaceMfaVerified } from '../utils/faceAuth';
 import { logError, logWarn } from '../utils/errorLogger';
 import { isProfileComplete } from '../utils/profileCompletion';
-import { getFaceAuthSettings, clearFaceMfaVerified, extractFaceDescriptorFromVideo, faceDistance, getStoredFaceLoginData } from '../utils/faceAuth';
+
 
 const Login = () => {
   const { user, loading: authLoading } = useAuth();
@@ -38,19 +39,10 @@ const Login = () => {
   const takeoverResolverRef = useRef(null);
   const otpInputRefs = useRef([]);
   const googleAuthStartedRef = useRef(false);
-  const faceVideoRef = useRef(null);
-  const faceStreamRef = useRef(null);
   const navigate = useNavigate();
   const currentDeviceLabel = 'Web Login';
   const loginOtpEndpoint = import.meta.env.VITE_LOGIN_OTP_ENDPOINT || '/api/login-otp';
-  const faceLoginEndpoint = import.meta.env.VITE_FACE_LOGIN_ENDPOINT || `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/face-login`;
   const otpResendCooldownSeconds = 60;
-  const [faceLoginOpen, setFaceLoginOpen] = useState(false);
-  const [faceLoginEmail, setFaceLoginEmail] = useState('');
-  const [faceCameraLoading, setFaceCameraLoading] = useState(false);
-  const [faceCameraReady, setFaceCameraReady] = useState(false);
-  const [faceLoginLoading, setFaceLoginLoading] = useState(false);
-  const [faceLoginError, setFaceLoginError] = useState('');
 
   const withTimeout = (promise, fallback, timeoutMs = 1800) =>
     Promise.race([
@@ -58,97 +50,7 @@ const Login = () => {
       new Promise((resolve) => window.setTimeout(() => resolve(fallback), timeoutMs)),
     ]);
 
-  const stopFaceCamera = () => {
-    if (faceStreamRef.current) {
-      faceStreamRef.current.getTracks().forEach((track) => track.stop());
-      faceStreamRef.current = null;
-    }
-    setFaceCameraReady(false);
-  };
 
-  useEffect(() => () => stopFaceCamera(), []);
-
-  const startFaceCamera = async () => {
-    setFaceLoginError('');
-    setFaceCameraLoading(true);
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user' },
-        audio: false,
-      });
-      faceStreamRef.current = stream;
-      if (faceVideoRef.current) {
-        faceVideoRef.current.srcObject = stream;
-        await faceVideoRef.current.play();
-      }
-      setFaceCameraReady(true);
-    } catch (error) {
-      setFaceLoginError(error?.message || 'Unable to access camera.');
-    } finally {
-      setFaceCameraLoading(false);
-    }
-  };
-
-  const openFaceLogin = () => {
-    setFaceLoginEmail(email || '');
-    setFaceLoginError('');
-    setFaceLoginOpen(true);
-  };
-
-  const closeFaceLogin = () => {
-    stopFaceCamera();
-    setFaceLoginOpen(false);
-    setFaceLoginLoading(false);
-    setFaceLoginError('');
-  };
-
-  const submitFaceLogin = async () => {
-    const targetEmail = String(faceLoginEmail || '').trim().toLowerCase();
-    if (!targetEmail) {
-      setFaceLoginError('Enter your registered email first.');
-      return;
-    }
-    if (!faceCameraReady) {
-      setFaceLoginError('Start camera and face it clearly.');
-      return;
-    }
-
-    setFaceLoginLoading(true);
-    setFaceLoginError('');
-    try {
-      const { descriptor } = await extractFaceDescriptorFromVideo(faceVideoRef.current);
-      const stored = getStoredFaceLoginData();
-      if (!stored?.descriptor || !stored?.email) {
-        throw new Error('No face registered on this device. Register your face in the Face Auth settings first.');
-      }
-      if (stored.email.toLowerCase() !== targetEmail) {
-        throw new Error('Face does not match this email. Register this email for face auth in settings.');
-      }
-      const dist = faceDistance(descriptor, stored.descriptor);
-      if (dist > 0.52) {
-        throw new Error('Face does not match. Please try again or use password login.');
-      }
-
-      await supabase.auth.signOut();
-      const { error: otpError } = await supabase.auth.signInWithOtp({
-        email: targetEmail,
-        options: { shouldCreateUser: false },
-      });
-      if (otpError) throw otpError;
-
-      closeFaceLogin();
-      setFaceLoginEmail('');
-      setToast({
-        show: true,
-        message: 'Face verified! Check your email for the login link.',
-        type: 'success',
-      });
-    } catch (error) {
-      setFaceLoginError(error?.message || 'Face login failed. Please try again.');
-    } finally {
-      setFaceLoginLoading(false);
-    }
-  };
 
   const applyPendingAvatarIfAny = async (userId, userEmail) => {
     if (!userId || !userEmail) return null;
@@ -334,10 +236,10 @@ const Login = () => {
         .eq('key', 'login_email_otp_enabled')
         .maybeSingle();
       if (error) throw error;
-      return data?.value !== 'false';
+      return data?.value === 'true';
     } catch (error) {
-      logWarn({ message: 'Login OTP setting check failed, defaulting to enabled:', source: 'Login', details: error?.message || error })
-      return true;
+      logWarn({ message: 'Login OTP setting check failed, defaulting to disabled:', source: 'Login', details: error?.message || error })
+      return false;
     }
   };
 
@@ -426,22 +328,6 @@ const Login = () => {
     return { allowed: false, message: 'Could not validate active session. Please try again.' };
   };
 
-  const loadFaceSettingsForLogin = async (userProfile) => {
-    const fallback = getFaceAuthSettings(userProfile);
-    if (!userProfile?.id) return fallback;
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('face_auth_enabled, face_mfa_enabled, face_image_url, face_registered_at')
-        .eq('id', userProfile.id)
-        .maybeSingle();
-      if (error) throw error;
-      return getFaceAuthSettings({ ...userProfile, ...(data || {}) });
-    } catch {
-      return fallback;
-    }
-  };
-
   const routeGoogleUser = async (oauthUser) => {
     let { data: profile } = await supabase
       .from('profiles')
@@ -449,17 +335,27 @@ const Login = () => {
       .eq('id', oauthUser.id)
       .maybeSingle();
 
-    if (!profile || !isProfileComplete(profile)) {
+    if (!profile || (profile.role !== 'admin' && !isProfileComplete(profile))) {
+      if (profile?.role === 'admin') {
+        navigate('/app', { replace: true });
+        return;
+      }
       setGoogleSigningIn(false);
       setProcessingOAuth(false);
       navigate('/complete-profile', { replace: true });
       return;
     }
 
-    const sessionCheck = await withTimeout(
-      ensureSingleActiveSession(oauthUser.id, profile),
-      { allowed: true, message: '' }
-    );
+    let sessionCheck;
+    try {
+      sessionCheck = await withTimeout(
+        ensureSingleActiveSession(oauthUser.id, profile),
+        { allowed: true, message: '' }
+      );
+    } catch {
+      logWarn({ message: 'ensureSingleActiveSession threw (OAuth)', source: 'Login', details: null });
+      sessionCheck = { allowed: true, message: '' };
+    }
     if (!sessionCheck.allowed) {
       await supabase.auth.signOut();
       setGoogleSigningIn(false);
@@ -590,7 +486,11 @@ const Login = () => {
                 .eq('id', session.user.id)
                 .maybeSingle();
 
-              if (!profile || !isProfileComplete(profile)) {
+              if (!profile || (profile.role !== 'admin' && !isProfileComplete(profile))) {
+                if (profile?.role === 'admin') {
+                  await routeGoogleUser(session.user);
+                  return;
+                }
                 setProcessingOAuth(false);
                 setGoogleSigningIn(false);
                 navigate('/complete-profile', { replace: true });
@@ -891,7 +791,13 @@ const Login = () => {
       clearFaceMfaVerified(signInData.user.id);
 
       // Check for admin role and MFA
-      const sessionCheck = await ensureSingleActiveSession(signInData.user.id, userProfile);
+      let sessionCheck;
+      try {
+        sessionCheck = await ensureSingleActiveSession(signInData.user.id, userProfile);
+      } catch {
+        logWarn({ message: 'ensureSingleActiveSession threw', source: 'Login', details: null });
+        sessionCheck = { allowed: true, message: '' };
+      }
       if (!sessionCheck.allowed) {
         await supabase.auth.signOut();
         setInlineNotice(sessionCheck.message || 'Login blocked. Account is active on another device.');
@@ -901,21 +807,19 @@ const Login = () => {
 
       if (userProfile.role === 'admin') {
         clearAdminVerificationState();
-        const faceSettings = await loadFaceSettingsForLogin(userProfile);
         setLoggingIn(false);
         setToast({
           show: true,
           message: sessionCheck.message || 'Logged in successfully!',
           type: 'success'
         });
-        navigate(faceSettings.mfaEnabled ? '/face-verify' : '/admin-auth-choice', {
+        navigate('/admin-auth-choice', {
           state: { next: '/admin-auth-choice' }
         });
         return;
       }
 
       // Account is active, proceed to app
-      const faceSettings = await loadFaceSettingsForLogin(userProfile);
       setLoggingIn(false);
       setToast({
         show: true,
@@ -923,7 +827,7 @@ const Login = () => {
         type: 'success'
       });
       setInlineNotice('');
-      navigate(faceSettings.mfaEnabled ? '/face-verify' : '/app', {
+      navigate('/app', {
         state: { next: '/app' }
       });
     } catch (error) {
@@ -931,7 +835,7 @@ const Login = () => {
       setAlertModal({
         show: true,
         title: 'Error',
-        message: 'Failed to login. Please try again.',
+        message: error?.message || 'Failed to login. Please try again.',
         type: 'error'
       });
       setLoggingIn(false);
@@ -1228,14 +1132,6 @@ const Login = () => {
             {googleSigningIn ? 'Connecting...' : 'Continue with Google'}
           </button>
 
-          <button
-            type="button"
-            onClick={openFaceLogin}
-            className="mt-3 inline-flex w-full items-center justify-center gap-3 rounded-xl border border-cyan-200 bg-cyan-50 px-4 py-3 font-semibold text-cyan-800 shadow-sm transition hover:bg-cyan-100"
-          >
-            <Camera size={18} />
-            Login with Face
-          </button>
         </div>
 
         <div className="mt-5 grid gap-3 sm:grid-cols-2">
@@ -1305,70 +1201,7 @@ const Login = () => {
         </div>
       )}
 
-      {faceLoginOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-          <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-cyan-100">
-                  <Camera className="text-cyan-600" size={20} />
-                </div>
-                <h3 className="text-lg font-bold text-slate-900">Login with Face</h3>
-              </div>
-              <button
-                type="button"
-                onClick={closeFaceLogin}
-                className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-              >
-                <X size={20} />
-              </button>
-            </div>
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="mb-1 block text-xs font-semibold text-slate-600">Email</label>
-                <input
-                  type="email"
-                  placeholder="Enter your registered email"
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 focus:border-cyan-300 focus:outline-none focus:ring-2 focus:ring-cyan-200"
-                  value={faceLoginEmail}
-                  onChange={(e) => setFaceLoginEmail(e.target.value)}
-                />
-              </div>
-              {!faceCameraReady ? (
-                <button
-                  type="button"
-                  onClick={startFaceCamera}
-                  disabled={faceCameraLoading || faceLoginLoading}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-cyan-600 px-4 py-3 font-semibold text-white hover:bg-cyan-700 disabled:opacity-60"
-                >
-                  <Camera size={18} />
-                  {faceCameraLoading ? 'Starting Camera...' : 'Start Camera'}
-                </button>
-              ) : (
-                <div className="overflow-hidden rounded-xl bg-slate-950">
-                  <video ref={faceVideoRef} autoPlay muted playsInline className="h-64 w-full object-cover" />
-                </div>
-              )}
-              {faceLoginError ? (
-                <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">
-                  {faceLoginError}
-                </div>
-              ) : null}
-              {faceCameraReady ? (
-                <button
-                  type="button"
-                  onClick={submitFaceLogin}
-                  disabled={faceLoginLoading}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
-                >
-                  <UserCheck size={18} />
-                  {faceLoginLoading ? 'Checking Face...' : 'Login with Face'}
-                </button>
-              ) : null}
-            </div>
-          </div>
-        </div>
-      ) : null}
+
     </>
   );
 };

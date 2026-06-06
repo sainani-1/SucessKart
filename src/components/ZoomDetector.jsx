@@ -62,7 +62,7 @@ const ZoomDetector = () => {
     } catch {}
   };
 
-  if (dismissed || zoom <= 80 || stableHighCount < 2) return null;
+  if (dismissed || zoom <= 120 || stableHighCount < 3) return null;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pointer-events-none">
@@ -73,7 +73,7 @@ const ZoomDetector = () => {
         <div>
           <h2 className="text-xl font-bold text-slate-800">Zoom Too High</h2>
           <p className="mt-2 text-sm text-slate-500">
-            Current zoom: <span className="font-semibold text-red-600">{zoom}%</span>. For best experience, set zoom to 80% or lower.
+            Current zoom: <span className="font-semibold text-red-600">{zoom}%</span>. For best experience, set zoom to 120% or lower.
           </p>
         </div>
         <button

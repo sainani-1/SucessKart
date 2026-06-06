@@ -285,7 +285,7 @@ Deno.serve(async (req: Request) => {
     ? LIFETIME_PREMIUM_DATE
     : addMonthsFrom(profile.premium_until, selectedPlanMonths);
 
-  if (configuredGatewayMode !== "skillpro_upi" && discount.finalAmount <= 0) {
+    if (configuredGatewayMode !== "skillpro_upi" && discount.finalAmount <= 0 && configuredGatewayMode !== "skillpro_upi") {
     const { data: payment, error: paymentError } = await adminClient
       .from("payments")
       .insert({
@@ -396,7 +396,7 @@ Deno.serve(async (req: Request) => {
       .insert({
         user_id: user.id,
         plan_code: selectedPlanCode,
-        gateway: "coupon",
+        gateway: "skillpro_upi",
         status: requestStatus,
         base_amount: baseAmount,
         discount_amount: discount.discountAmount,

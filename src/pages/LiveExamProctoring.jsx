@@ -456,6 +456,7 @@ export default function LiveExamProctoring({ forcedPanel = '' }) {
     title: '',
     startsAt: '',
     durationMinutes: 60,
+    prepTime: 5,
     repeatDaily: false,
     repeatUntil: '',
     useTodayToWindow: true,
@@ -1782,6 +1783,7 @@ export default function LiveExamProctoring({ forcedPanel = '' }) {
             title: buildSlotTitle(createForm.title, examLabel, occurrenceStart),
             starts_at: occurrenceStartIso,
             ends_at: occurrenceEndIso,
+            prep_time_minutes: Number(createForm.prepTime || 5),
             max_capacity: Number(createForm.maxCapacity || 1),
             notes: createForm.notes || null,
             monitor_room_name: roomNameForSlot(null, exam),
@@ -1845,6 +1847,7 @@ export default function LiveExamProctoring({ forcedPanel = '' }) {
       title: slot.title || '',
       startsAt,
       durationMinutes,
+      prepTime: (slot.prep_time_minutes != null && !isNaN(Number(slot.prep_time_minutes))) ? Number(slot.prep_time_minutes) : 5,
       repeatDaily: false,
       repeatUntil: '',
       useTodayToWindow: true,
@@ -1882,6 +1885,7 @@ export default function LiveExamProctoring({ forcedPanel = '' }) {
           title: buildSlotTitle(createForm.title, examLabel, createForm.startsAt),
           starts_at: startsAtIso,
           ends_at: endsAtIso,
+          prep_time_minutes: Number(createForm.prepTime || 5),
           max_capacity: Number(createForm.maxCapacity || 1),
           notes: createForm.notes || null,
           updated_at: nowIso(),
@@ -2167,7 +2171,12 @@ export default function LiveExamProctoring({ forcedPanel = '' }) {
       }
       setStudentSelectedDate(toLocalDateInputValue(slot.starts_at));
       setStudentCalendarMonth(getMonthStart(slot.starts_at));
-      setInfo(notificationsSent ? 'Exam slot booked successfully.' : 'Exam slot booked successfully. Notifications will need admin-side RLS access to send.');
+      const prepTime = (slot.prep_time_minutes != null && !isNaN(Number(slot.prep_time_minutes))) ? Number(slot.prep_time_minutes) : 5;
+      const deadline = new Date(new Date(slot.starts_at).getTime() + prepTime * 60000);
+      void showPopupMessage(
+        'Exam Booked Successfully',
+        `Your slot for ${getExamDisplayName(exam, coursesById[exam?.course_id])} is confirmed for ${formatDateTime(slot.starts_at)}.\n\nPlease open this page at least ${prepTime} minutes before the exam start time and be ready with your camera and microphone. If you do not join within ${prepTime} minutes of the scheduled start, your exam slot will be marked as timed out.`
+      );
       await loadData({ silent: true });
     } catch (actionError) {
       setError(actionError.message || 'Failed to book slot.');
@@ -3393,6 +3402,7 @@ export default function LiveExamProctoring({ forcedPanel = '' }) {
               <label className="space-y-1 text-sm"><span className="font-medium text-slate-700">Slot Title</span><input value={createForm.title} onChange={(event) => setCreateForm((prev) => ({ ...prev, title: event.target.value }))} className="w-full rounded-xl border border-slate-300 px-3 py-2" placeholder="Example: Morning Slot 10:00 AM" /></label>
               <label className="space-y-1 text-sm"><span className="font-medium text-slate-700">Slot Start Time</span><input type="datetime-local" value={createForm.startsAt} onChange={(event) => setCreateForm((prev) => ({ ...prev, startsAt: event.target.value }))} className="w-full rounded-xl border border-slate-300 px-3 py-2" /></label>
               <label className="space-y-1 text-sm"><span className="font-medium text-slate-700">Duration (minutes)</span><input type="number" min="15" value={createForm.durationMinutes} onChange={(event) => setCreateForm((prev) => ({ ...prev, durationMinutes: event.target.value }))} className="w-full rounded-xl border border-slate-300 px-3 py-2" /></label>
+              <label className="space-y-1 text-sm"><span className="font-medium text-slate-700">Join Deadline (minutes after start)</span><input type="number" min="1" value={createForm.prepTime} onChange={(event) => setCreateForm((prev) => ({ ...prev, prepTime: event.target.value }))} className="w-full rounded-xl border border-slate-300 px-3 py-2" /><p className="text-xs text-slate-500">Students must join within this many minutes after the slot start time, or the exam will show as timed out. Default: 5 minutes.</p></label>
               <div className="space-y-2 text-sm">
                 <label className="flex items-center gap-2 text-slate-700">
                   <input

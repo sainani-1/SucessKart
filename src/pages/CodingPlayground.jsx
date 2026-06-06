@@ -46,26 +46,6 @@ const CodingPlayground = () => {
   const [history, setHistory] = useState([]);
   const premiumPlusAccess = isPremiumPlus(profile);
 
-  if (profile?.role === 'student' && !premiumPlusAccess) {
-    return (
-      <div className="mx-auto max-w-2xl rounded-3xl border border-emerald-200 bg-white p-8 text-center shadow-sm">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
-          <Code2 size={24} />
-        </div>
-        <h1 className="mt-4 text-2xl font-bold text-slate-900">Premium Plus Required</h1>
-        <p className="mt-3 text-sm text-slate-600">
-          Coding Playground is available only in Premium Plus.
-        </p>
-        <a
-          href={buildPlanCheckoutPath('premium_plus')}
-          className="mt-5 inline-flex rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-700"
-        >
-          Buy Premium Plus
-        </a>
-      </div>
-    );
-  }
-
   const loadHistory = async () => {
     if (!actorId) return;
     const { data, error } = await supabase
@@ -85,6 +65,26 @@ const CodingPlayground = () => {
       setHistory([]);
     });
   }, [actorId]);
+
+  if (profile?.role === 'student' && !premiumPlusAccess) {
+    return (
+      <div className="mx-auto max-w-2xl rounded-3xl border border-emerald-200 bg-white p-8 text-center shadow-sm">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+          <Code2 size={24} />
+        </div>
+        <h1 className="mt-4 text-2xl font-bold text-slate-900">Premium Plus Required</h1>
+        <p className="mt-3 text-sm text-slate-600">
+          Coding Playground is available only in Premium Plus.
+        </p>
+        <a
+          href={buildPlanCheckoutPath('premium_plus')}
+          className="mt-5 inline-flex rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-700"
+        >
+          Buy Premium Plus
+        </a>
+      </div>
+    );
+  }
 
   const handleLanguageChange = (nextLanguage) => {
     setLanguage(nextLanguage);

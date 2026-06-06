@@ -28,26 +28,6 @@ const DiscussionForum = () => {
   const [search, setSearch] = useState('');
   const premiumPlusAccess = isPremiumPlus(profile);
 
-  if (profile?.role === 'student' && !premiumPlusAccess) {
-    return (
-      <div className="mx-auto max-w-2xl rounded-3xl border border-indigo-200 bg-white p-8 text-center shadow-sm">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-indigo-100 text-indigo-700">
-          <MessageSquare size={24} />
-        </div>
-        <h1 className="mt-4 text-2xl font-bold text-slate-900">Premium Plus Required</h1>
-        <p className="mt-3 text-sm text-slate-600">
-          Discussion Forum is available only in Premium Plus.
-        </p>
-        <a
-          href={buildPlanCheckoutPath('premium_plus')}
-          className="mt-5 inline-flex rounded-xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white hover:bg-indigo-700"
-        >
-          Buy Premium Plus
-        </a>
-      </div>
-    );
-  }
-
   const loadVotes = async () => {
     if (!profile?.id) return;
     const { data } = await supabase.from('discussion_votes').select('post_id, answer_id').eq('user_id', profile.id);
@@ -115,6 +95,26 @@ const DiscussionForum = () => {
       supabase.removeChannel(channel);
     };
   }, [profile?.id, selectedPostId]);
+
+  if (profile?.role === 'student' && !premiumPlusAccess) {
+    return (
+      <div className="mx-auto max-w-2xl rounded-3xl border border-indigo-200 bg-white p-8 text-center shadow-sm">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-indigo-100 text-indigo-700">
+          <MessageSquare size={24} />
+        </div>
+        <h1 className="mt-4 text-2xl font-bold text-slate-900">Premium Plus Required</h1>
+        <p className="mt-3 text-sm text-slate-600">
+          Discussion Forum is available only in Premium Plus.
+        </p>
+        <a
+          href={buildPlanCheckoutPath('premium_plus')}
+          className="mt-5 inline-flex rounded-xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white hover:bg-indigo-700"
+        >
+          Buy Premium Plus
+        </a>
+      </div>
+    );
+  }
 
   const selectedPost = posts.find((item) => item.id === selectedPostId) || null;
   const visiblePosts = posts.filter((post) => {

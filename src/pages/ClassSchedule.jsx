@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, Plus, Clock, Video, ExternalLink, Trash2, X } from 'lucide-react';
+import { Calendar, Plus, Clock, Video, ExternalLink, Trash2, X, Link } from 'lucide-react';
 import AlertModal from '../components/AlertModal';
 import { sendAdminNotification } from '../utils/adminNotifications';
 import { logError } from '../utils/errorLogger';
@@ -46,6 +46,8 @@ const ClassSchedule = ({
   const [alertModal, setAlertModal] = useState({ show: false, title: '', message: '', type: 'info' });
   const [deleteModal, setDeleteModal] = useState({ show: false, sessionId: null, sessionTitle: '' });
   const [endModal, setEndModal] = useState({ show: false, sessionId: null, sessionTitle: '' });
+  const [linkModal, setLinkModal] = useState({ show: false, sessionId: null, sessionTitle: '', currentLink: '' });
+  const [newMeetingLink, setNewMeetingLink] = useState('');
   const [joiningSessionId, setJoiningSessionId] = useState(null);
   const [creatingSession, setCreatingSession] = useState(false);
   const [nowTick, setNowTick] = useState(Date.now());
@@ -360,6 +362,24 @@ const ClassSchedule = ({
         type: 'error'
       });
     }
+  };
+
+  const handleUpdateMeetingLink = async () => {
+    const sessionId = linkModal.sessionId;
+    const link = newMeetingLink.trim();
+    if (!link) {
+      setAlertModal({ show: true, title: 'Missing Link', message: 'Please enter a meeting link.', type: 'warning' });
+      return;
+    }
+    const { error } = await supabase.from('class_sessions').update({ meeting_link: link }).eq('id', sessionId);
+    if (error) {
+      setAlertModal({ show: true, title: 'Error', message: 'Failed to update meeting link.', type: 'error' });
+    } else {
+      setAlertModal({ show: true, title: 'Success', message: 'Meeting link updated successfully.', type: 'success' });
+      loadSessions();
+    }
+    setLinkModal({ show: false, sessionId: null, sessionTitle: '', currentLink: '' });
+    setNewMeetingLink('');
   };
 
   const createSession = async () => {
@@ -1060,6 +1080,19 @@ const ClassSchedule = ({
                     End
                   </button>
                 )}
+                {profile.role === 'admin' && (
+                  <button
+                    onClick={() => {
+                      setNewMeetingLink(session.meeting_link || '');
+                      setLinkModal({ show: true, sessionId: session.id, sessionTitle: session.title, currentLink: session.meeting_link || '' });
+                    }}
+                    className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-emerald-700 transition"
+                    title={session.meeting_link ? 'Edit Meeting Link' : 'Add Meeting Link'}
+                  >
+                    <Link size={16} className="mr-1" />
+                    {session.meeting_link ? 'Edit Link' : 'Add Link'}
+                  </button>
+                )}
                 {(profile.role === 'teacher' || profile.role === 'admin') && (
                   <button
                     onClick={() => setDeleteModal({ show: true, sessionId: session.id, sessionTitle: session.title })}
@@ -1198,6 +1231,36 @@ const ClassSchedule = ({
                 className="flex-1 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 font-medium transition"
               >
                 End Session
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {linkModal.show && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl">
+            <h3 className="text-lg font-bold text-gray-900 mb-2">{linkModal.currentLink ? 'Edit' : 'Add'} Meeting Link</h3>
+            <p className="text-sm text-gray-600 mb-4">{linkModal.sessionTitle}</p>
+            <input
+              type="url"
+              value={newMeetingLink}
+              onChange={(e) => setNewMeetingLink(e.target.value)}
+              placeholder="https://zoom.us/j/... or Google Meet link"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+            />
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => { setLinkModal({ show: false, sessionId: null, sessionTitle: '', currentLink: '' }); setNewMeetingLink(''); }}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleUpdateMeetingLink}
+                className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium transition"
+              >
+                Save Link
               </button>
             </div>
           </div>

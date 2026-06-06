@@ -391,11 +391,14 @@ const UserManagementPage = () => {
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        {u.is_locked ? (
-                          <span className="text-xs text-red-600 font-semibold">Locked{u.locked_until ? ` until ${new Date(u.locked_until).toLocaleDateString()}` : ''}</span>
-                        ) : (
-                          <span className="text-xs text-green-600 font-semibold">Active</span>
-                        )}
+                        {(() => {
+                          const effectivelyLocked = u.is_locked && u.locked_until && (new Date(u.locked_until) > new Date() || u.locked_until >= '9999-12-31');
+                          return effectivelyLocked ? (
+                            <span className="text-xs text-red-600 font-semibold">Locked until {new Date(u.locked_until).toLocaleDateString()}</span>
+                          ) : (
+                            <span className="text-xs text-green-600 font-semibold">Active</span>
+                          );
+                        })()}
                       </td>
                       <td className="px-4 py-3">
                         {!u.auth_user_id ? (

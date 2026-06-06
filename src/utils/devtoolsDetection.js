@@ -11,7 +11,7 @@ const getViewportZoom = () => {
   return 1;
 };
 
-export const hasDevToolsSizeSignal = () => {
+const checkSizeSignal = () => {
   if (typeof window === 'undefined') return false;
 
   const zoom = getViewportZoom();
@@ -29,5 +29,49 @@ export const hasDevToolsSizeSignal = () => {
   return widthLooksLikeDockedDevTools || heightLooksLikeDockedDevTools;
 };
 
-export const isLikelyDevToolsOpen = hasDevToolsSizeSignal;
+// Detect DevTools via debugger statement timing
+const checkDebuggerSignal = () => {
+  const start = performance.now();
+  debugger;
+  const elapsed = performance.now() - start;
+  return elapsed > 100;
+};
+
+// Detect DevTools via console.log timing (DevTools slows console operations)
+const checkConsoleSignal = () => {
+  const start = performance.now();
+  for (let i = 0; i < 100; i++) {
+    console.log(i);
+    console.clear();
+  }
+  const elapsed = performance.now() - start;
+  return elapsed > 200;
+};
+
+let cachedResult = null;
+let cacheTime = 0;
+const CACHE_TTL = 2000;
+
+export const hasDevToolsSizeSignal = () => {
+  if (cachedResult !== null && Date.now() - cacheTime < CACHE_TTL) {
+    return cachedResult;
+  }
+  cachedResult = checkSizeSignal();
+  cacheTime = Date.now();
+  return cachedResult;
+};
+
+export const isLikelyDevToolsOpen = () => {
+  if (cachedResult !== null && Date.now() - cacheTime < CACHE_TTL) {
+    return cachedResult;
+  }
+  const sizeSignal = checkSizeSignal();
+  const debuggerSignal = checkDebuggerSignal();
+  const consoleSignal = checkConsoleSignal();
+  const result = sizeSignal || debuggerSignal || consoleSignal;
+  cachedResult = result;
+  cacheTime = Date.now();
+  return result;
+};
+
 export const isDeveloperToolsDetected = isLikelyDevToolsOpen;

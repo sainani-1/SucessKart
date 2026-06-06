@@ -69,55 +69,6 @@ const ChatWithTeacher = () => {
     return <span className="text-slate-400 text-[9px] ml-1">✓✓</span>;
   };
 
-  if (profile?.role === 'student' && !premiumAccess) {
-    return (
-      <div className="mx-auto max-w-2xl rounded-3xl border border-amber-200 bg-white p-8 text-center shadow-sm">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-amber-100 text-amber-700">
-          <MessageCircle size={24} />
-        </div>
-        <h1 className="mt-4 text-2xl font-bold text-slate-900">Premium Plus Required</h1>
-        <p className="mt-3 text-sm text-slate-600">Ask a Doubt is available only for Premium Plus students.</p>
-        <button type="button" onClick={() => navigate(buildPlanCheckoutPath('premium_plus'))}
-          className="mt-5 rounded-xl bg-amber-500 px-5 py-3 text-sm font-semibold text-white hover:bg-amber-600">
-          Upgrade to Premium Plus
-        </button>
-      </div>
-    );
-  }
-
-  useEffect(() => {
-    if (!profile?.id) return;
-    setMessages([]);
-    setGroupId(null);
-    setTeacher(null);
-    setError(null);
-    initChat();
-  }, [profile?.id, profile?.assigned_teacher_id]);
-
-  useEffect(() => {
-    if (!groupId) return;
-    autoLoadRef.current = 0;
-    loadMessages();
-  }, [groupId]);
-
-  // Poll every 3s for live updates
-  useEffect(() => {
-    if (!groupId || !profile?.id) return;
-    loadMessages();
-    const interval = setInterval(() => loadNewMessagesOnly(), 3000);
-    return () => clearInterval(interval);
-  }, [groupId, profile?.id]);
-
-  useEffect(() => {
-    if (!groupId || !profile?.id) return;
-    const interval = setInterval(() => loadReceiverReadState(groupId), 30000);
-    return () => clearInterval(interval);
-  }, [groupId, profile?.id, teacher?.id]);
-
-  useEffect(() => {
-    return () => { if (groupId) void markChatAsRead(profile?.id, groupId); };
-  }, [groupId]);
-
   const initChat = async () => {
     if (!profile?.assigned_teacher_id) return;
     try {
@@ -160,6 +111,22 @@ const ChatWithTeacher = () => {
       setError('Failed to load chat. Please refresh the page.');
     }
   };
+
+  if (profile?.role === 'student' && !premiumAccess) {
+    return (
+      <div className="mx-auto max-w-2xl rounded-3xl border border-amber-200 bg-white p-8 text-center shadow-sm">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+          <MessageCircle size={24} />
+        </div>
+        <h1 className="mt-4 text-2xl font-bold text-slate-900">Premium Plus Required</h1>
+        <p className="mt-3 text-sm text-slate-600">Ask a Doubt is available only for Premium Plus students.</p>
+        <button type="button" onClick={() => navigate(buildPlanCheckoutPath('premium_plus'))}
+          className="mt-5 rounded-xl bg-amber-500 px-5 py-3 text-sm font-semibold text-white hover:bg-amber-600">
+          Upgrade to Premium Plus
+        </button>
+      </div>
+    );
+  }
 
   const loadMessages = async () => {
     if (!groupId) return;

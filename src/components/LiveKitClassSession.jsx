@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   LiveKitRoom,
   ParticipantTile,
@@ -1474,6 +1474,43 @@ const ClassroomLayout = ({ sessionId, currentRole, currentUserProfile, classSess
   const speakingLocked = audioRestricted || !isSpeakingAllowed;
   const breakout = controls?.breakout && typeof controls.breakout === 'object' ? controls.breakout : { active: false, rooms: [] };
 
+  const loadEngagement = useCallback(async () => {
+    const [
+      { data: pollRows },
+      { data: pollVoteRows },
+      { data: questionRows },
+      { data: questionVoteRows },
+      { data: attendanceRows },
+      { data: statsRows },
+      { data: recordingRows },
+    ] = await Promise.all([
+      supabase.from('class_session_live_polls').select('*').eq('session_id', sessionId).order('created_at', { ascending: false }),
+      supabase.from('class_session_live_poll_votes').select('*').eq('session_id', sessionId).order('created_at', { ascending: false }),
+      supabase
+        .from('class_session_live_questions')
+        .select('*')
+        .eq('session_id', sessionId)
+        .order('is_pinned', { ascending: false })
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('class_session_live_question_votes')
+        .select('*')
+        .eq('session_id', sessionId)
+        .order('created_at', { ascending: false }),
+      supabase.from('class_attendance').select('id, student_id, join_time, leave_time, live_minutes, attended').eq('session_id', sessionId),
+      supabase.from('class_session_live_participant_stats').select('*').eq('session_id', sessionId).order('updated_at', { ascending: false }),
+      supabase.from('class_session_recordings').select('*').eq('session_id', sessionId).order('created_at', { ascending: false }),
+    ]);
+
+    setPolls(pollRows || []);
+    setPollVotes(pollVoteRows || []);
+    setQuestions(questionRows || []);
+    setQuestionVotes(questionVoteRows || []);
+    setAttendanceEntries(attendanceRows || []);
+    setParticipantStats(statsRows || []);
+    setRecordings(recordingRows || []);
+  }, [sessionId, setPolls, setPollVotes, setQuestions, setQuestionVotes, setAttendanceEntries, setParticipantStats, setRecordings]);
+
   useEffect(() => {
     setCollabState((current) => ({
       ...current,
@@ -1777,45 +1814,13 @@ const ClassroomLayout = ({ sessionId, currentRole, currentUserProfile, classSess
     if (!sessionId || !currentUserProfile?.id) return undefined;
 
     let active = true;
-    const loadEngagement = async () => {
-      const [
-        { data: pollRows },
-        { data: pollVoteRows },
-        { data: questionRows },
-        { data: questionVoteRows },
-        { data: attendanceRows },
-        { data: statsRows },
-        { data: recordingRows },
-      ] = await Promise.all([
-        supabase.from('class_session_live_polls').select('*').eq('session_id', sessionId).order('created_at', { ascending: false }),
-        supabase.from('class_session_live_poll_votes').select('*').eq('session_id', sessionId).order('created_at', { ascending: false }),
-        supabase
-          .from('class_session_live_questions')
-          .select('*')
-          .eq('session_id', sessionId)
-          .order('is_pinned', { ascending: false })
-          .order('created_at', { ascending: false }),
-        supabase
-          .from('class_session_live_question_votes')
-          .select('*')
-          .eq('session_id', sessionId)
-          .order('created_at', { ascending: false }),
-        supabase.from('class_attendance').select('id, student_id, join_time, leave_time, live_minutes, attended').eq('session_id', sessionId),
-        supabase.from('class_session_live_participant_stats').select('*').eq('session_id', sessionId).order('updated_at', { ascending: false }),
-        supabase.from('class_session_recordings').select('*').eq('session_id', sessionId).order('created_at', { ascending: false }),
-      ]);
 
+    const loadAndCheck = async () => {
       if (!active) return;
-      setPolls(pollRows || []);
-      setPollVotes(pollVoteRows || []);
-      setQuestions(questionRows || []);
-      setQuestionVotes(questionVoteRows || []);
-      setAttendanceEntries(attendanceRows || []);
-      setParticipantStats(statsRows || []);
-      setRecordings(recordingRows || []);
+      await loadEngagement();
     };
 
-    loadEngagement();
+    loadAndCheck();
 
     const channel = supabase
       .channel(`class-live-engagement-${sessionId}`)
@@ -1832,7 +1837,7 @@ const ClassroomLayout = ({ sessionId, currentRole, currentUserProfile, classSess
       active = false;
       supabase.removeChannel(channel);
     };
-  }, [sessionId, currentUserProfile?.id]);
+  }, [sessionId, currentUserProfile?.id, loadEngagement]);
 
   useEffect(() => {
     if (!sessionId || !currentUserProfile?.id) return undefined;

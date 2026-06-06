@@ -577,14 +577,6 @@ const Sidebar = ({ isMobile = false, mobileOpen = false, onClose = () => {}, onR
                   <Sparkles size={28} />
                   {shouldShowText && <span className="truncate text-sm font-medium">Timeline</span>}
                 </NavLink>
-                <NavLink to="/app/course-doubt-helper" className={navItemClass} title="Course Doubt Helper">
-                  <MessageCircle size={28} />
-                  {shouldShowText && <span className="truncate text-sm font-medium">Doubt Helper</span>}
-                </NavLink>
-                <NavLink to="/app/leaderboard" className={navItemClass} title="Learning Leaderboard">
-                  <Trophy size={28} />
-                  {shouldShowText && <span className="truncate text-sm font-medium">Leaderboard</span>}
-                </NavLink>
               </>
             )}
 
@@ -938,6 +930,14 @@ const Sidebar = ({ isMobile = false, mobileOpen = false, onClose = () => {}, onR
                 </span>
               )}
             </NavLink>
+            <NavLink to="/app/admin/tried-to-register" className={navItemClass} title="Tried to Register">
+              <UserPlus size={28} />
+              {shouldShowText && <span className="truncate text-sm font-medium">Tried to Register</span>}
+            </NavLink>
+            <NavLink to="/app/admin/user-tools" className={navItemClass} title="Add/Remove">
+              <UserPlus size={28} />
+              {shouldShowText && <span className="truncate text-sm font-medium">Add/Remove</span>}
+            </NavLink>
             <NavLink to="/app/admin/usernames" className={navItemClass} title="Usernames">
               <User size={28} />
               {shouldShowText && <span className="truncate text-sm font-medium">Usernames</span>}
@@ -1197,11 +1197,6 @@ const Sidebar = ({ isMobile = false, mobileOpen = false, onClose = () => {}, onR
             {/* Send Gift - Admin only (single entry) */}
           </>
         )}
-
-        <NavLink to="/app/face-auth" className={navItemClass} title="Face Auth">
-          <ShieldCheck size={28} />
-          {shouldShowText && <span className="truncate text-sm font-medium">Face Auth</span>}
-        </NavLink>
 
         {role !== 'instructor' ? (
           <NavLink to="/app/settings" className={navItemClass} title="Settings">

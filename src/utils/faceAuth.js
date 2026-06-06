@@ -87,8 +87,10 @@ const readLocalSettings = (userId) => {
 };
 
 const writeLocalSettings = (userId, settings) => {
+  const safe = { ...settings };
+  delete safe.descriptor;
   try {
-    localStorage.setItem(localKey(userId), JSON.stringify(settings));
+    localStorage.setItem(localKey(userId), JSON.stringify(safe));
   } catch {
     // Local fallback is best-effort.
   }
@@ -101,7 +103,7 @@ export const getFaceAuthSettings = (profile) => {
     enabled: Boolean(profile.face_auth_enabled ?? local.enabled),
     mfaEnabled: Boolean(profile.face_mfa_enabled ?? local.mfaEnabled),
     imageUrl: profile.face_image_url || local.imageUrl || '',
-    descriptor: profile.face_descriptor || local.descriptor || null,
+    descriptor: profile.face_descriptor || null,
     registeredAt: profile.face_registered_at || local.registeredAt || null,
   };
 };
@@ -118,7 +120,9 @@ export const isFaceMfaVerified = (userId) => {
 export const getStoredFaceLoginData = () => {
   try {
     const raw = localStorage.getItem(loginDataKey);
-    return raw ? JSON.parse(raw) : null;
+    if (!raw) return null;
+    const decoded = decodeURIComponent(escape(atob(raw)));
+    return JSON.parse(decoded);
   } catch {
     return null;
   }
@@ -139,6 +143,14 @@ export const clearFaceMfaVerified = (userId) => {
     sessionStorage.removeItem(faceMfaSessionKey(userId));
   } catch {
     // Ignore storage failures.
+  }
+};
+
+export const clearFaceLoginData = () => {
+  try {
+    localStorage.removeItem(loginDataKey);
+  } catch {
+    // best-effort
   }
 };
 
@@ -168,18 +180,18 @@ export const saveFaceAuthSettings = async (profile, settings) => {
     enabled: payload.face_auth_enabled,
     mfaEnabled: payload.face_mfa_enabled,
     imageUrl: payload.face_image_url || '',
-    descriptor: payload.face_descriptor || null,
     registeredAt: payload.face_registered_at || null,
   };
   writeLocalSettings(profile.id, localPayload);
 
   if (settings.enabled && settings.descriptor) {
     try {
-      localStorage.setItem(loginDataKey, JSON.stringify({
+      const encoded = btoa(unescape(encodeURIComponent(JSON.stringify({
         email: profile.email || '',
         descriptor: settings.descriptor,
         enabled: true,
-      }));
+      }))));
+      localStorage.setItem(loginDataKey, encoded);
     } catch {
       // best-effort
     }

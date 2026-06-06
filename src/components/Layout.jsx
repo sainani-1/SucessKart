@@ -9,7 +9,6 @@ import Toast from './Toast';
 import { logAdminNavigation } from '../utils/adminActivityLogger';
 import { useNotifications } from '../context/NotificationContext';
 import { readBrowserState, writeBrowserState } from '../utils/browserState';
-import NotificationPermissionPopup from './NotificationPermissionPopup';
 import ChatOverlay from './ChatOverlay';
 import { logError } from '../utils/errorLogger';
 
@@ -46,17 +45,12 @@ const Layout = () => {
     typeof window !== 'undefined' ? window.innerWidth < 768 : false
   );
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const [notificationPrompt, setNotificationPrompt] = useState({ open: false, nextPath: null });
-  const [notificationPermissionStatus, setNotificationPermissionStatus] = useState(() =>
-    typeof window !== 'undefined' && 'Notification' in window ? window.Notification.permission : 'unsupported'
-  );
   // Sidebar width: 16rem (w-64) when open, 5rem (w-20) when collapsed
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => readBrowserState(SIDEBAR_COLLAPSED_KEY, false));
   const [toast, setToast] = useState({ show: false, message: '', type: 'info' });
   const [examReminderPopup, setExamReminderPopup] = useState({ open: false, title: '', message: '' });
   const seenRealtimeNotificationIdsRef = useRef(new Set());
   const seenActivityEventKeysRef = useRef(new Set());
-  const notificationPromptHandledRef = useRef(false);
   const isMissingTargetUserColumn = (err) => {
     const msg = String(err?.message || '').toLowerCase();
     const details = String(err?.details || '').toLowerCase();
@@ -104,7 +98,14 @@ const Layout = () => {
   }, []);
 
   useEffect(() => {
-    if (!location.pathname) return;
+    const saved = readBrowserState(LAST_OPENED_PAGE_KEY);
+    if (saved?.pathname && location.pathname === '/app' && saved.pathname !== '/app') {
+      navigate(saved.pathname, { replace: true });
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!location.pathname || location.pathname === '/app') return;
     writeBrowserState(LAST_OPENED_PAGE_KEY, {
       pathname: location.pathname,
       searchedAt: new Date().toISOString(),
@@ -157,7 +158,6 @@ const Layout = () => {
       { label: 'Attendance', path: '/app/attendance' },
       { label: 'Ask a Doubt', path: '/app/chat' },
       { label: 'Request Teacher', path: '/app/request-teacher' },
-      { label: 'Report Issue', path: '/app/report-issue' },
     ];
 
     const teacherTargets = [
@@ -183,7 +183,6 @@ const Layout = () => {
       { label: 'Apply Leave', path: '/app/leaves' },
       { label: 'Session Reassignments', path: '/app/session-reassignments' },
       { label: 'Student Requests', path: '/app/teacher-requests' },
-      { label: 'Report Issue', path: '/app/report-issue' },
     ];
 
     const adminTargets = [
@@ -290,61 +289,10 @@ const Layout = () => {
         .filter((item) => item.label.toLowerCase().includes(panelSearch.trim().toLowerCase()))
         .slice(0, 8);
 
-  const refreshNotificationPermissionStatus = useCallback(() => {
-    const nextStatus = typeof window !== 'undefined' && 'Notification' in window
-      ? window.Notification.permission
-      : 'unsupported';
-    setNotificationPermissionStatus(nextStatus);
-    return nextStatus;
-  }, []);
-
-  const shouldAskForNotifications = useCallback(() => {
-    if (notificationPromptHandledRef.current) return false;
-    const nextStatus = refreshNotificationPermissionStatus();
-    return nextStatus !== 'granted' && nextStatus !== 'unsupported';
-  }, [refreshNotificationPermissionStatus]);
-
   const requestPageSwitch = useCallback((path) => {
     if (!path || path === location.pathname) return;
-    if (shouldAskForNotifications()) {
-      setNotificationPrompt({ open: true, nextPath: path });
-      return;
-    }
     navigate(path);
-  }, [location.pathname, navigate, shouldAskForNotifications]);
-
-  const finishNotificationPrompt = useCallback((nextPath) => {
-    setNotificationPrompt({ open: false, nextPath: null });
-    if (nextPath) navigate(nextPath);
-  }, [navigate]);
-
-  const allowNotifications = useCallback(async () => {
-    const nextPath = notificationPrompt.nextPath;
-    notificationPromptHandledRef.current = true;
-    if (typeof window !== 'undefined' && 'Notification' in window) {
-      try {
-        await window.Notification.requestPermission();
-      } catch {
-        // Some browsers only allow this from a direct click; the user can try again.
-      }
-    }
-    refreshNotificationPermissionStatus();
-    finishNotificationPrompt(nextPath);
-  }, [finishNotificationPrompt, notificationPrompt.nextPath, refreshNotificationPermissionStatus]);
-
-  const skipNotifications = useCallback(() => {
-    notificationPromptHandledRef.current = true;
-    finishNotificationPrompt(notificationPrompt.nextPath);
-  }, [finishNotificationPrompt, notificationPrompt.nextPath]);
-
-  useEffect(() => {
-    if (!profile?.id || notificationPromptHandledRef.current) return;
-    if (shouldAskForNotifications()) {
-      setNotificationPrompt({ open: true, nextPath: null });
-    } else {
-      notificationPromptHandledRef.current = true;
-    }
-  }, [profile?.id, shouldAskForNotifications]);
+  }, [location.pathname, navigate]);
 
   const handlePanelTargetSelect = async (item) => {
     if (!item) return;
@@ -720,12 +668,6 @@ const Layout = () => {
         message={toast.message}
         type={toast.type}
         onClose={() => setToast((prev) => ({ ...prev, show: false }))}
-      />
-      <NotificationPermissionPopup
-        open={notificationPrompt.open}
-        permissionStatus={notificationPermissionStatus}
-        onAllow={allowNotifications}
-        onSkip={skipNotifications}
       />
       {examReminderPopup.open ? (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4">

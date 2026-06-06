@@ -19,7 +19,7 @@ import { clearSecureAuthStorage, readStoredAuthTokens, removeLegacyLocalAuthArti
 import { refreshSessionFromHttpOnlyCookie } from '../utils/authCookieBridge';
 import { requestSessionFromOtherTabs } from '../utils/crossTabAuth';
 import { logError } from '../utils/errorLogger';
-import { clearFaceMfaVerified } from '../utils/faceAuth';
+import { clearFaceMfaVerified, clearFaceLoginData } from '../utils/faceAuth';
 
 const AuthContext = createContext();
 
@@ -87,12 +87,29 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const clearPerUserSidebarKeys = (userId) => {
+    if (!userId || typeof window === 'undefined') return;
+    const keys = [
+      'lastSeenGuidanceRequests_',
+      'lastSeenMultiSessionAlerts_',
+      'lastSeenUsers_',
+      'lastSeenTeacherRequests_',
+      'lastSeenLeaves_',
+      'lastSeenStartupIdeas_',
+    ];
+    const prefix = 'exam_reminders_sent_';
+    keys.forEach(k => window.localStorage.removeItem(k + userId));
+    window.localStorage.removeItem(prefix + userId);
+  };
+
   const forceClientLogout = async (userId, notice = null) => {
     if (notice) {
       setSingleSessionNotice(notice);
     }
     clearStoredSessionKey(userId);
     clearFaceMfaVerified(userId);
+    clearFaceLoginData();
+    clearPerUserSidebarKeys(userId);
     setUser(null);
     setProfile(null);
     setProfileChecked(true);
@@ -139,14 +156,47 @@ export const AuthProvider = ({ children }) => {
 
   const isPremiumPlus = (p) => getPlanTier(p) === 'premium_plus';
 
+  const restoreSessionFromStore = async () => {
+    let session = null;
+    const { data } = await supabase.auth.getSession();
+    session = data?.session || null;
+
+    if (!session) {
+      const storedTokens = readStoredAuthTokens();
+      if (storedTokens?.access_token && storedTokens?.refresh_token) {
+        try {
+          const { data: sessionData } = await supabase.auth.setSession(storedTokens);
+          session = sessionData?.session || null;
+        } catch {
+          session = null;
+        }
+      }
+    }
+
+    if (!session) {
+      const restored = await refreshSessionFromHttpOnlyCookie();
+      if (restored?.access_token && restored?.refresh_token) {
+        const { data: sessionData } = await supabase.auth.setSession(restored);
+        session = sessionData?.session || null;
+      }
+    }
+
+    if (!session) {
+      const sharedSession = await requestSessionFromOtherTabs();
+      if (sharedSession?.access_token && sharedSession?.refresh_token) {
+        const { data: sessionData } = await supabase.auth.setSession(sharedSession);
+        session = sessionData?.session || null;
+      }
+    }
+
+    return session;
+  };
+
   useEffect(() => {
     let isMounted = true;
     removeLegacyLocalAuthArtifacts();
-    const cachedProfile = readProfileCache();
     const cachedImpersonation = readImpersonation();
-    if (cachedProfile?.profile) {
-      setProfile(cachedProfile.profile);
-      setProfileChecked(true);
+    if (cachedImpersonation) {
       setImpersonationProfile(cachedImpersonation);
     }
 
@@ -154,7 +204,6 @@ export const AuthProvider = ({ children }) => {
       if (isMounted) setLoading(false);
     }, 1000);
 
-    // Wait briefly for Supabase to restore the tab-scoped secure session.
     const restoreSession = async () => {
       if (typeof navigator !== 'undefined' && !navigator.onLine) {
         if (isMounted) setLoading(false);
@@ -163,40 +212,7 @@ export const AuthProvider = ({ children }) => {
         return;
       }
       try {
-        let tries = 0;
-        let session = null;
-        while (tries < 5 && !session) {
-          const { data } = await supabase.auth.getSession();
-          session = data.session;
-          if (session) break;
-          await new Promise(res => setTimeout(res, 50));
-          tries++;
-        }
-        if (!session) {
-          const storedTokens = readStoredAuthTokens();
-          if (storedTokens?.access_token && storedTokens?.refresh_token) {
-            try {
-              const { data } = await supabase.auth.setSession(storedTokens);
-              session = data.session;
-            } catch {
-              session = null;
-            }
-          }
-        }
-        if (!session) {
-          const restored = await refreshSessionFromHttpOnlyCookie();
-          if (restored?.access_token && restored?.refresh_token) {
-            const { data } = await supabase.auth.setSession(restored);
-            session = data.session;
-          }
-        }
-        if (!session) {
-          const sharedSession = await requestSessionFromOtherTabs();
-          if (sharedSession?.access_token && sharedSession?.refresh_token) {
-            const { data } = await supabase.auth.setSession(sharedSession);
-            session = data.session;
-          }
-        }
+        const session = await restoreSessionFromStore();
         if (!isMounted) return;
         if (session?.user) {
           const allowed = await validateSessionOwnership(session.user.id);
@@ -261,48 +277,12 @@ export const AuthProvider = ({ children }) => {
     let mounted = true;
     let resuming = false;
 
-    const restorePersistedSession = async () => {
-      let session = null;
-      const { data } = await supabase.auth.getSession();
-      session = data?.session || null;
-
-      if (!session) {
-        const storedTokens = readStoredAuthTokens();
-        if (storedTokens?.access_token && storedTokens?.refresh_token) {
-          try {
-            const { data: sessionData } = await supabase.auth.setSession(storedTokens);
-            session = sessionData?.session || null;
-          } catch {
-            session = null;
-          }
-        }
-      }
-
-      if (!session) {
-        const restored = await refreshSessionFromHttpOnlyCookie();
-        if (restored?.access_token && restored?.refresh_token) {
-          const { data: sessionData } = await supabase.auth.setSession(restored);
-          session = sessionData?.session || null;
-        }
-      }
-
-      if (!session) {
-        const sharedSession = await requestSessionFromOtherTabs();
-        if (sharedSession?.access_token && sharedSession?.refresh_token) {
-          const { data: sessionData } = await supabase.auth.setSession(sharedSession);
-          session = sessionData?.session || null;
-        }
-      }
-
-      return session;
-    };
-
     const resumeAuthState = async () => {
       if (resuming || !mounted) return;
       if (typeof navigator !== 'undefined' && !navigator.onLine) return;
       resuming = true;
       try {
-        const session = await restorePersistedSession();
+        const session = await restoreSessionFromStore();
         if (!mounted || !session?.user) return;
 
         const allowed = await validateSessionOwnership(session.user.id);
@@ -446,6 +426,33 @@ export const AuthProvider = ({ children }) => {
     };
   }, [user?.id]);
 
+  useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+
+    const checkUserExists = async () => {
+      if (cancelled) return;
+      const { data: { user: authUser }, error } = await supabase.auth.getUser();
+      if (cancelled) return;
+      if (error) {
+        if (error?.status === 401) {
+          await forceClientLogout(user.id);
+        }
+        return;
+      }
+      if (!authUser) {
+        await forceClientLogout(user.id);
+      }
+    };
+
+    const interval = setInterval(checkUserExists, 30000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [user?.id]);
+
   const fetchProfile = async (userId, options = {}) => {
     const { background = false } = options;
     try {
@@ -501,6 +508,15 @@ export const AuthProvider = ({ children }) => {
         fullName: hydratedProfile.full_name || ''
       });
     } catch (error) {
+      const isProfileDeleted = typeof error?.code === 'string' && (
+        error.code === 'PGRST116' ||
+        error.message?.includes('no rows') ||
+        error.message?.includes('0 rows')
+      );
+      if (isProfileDeleted) {
+        await forceClientLogout(userId);
+        return;
+      }
       if (!background) {
         setProfile(null);
         setImpersonationProfile(null);
@@ -539,6 +555,8 @@ export const AuthProvider = ({ children }) => {
     clearImpersonation();
     clearStoredSessionKey(currentUserId);
     clearFaceMfaVerified(currentUserId);
+    clearFaceLoginData();
+    clearPerUserSidebarKeys(currentUserId);
     clearDailyLoginState();
     clearSecureAuthStorage();
     try {

@@ -27,7 +27,7 @@ const EXAM_PHASES = {
 };
 
 const FULLSCREEN_TIMEOUT_SEC = 20;
-const TAB_SWITCH_GRACE_SEC = 30;
+const TAB_SWITCH_GRACE_SEC = 3;
 const MAX_FULLSCREEN_WARNINGS = 2;
 const RETAKE_LOCK_DAYS = 60;
 const BLANK_SCREEN_WARNING_SEC = 8;
@@ -35,6 +35,7 @@ const BLANK_SCREEN_LOCK_SEC = 15;
 const MIC_SILENCE_WARNING_SEC = 20;
 const MIC_SILENCE_LOCK_SEC = 45;
 const MIC_SILENCE_RMS_THRESHOLD = 0.006;
+// Camera thresholds — adjust as needed for different lighting/conditions
 const CAMERA_DARK_BRIGHTNESS_THRESHOLD = 35;
 const CAMERA_FLAT_VARIANCE_THRESHOLD = 120;
 const EXAM_SESSION_PREFIX = "strict_exam_session";
@@ -240,6 +241,15 @@ export default function Exam({ examMode = "certification" }) {
   const [showWaitingHallPopup, setShowWaitingHallPopup] = useState(false);
   const [dismissedWaitingHallPopupKey, setDismissedWaitingHallPopupKey] = useState("");
   const [submitReady, setSubmitReady] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [editorHeight, setEditorHeight] = useState(500);
+
+  useEffect(() => {
+    const calc = () => setEditorHeight(Math.max(350, window.innerHeight - 480));
+    calc();
+    window.addEventListener('resize', calc);
+    return () => window.removeEventListener('resize', calc);
+  }, []);
   const [submitCountdown, setSubmitCountdown] = useState(6);
   const [submitDelaySeconds, setSubmitDelaySeconds] = useState(6);
   const [supportVoiceConnected, setSupportVoiceConnected] = useState(false);
@@ -249,6 +259,7 @@ export default function Exam({ examMode = "certification" }) {
   const [remainingExamSeconds, setRemainingExamSeconds] = useState(null);
   const [submittedAt, setSubmittedAt] = useState(null);
   const [bootstrappingExam, setBootstrappingExam] = useState(true);
+  const [browserBlocked, setBrowserBlocked] = useState(false);
   const isTerminatingRef = useRef(false);
   const lastAppSwitchEventRef = useRef(0);
   const fullscreenWarningsRef = useRef(0);
@@ -262,6 +273,7 @@ export default function Exam({ examMode = "certification" }) {
   const autoResumeFullscreenAttemptedRef = useRef(false);
   const tabSwitchTimerRef = useRef(null);
   const tabSwitchGraceActiveRef = useRef(false);
+  const cameraTrackEndedRef = useRef(false);
   const blankScreenWarnedRef = useRef(false);
   const blankScreenTerminatedRef = useRef(false);
   const blankScreenStartedAtRef = useRef(0);
@@ -1453,7 +1465,7 @@ export default function Exam({ examMode = "certification" }) {
           .maybeSingle(),
         supabase
           .from("exam_questions")
-          .select("*")
+          .select("id, exam_id, question, options, order_index, course_id, question_type, coding_language, shown_test_cases, hidden_test_cases, coding_description")
           .eq("exam_id", resolvedExamId ?? routeCourseId)
           .order("order_index", { ascending: true }),
         supabase
@@ -1557,6 +1569,22 @@ export default function Exam({ examMode = "certification" }) {
         return;
       }
 
+      // Retake allowed — clear any stale media streams from previous attempt
+      if (cameraStream) {
+        cameraStream.getTracks().forEach((t) => t.stop());
+        setCameraStream(null);
+      }
+      if (screenShareStream) {
+        screenShareStream.getTracks().forEach((t) => t.stop());
+        setScreenShareStream(null);
+      }
+      cameraTrackEndedRef.current = false;
+      blankScreenWarnedRef.current = false;
+      blankScreenTerminatedRef.current = false;
+      blankScreenStartedAtRef.current = 0;
+      cameraTrackIssueStartedAtRef.current = 0;
+      lastCameraSignatureRef.current = null;
+
       if (!hasRestoredSessionRef.current) {
         const raw =
           getSavedExamProgress(getSessionKey(userData.user.id)) ||
@@ -1564,6 +1592,12 @@ export default function Exam({ examMode = "certification" }) {
         if (raw) {
           try {
             const parsed = JSON.parse(raw);
+            const integrityKey = 'exam_progress_integrity_' + (userData?.user?.id || 'anonymous');
+            if (parsed?._integrity !== integrityKey) {
+              clearSavedExamProgress(getSessionKey(userData.user.id));
+              clearSavedExamProgress(getSessionKey());
+              return;
+            }
             if (parsed?.answers && typeof parsed.answers === "object") {
               setAnswers(parsed.answers);
             }
@@ -1676,6 +1710,13 @@ export default function Exam({ examMode = "certification" }) {
   }, [routeCourseId, routeExamId, isTeacherTestMode]);
 
   useEffect(() => {
+    if (phase !== EXAM_PHASES.RULES && phase !== EXAM_PHASES.PERMISSION) return;
+    if (typeof navigator !== 'undefined' && !navigator.keyboard?.lock) {
+      setBrowserBlocked(true);
+    }
+  }, [phase]);
+
+  useEffect(() => {
     if (phase === EXAM_PHASES.RESULT || phase === EXAM_PHASES.TERMINATED) return;
     if (!hasRestoredSessionRef.current) return;
     const sessionKey = getSessionKey(currentUserId);
@@ -1692,6 +1733,7 @@ export default function Exam({ examMode = "certification" }) {
       tabSwitchWarnings,
       invigilatorPauseMessage,
       updatedAt: Date.now(),
+      _integrity: 'exam_progress_integrity_' + (currentUserId || 'anonymous'),
     };
     const serialized = JSON.stringify(payload);
     setSavedExamProgress(sessionKey, serialized);
@@ -1795,8 +1837,8 @@ export default function Exam({ examMode = "certification" }) {
     const handleShareEnded = () => {
       void syncLiveExamSession({ screen_share_connected: false });
       if (phase !== EXAM_PHASES.RUNNING && phase !== EXAM_PHASES.SUBMITTING) return;
-      void recordLiveExamViolation("screen_share_interrupted", 2, "Screen sharing stopped during live exam.");
-      void terminateExamForViolation("Screen sharing was interrupted during the exam.");
+      void recordLiveExamViolation("screen_share_interrupted", 1, "Screen sharing stopped during live exam.");
+      void terminateExamForViolation("Screen sharing stopped during the exam. Account blocked.");
     };
 
     track.addEventListener?.("ended", handleShareEnded);
@@ -1928,10 +1970,25 @@ export default function Exam({ examMode = "certification" }) {
       }
 
       markCameraIssue("Camera appears covered, shuttered, frozen, or unavailable during exam.");
+
+      // Periodic screen share surface re-check
+      if (screenShareStream) {
+        try {
+          const [sst] = screenShareStream.getVideoTracks?.() || [];
+          if (sst?.readyState === 'ended') {
+            markCameraIssue('Screen share track ended');
+          } else {
+            const surface = String(sst.getSettings?.().displaySurface || '').toLowerCase();
+            if (surface && surface !== 'monitor' && surface !== '') {
+              markCameraIssue('Screen share switched to ' + surface);
+            }
+          }
+        } catch {}
+      }
     }, 1500);
 
     const handleTrackEnded = () => {
-      markCameraIssue("Camera feed ended during exam.");
+      void terminateExamForViolation("Camera feed ended during exam. Account blocked.");
     };
     const handleTrackMute = () => {
       markCameraIssue("Camera feed was muted or blocked during exam.");
@@ -2118,7 +2175,7 @@ export default function Exam({ examMode = "certification" }) {
       setTabSwitchCountdown(TAB_SWITCH_GRACE_SEC);
       setTabWarningMessage(
         warningMessage ||
-          "App/Tab change detected. Return to the exam and click the button below within 30 seconds. A second violation will block the account as usual."
+          "App/Tab change detected. Return to the exam immediately. A second violation or leaving again will block your account."
       );
       setShowTabWarningModal(true);
       tabSwitchTimerRef.current = setInterval(() => {
@@ -2187,6 +2244,12 @@ export default function Exam({ examMode = "certification" }) {
     const handleVisibility = () => {
       if (document.hidden) {
         handleAppSwitchAttempt();
+      } else if (tabSwitchGraceActiveRef.current) {
+        clearTabSwitchTimer();
+        tabSwitchGraceActiveRef.current = false;
+        setShowTabWarningModal(false);
+        setTabWarningMessage("");
+        setInfoMsg("Warning recorded for tab switch. Continue the exam carefully.");
       }
     };
 
@@ -2321,24 +2384,24 @@ export default function Exam({ examMode = "certification" }) {
     body.style.userSelect = "none";
     body.style.webkitUserSelect = "none";
 
-    document.addEventListener("copy", prevent);
-    document.addEventListener("paste", prevent);
-    document.addEventListener("cut", prevent);
-    document.addEventListener("selectstart", prevent);
-    document.addEventListener("contextmenu", prevent);
-    document.addEventListener("dragstart", prevent);
+    document.addEventListener("copy", prevent, { capture: true });
+    document.addEventListener("paste", prevent, { capture: true });
+    document.addEventListener("cut", prevent, { capture: true });
+    document.addEventListener("selectstart", prevent, { capture: true });
+    document.addEventListener("contextmenu", prevent, { capture: true });
+    document.addEventListener("dragstart", prevent, { capture: true });
     document.addEventListener("keydown", preventCopyKeys, true);
     window.addEventListener("keydown", preventCopyKeys, true);
 
     return () => {
       body.style.userSelect = previousUserSelect;
       body.style.webkitUserSelect = previousWebkitUserSelect;
-      document.removeEventListener("copy", prevent);
-      document.removeEventListener("paste", prevent);
-      document.removeEventListener("cut", prevent);
-      document.removeEventListener("selectstart", prevent);
-      document.removeEventListener("contextmenu", prevent);
-      document.removeEventListener("dragstart", prevent);
+      document.removeEventListener("copy", prevent, { capture: true });
+      document.removeEventListener("paste", prevent, { capture: true });
+      document.removeEventListener("cut", prevent, { capture: true });
+      document.removeEventListener("selectstart", prevent, { capture: true });
+      document.removeEventListener("contextmenu", prevent, { capture: true });
+      document.removeEventListener("dragstart", prevent, { capture: true });
       document.removeEventListener("keydown", preventCopyKeys, true);
       window.removeEventListener("keydown", preventCopyKeys, true);
     };
@@ -3077,8 +3140,8 @@ export default function Exam({ examMode = "certification" }) {
         last_violation_type: violationType,
         last_violation_at: new Date().toISOString(),
       });
-    } catch {
-      // best effort only
+    } catch (err) {
+      console.error('Failed to record violation:', err);
     }
   }
 
@@ -3154,18 +3217,23 @@ export default function Exam({ examMode = "certification" }) {
     if (phase !== EXAM_PHASES.FULLSCREEN) return;
     setErrorMsg("");
     setInfoMsg("");
+
+    const fullscreenOk = await enterFullscreen();
+    if (!fullscreenOk) {
+      return;
+    }
+
     await primeMicAudioContext();
     let ensuredContext = liveExamContext;
     if (requiresLiveMedia && !isEntireScreenShareStream(screenShareStream)) {
       setErrorMsg("Share the entire screen first. Tab share or app-window share is not allowed.");
+      if (document.fullscreenElement) {
+        await document.exitFullscreen().catch(() => {});
+      }
       return;
     }
     if (requiresLiveMedia) {
       ensuredContext = await ensureLiveSessionContext({ reactivate: true, force: true });
-    }
-    const fullscreenOk = await enterFullscreen();
-    if (!fullscreenOk) {
-      return;
     }
 
     setPhase(EXAM_PHASES.RUNNING);
@@ -3202,12 +3270,20 @@ export default function Exam({ examMode = "certification" }) {
   }
 
   async function reEnterFullscreen() {
+    const ok = await enterFullscreen();
+    if (!ok) return;
+
     let nextCameraStream = cameraStream;
     let nextScreenStream = screenShareStream;
 
     if (!hasActiveVideoTrack(nextCameraStream)) {
       const refreshedCameraStream = await requestCameraMicPermissions();
-      if (!refreshedCameraStream) return;
+      if (!refreshedCameraStream) {
+        if (document.fullscreenElement) {
+          await document.exitFullscreen().catch(() => {});
+        }
+        return;
+      }
       if (cameraStream && cameraStream !== refreshedCameraStream) {
         cameraStream.getTracks().forEach((track) => track.stop());
       }
@@ -3219,6 +3295,9 @@ export default function Exam({ examMode = "certification" }) {
       const refreshedScreenStream = await requestScreenSharePermissions();
       if (!refreshedScreenStream) {
         setErrorMsg("Entire-screen sharing is required before returning to fullscreen.");
+        if (document.fullscreenElement) {
+          await document.exitFullscreen().catch(() => {});
+        }
         return;
       }
       if (screenShareStream && screenShareStream !== refreshedScreenStream) {
@@ -3227,9 +3306,6 @@ export default function Exam({ examMode = "certification" }) {
       nextScreenStream = refreshedScreenStream;
       setScreenShareStream(refreshedScreenStream);
     }
-
-    const ok = await enterFullscreen();
-    if (!ok) return;
     setNeedsFullscreenResume(false);
     setResumeWarningMessage("");
     setShowFullscreenPrompt(false);
@@ -3431,7 +3507,7 @@ export default function Exam({ examMode = "certification" }) {
       await terminateExamForViolation(reason);
       return;
     }
-    const lockUntil = new Date(Date.now() + strictProctorLockDays * 24 * 60 * 60 * 1000);
+    const lockUntil = new Date(Date.now() + Math.max(1, strictProctorLockDays) * 24 * 60 * 60 * 1000);
     const payload = {
       user_id: userData.user.id,
       exam_id: examId ?? routeCourseId,
@@ -3603,7 +3679,7 @@ export default function Exam({ examMode = "certification" }) {
     setErrorMsg("");
     setInfoMsg("");
     setSubmitReady(false);
-    const nextSubmitDelay = 6 + Math.floor(Math.random() * 3);
+    const nextSubmitDelay = 8 + Math.floor(Math.random() * 4);
     setSubmitDelaySeconds(nextSubmitDelay);
     setSubmitCountdown(nextSubmitDelay);
     setSubmissionFinalized(false);
@@ -3611,15 +3687,6 @@ export default function Exam({ examMode = "certification" }) {
     setSubmittedAt(null);
     setPhase(EXAM_PHASES.SUBMITTING);
 
-    // Stop proctor media immediately once submission starts.
-    if (cameraStream) {
-      cameraStream.getTracks().forEach((track) => track.stop());
-      setCameraStream(null);
-    }
-    if (screenShareStream) {
-      screenShareStream.getTracks().forEach((track) => track.stop());
-      setScreenShareStream(null);
-    }
     try {
       navigator.keyboard?.unlock?.();
     } catch {
@@ -3655,142 +3722,60 @@ export default function Exam({ examMode = "certification" }) {
         if (courseResp.data?.title) setCourseName(courseResp.data.title);
       }
 
-      let correct = 0;
-      let total = 0;
-
+      // Evaluate coding questions client-side (Judge0 is external API, results are trustworthy)
+      const coding_results = [];
       for (const q of questions) {
-        const questionType = resolveQuestionType(q);
-        const answer = answers[q.id];
-
-        if (questionType === "coding") {
-          total += 1;
-          const { code: answerCode, language: answerLanguage } = getCodingAnswer(q);
-
-          if (!answerCode.trim()) {
-            continue;
-          }
-
-          const shownCases = normalizeTestCases(q.shown_test_cases).map((tc) => ({
-            input: tc?.input ?? "",
-            output: tc?.output ?? "",
-            hidden: false,
-          }));
-          const hiddenCases = normalizeTestCases(q.hidden_test_cases).map((tc) => ({
-            input: tc?.input ?? "",
-            output: tc?.output ?? "",
-            hidden: true,
-          }));
-          const mergedCases = [...shownCases, ...hiddenCases];
-          if (mergedCases.length === 0) {
-            continue;
-          }
-
-          const runResults = await runCode(answerLanguage, answerCode, mergedCases);
-          const allPassed = runResults.every(
-            (result) =>
-              String(result?.status || "").toLowerCase() === "accepted"
-          );
-          if (allPassed) {
-            correct += 1;
-          }
+        if (resolveQuestionType(q) !== 'coding') continue;
+        const { code: answerCode, language: answerLanguage } = getCodingAnswer(q);
+        if (!answerCode.trim()) {
+          coding_results.push({ question_id: q.id, passed: false });
           continue;
         }
-
-        const options = normalizeOptions(q.options);
-        const hasMcq = options.length > 0 && Number.isInteger(q.correct_index);
-        if (!hasMcq) continue;
-        total += 1;
-        if (answer === options[q.correct_index]) {
-          correct += 1;
-        }
+        const shownCases = normalizeTestCases(q.shown_test_cases).map((tc) => ({ input: tc?.input ?? '', output: tc?.output ?? '', hidden: false }));
+        const hiddenCases = normalizeTestCases(q.hidden_test_cases).map((tc) => ({ input: tc?.input ?? '', output: tc?.output ?? '', hidden: true }));
+        const mergedCases = [...shownCases, ...hiddenCases];
+        if (mergedCases.length === 0) { coding_results.push({ question_id: q.id, passed: false }); continue; }
+        const runResults = await runCode(answerLanguage, answerCode, mergedCases);
+        const allPassed = runResults.every((result) => String(result?.status || '').toLowerCase() === 'accepted');
+        coding_results.push({ question_id: q.id, passed: allPassed });
       }
 
-      const percentage = total === 0 ? 0 : Math.round((correct / total) * 100);
-      const passed = total === 0 ? true : percentage >= examPassPercent;
-      const nextAttemptAllowedAt = passed
-        ? null
-        : isTeacherTestMode
-          ? null
-          : new Date(Date.now() + strictProctorLockDays * 24 * 60 * 60 * 1000).toISOString();
+      // Call server-side grading edge function
+      const { data: fnData, error: fnError } = await supabase.functions.invoke('submit-exam', {
+        body: {
+          exam_id: examId ?? routeCourseId,
+          answers: questions
+            .filter(q => resolveQuestionType(q) !== 'coding')
+            .map(q => ({ question_id: q.id, answer: answers[q.id] || null })),
+          coding_results,
+          started_at: examStartedAt,
+        },
+      });
 
-      const submissionPayload = {
-        user_id: userData.user.id,
-        exam_id: examId ?? routeCourseId,
-        score_percent: percentage,
-        passed,
-        next_attempt_allowed_at: nextAttemptAllowedAt,
-        submitted_at: new Date().toISOString(),
-      };
-
-      const { error } = await supabase
-        .from("exam_submissions")
-        .upsert([submissionPayload], {
-          onConflict: "exam_id,user_id",
-        });
-      if (error) throw new Error(error.message);
-      if (isTeacherTestMode && !isLiveManagedExam) {
-        if (passed) {
-          await supabase
-            .from("exam_attempt_blocks")
-            .delete()
-            .eq("user_id", userData.user.id)
-            .eq("exam_id", examId ?? routeCourseId);
-        } else {
-          const blockCheckpoint = examQuestionSetUpdatedAt || new Date().toISOString();
-          const { error: blockErr } = await supabase
-            .from("exam_attempt_blocks")
-            .upsert(
-              [
-                {
-                  user_id: userData.user.id,
-                  exam_id: examId ?? routeCourseId,
-                  unblock_after_question_update_at: blockCheckpoint,
-                  reason: "Teacher test requires updated questions before retry.",
-                  updated_at: new Date().toISOString(),
-                },
-              ],
-              { onConflict: "user_id,exam_id" }
-            );
-          if (blockErr) throw new Error(blockErr.message);
+      if (fnError) throw new Error(fnError.message);
+      if (!fnData?.success) {
+        if (fnData?.error === 'already_passed') {
+          // Already passed — show existing result
+          setSubmissionFinalized(true);
+          setPendingResultData({ correct: fnData.correct || 0, total: fnData.total || 0, percentage: fnData.score_percent || 100, passed: true, nextAttemptAllowedAt: null });
+          return;
         }
+        throw new Error(fnData?.message || 'Failed to submit exam');
       }
-      const { data: submissionRow } = await supabase
-        .from("exam_submissions")
-        .select("id")
-        .eq("user_id", userData.user.id)
-        .eq("exam_id", examId ?? routeCourseId)
-        .order("submitted_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      const rawSubmissionId = submissionRow?.id ? String(submissionRow.id) : "N/A";
-      setSubmittedAt(submissionPayload.submitted_at);
+
+      const { correct, total, percentage, passed, next_attempt_allowed_at, submission_id, attempt_number } = fnData;
+
+      const rawSubmissionId = submission_id || 'N/A';
+      setSubmittedAt(new Date().toISOString());
       setSubmissionId(rawSubmissionId);
       setDisplaySubmissionId(formatDisplaySubmissionId(rawSubmissionId));
-
-      if (passed && submissionRow?.id && examGenerateCertificate && resolvedCourseId) {
-        // Best-effort only: certificate insertion can be blocked by RLS depending on policy.
-        // Do not fail exam submission when certificate insert is denied.
-        const { error: certError } = await supabase
-          .from("certificates")
-          .insert([
-            {
-              user_id: userData.user.id,
-              course_id: resolvedCourseId,
-              exam_submission_id: submissionRow.id,
-              issued_at: new Date().toISOString(),
-            },
-          ]);
-        if (certError && certError.code !== "23505" && certError.code !== "42501") {
-          logError({ message: "Certificate insert skipped:", source: 'Exam', details: certError.message });
-        }
-      }
 
       if (isLiveManagedExam) {
         await syncLiveExamSession({
           status: "completed",
-          ended_at: submissionPayload.submitted_at,
+          ended_at: new Date().toISOString(),
           attendance_status: "present",
-          last_heartbeat_at: submissionPayload.submitted_at,
+          last_heartbeat_at: new Date().toISOString(),
           camera_connected: false,
           mic_connected: false,
           screen_share_connected: false,
@@ -3799,7 +3784,16 @@ export default function Exam({ examMode = "certification" }) {
       }
 
       setSubmissionFinalized(true);
-      setPendingResultData({ correct, total, percentage, passed, nextAttemptAllowedAt });
+      // Stop proctor media after submission network call succeeds
+      if (cameraStream) {
+        cameraStream.getTracks().forEach((track) => track.stop());
+        setCameraStream(null);
+      }
+      if (screenShareStream) {
+        screenShareStream.getTracks().forEach((track) => track.stop());
+        setScreenShareStream(null);
+      }
+      setPendingResultData({ correct, total, percentage, passed, nextAttemptAllowedAt: next_attempt_allowed_at });
     } catch (error) {
       setErrorMsg("Error submitting exam: " + error.message);
       setPhase(EXAM_PHASES.RUNNING);
@@ -4140,13 +4134,18 @@ export default function Exam({ examMode = "certification" }) {
       <div
         className={`mx-auto grid gap-6 ${
           isExamWorkspace
-            ? "max-w-7xl grid-cols-1 lg:grid-cols-[280px,1fr]"
+            ? "w-full px-2 grid-cols-1 lg:grid-cols-[240px,1fr]"
             : "max-w-4xl grid-cols-1"
         }`}
       >
-        {isExamWorkspace ? (
+        {isExamWorkspace && sidebarOpen ? (
           <aside className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 h-fit lg:sticky lg:top-6">
-            <h2 className="text-lg font-bold text-slate-900 mb-1">Question Navigator</h2>
+            <div className="flex items-center justify-between mb-1">
+              <h2 className="text-lg font-bold text-slate-900">Question Navigator</h2>
+              <button onClick={() => setSidebarOpen(false)} className="text-slate-400 hover:text-slate-700 transition p-1 rounded-lg hover:bg-slate-100" title="Hide sidebar">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd"/></svg>
+              </button>
+            </div>
             <p className="text-xs text-slate-500 mb-4">
               Review all admin-added questions and jump by number.
             </p>
@@ -4204,11 +4203,18 @@ export default function Exam({ examMode = "certification" }) {
         <main className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 md:p-8 space-y-5">
           <header className="space-y-2">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <h1 className="text-2xl font-bold text-slate-900">Strict Proctoring Exam</h1>
-                <p className="text-sm text-slate-600">
-                  Rules acceptance, camera/mic permission, and fullscreen are mandatory before writing.
-                </p>
+              <div className="flex items-center gap-3">
+                {isExamWorkspace && !sidebarOpen ? (
+                  <button onClick={() => setSidebarOpen(true)} className="text-slate-500 hover:text-slate-800 transition p-1.5 rounded-lg hover:bg-slate-100 border border-slate-200" title="Show sidebar">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd"/></svg>
+                  </button>
+                ) : null}
+                <div>
+                  <h1 className="text-2xl font-bold text-slate-900">Strict Proctoring Exam</h1>
+                  <p className="text-sm text-slate-600">
+                    Rules acceptance, camera/mic permission, and fullscreen are mandatory before writing.
+                  </p>
+                </div>
               </div>
               {(phase === EXAM_PHASES.RUNNING || phase === EXAM_PHASES.SUBMITTING) ? (
                 <div className={`inline-flex items-center rounded-xl border px-4 py-2 text-sm font-bold shadow-sm ${
@@ -4272,6 +4278,12 @@ export default function Exam({ examMode = "certification" }) {
                 </div>
                 {phase === EXAM_PHASES.RULES ? (
                   <div className="space-y-5">
+                    {browserBlocked ? (
+                      <div className="rounded-xl border-2 border-red-300 bg-red-50 p-4 text-center">
+                        <p className="text-sm font-bold text-red-700">Your browser does not support this exam's security requirements.</p>
+                        <p className="mt-1 text-xs text-red-600">Please use Chrome or Edge.</p>
+                      </div>
+                    ) : null}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                       <div className="rounded-lg border border-slate-200 p-3 bg-slate-50">No tab/app switching during exam.</div>
                       <div className="rounded-lg border border-slate-200 p-3 bg-slate-50">Stay in fullscreen until submission completes.</div>
@@ -4334,10 +4346,10 @@ export default function Exam({ examMode = "certification" }) {
           {(phase === EXAM_PHASES.RUNNING || phase === EXAM_PHASES.SUBMITTING) && activeQuestion ? (
             <section className="space-y-4">
               <div>
-                <p className="text-xs font-semibold text-slate-500">
+                <p className="text-sm font-bold text-slate-500">
                   Question {activeQuestionIndex + 1} of {questions.length}
                 </p>
-                <h3 className="text-lg font-semibold text-slate-900 mt-1">
+                <h3 className="text-2xl font-bold text-slate-900 mt-1 leading-relaxed">
                   {activeQuestion.question}
                 </h3>
                 {resolveQuestionType(activeQuestion) === "coding" && activeQuestion.coding_description ? (
@@ -4408,7 +4420,7 @@ export default function Exam({ examMode = "certification" }) {
                       </div>
                       <div className="pl-2 pr-2 py-2">
                         <MonacoCdnEditor
-                          height={300}
+                          height={editorHeight}
                           language={
                             typeof answers[activeQuestion.id] === "object" &&
                             answers[activeQuestion.id]?.language

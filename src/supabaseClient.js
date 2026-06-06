@@ -1,10 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import {
-  clearDailyLoginState,
-  isDailyLoginExpired,
-  readDailyLoginState,
-  writeDailyLoginState
-} from './utils/dailySession';
+import { clearDailyLoginState, isDailyLoginExpired, readDailyLoginState, writeDailyLoginState } from './utils/dailySession';
 import {
   migrateLegacyAuthStorage,
   removeLegacyLocalAuthArtifacts,
@@ -51,7 +46,7 @@ export const supabase = createClient(supabaseUrl, supabaseKey, {
   }
 });
 
-if (import.meta.env.DEV && typeof window !== 'undefined') {
+if (import.meta.env.DEV && typeof window !== 'undefined' && import.meta.env.VITE_EXPOSE_SUPABASE === 'true') {
   window.supabase = supabase;
 }
 
@@ -82,19 +77,30 @@ supabase.auth.onAuthStateChange((event, session) => {
 });
 
 let proactiveRefreshInFlight = false;
-window.setInterval(async () => {
-  if (proactiveRefreshInFlight) return;
-  proactiveRefreshInFlight = true;
-  try {
-    const { data } = await supabase.auth.getSession();
-    if (!data?.session?.refresh_token) return;
-    await supabase.auth.refreshSession();
-  } catch {
-    // Existing expiry checks handle failed refreshes.
-  } finally {
-    proactiveRefreshInFlight = false;
-  }
-}, 12 * 60 * 1000);
+let proactiveRefreshTimer = null;
+function startProactiveRefresh() {
+  if (proactiveRefreshTimer) clearInterval(proactiveRefreshTimer);
+  proactiveRefreshTimer = window.setInterval(async () => {
+    if (proactiveRefreshInFlight) return;
+    proactiveRefreshInFlight = true;
+    try {
+      const { data } = await supabase.auth.getSession();
+      if (!data?.session?.refresh_token) return;
+      await supabase.auth.refreshSession();
+    } catch {
+      // Existing expiry checks handle failed refreshes.
+    } finally {
+      proactiveRefreshInFlight = false;
+    }
+  }, 12 * 60 * 1000);
+}
+startProactiveRefresh();
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeunload', () => {
+    if (proactiveRefreshTimer) clearInterval(proactiveRefreshTimer);
+  });
+}
 
 async function checkSessionExpiry() {
   const loginState = readDailyLoginState();

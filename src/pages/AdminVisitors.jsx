@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
-import { Globe2, Monitor, Smartphone, Tablet, Search, Trash2, AlertTriangle, RotateCw } from 'lucide-react';
+import { Globe2, Monitor, Smartphone, Tablet, Search, Trash2, AlertTriangle, RotateCw, User } from 'lucide-react';
 import AlertModal from '../components/AlertModal';
 
 const ITEMS_PER_PAGE = 50;
@@ -34,7 +34,7 @@ const AdminVisitors = () => {
         .order('created_at', { ascending: false });
 
       if (search.trim()) {
-        query = query.or(`ip_address.ilike.%${search.trim()}%,browser.ilike.%${search.trim()}%,os.ilike.%${search.trim()}%,device_type.ilike.%${search.trim()}%,page_url.ilike.%${search.trim()}%,country.ilike.%${search.trim()}%,city.ilike.%${search.trim()}%`);
+        query = query.or(`ip_address.ilike.%${search.trim()}%,browser.ilike.%${search.trim()}%,os.ilike.%${search.trim()}%,device_type.ilike.%${search.trim()}%,page_url.ilike.%${search.trim()}%,country.ilike.%${search.trim()}%,city.ilike.%${search.trim()}%,username.ilike.%${search.trim()}%,email.ilike.%${search.trim()}%`);
       }
 
       if (deviceFilter !== 'all') {
@@ -234,6 +234,7 @@ const AdminVisitors = () => {
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">#</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Date & Time</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">IP Address</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">User</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Device</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Browser</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">OS</th>
@@ -254,6 +255,18 @@ const AdminVisitors = () => {
                     <span className="text-xs font-mono bg-slate-100 px-2 py-1 rounded text-slate-700">
                       {v.ip_address || '—'}
                     </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    {v.user_id ? (
+                      <div className="flex items-center gap-1.5">
+                        <User size={12} className="text-blue-500" />
+                        <span className="text-xs text-blue-700 font-medium" title={v.email || ''}>
+                          {v.username || v.email || 'User'}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-slate-400">Guest</span>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
@@ -290,14 +303,14 @@ const AdminVisitors = () => {
               ))}
               {visitors.length === 0 && !loading && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-12 text-center text-slate-500">
+                  <td colSpan={9} className="px-4 py-12 text-center text-slate-500">
                     No visitor data found. Visitors will appear here once they browse the website.
                   </td>
                 </tr>
               )}
               {loading && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-12 text-center text-slate-500">
+                  <td colSpan={9} className="px-4 py-12 text-center text-slate-500">
                     Loading visitor data...
                   </td>
                 </tr>
@@ -349,6 +362,9 @@ const AdminVisitors = () => {
             <div className="space-y-3">
               <DetailRow label="Date & Time" value={formatDate(selectedVisitor.created_at)} />
               <DetailRow label="IP Address" value={selectedVisitor.ip_address || '—'} mono />
+              {selectedVisitor.user_id && (
+                <DetailRow label="User" value={`${selectedVisitor.username || selectedVisitor.email || 'Logged in'} ${selectedVisitor.email ? `(${selectedVisitor.email})` : ''}`} />
+              )}
               <DetailRow label="Device Type" value={selectedVisitor.device_type || 'Desktop'} />
               <DetailRow label="Browser" value={`${selectedVisitor.browser || 'Unknown'} ${selectedVisitor.browser_version || ''}`} />
               <DetailRow label="OS" value={`${selectedVisitor.os || 'Unknown'} ${selectedVisitor.os_version || ''}`} />

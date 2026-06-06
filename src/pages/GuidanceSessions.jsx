@@ -982,7 +982,7 @@ const GuidanceSessions = () => {
                                 onClick={() => {
                                   void sendAdminNotification({
                                     title: 'Guidance Session Opened',
-                                    content: `${profile?.full_name || 'User'} opened the guidance session link for "${sess.title || req.topic || 'mentorship session'}".`,
+                                    content: `${profile?.full_name || 'User'} opened the guidance session link for "${sess.title || sess.topic || 'mentorship session'}".`,
                                     admin_id: profile?.id || null,
                                   });
                                 }}

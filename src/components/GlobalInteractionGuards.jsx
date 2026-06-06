@@ -206,7 +206,7 @@ const GlobalInteractionGuards = () => {
   }
 
   return (
-    <div className="fixed inset-0 z-[2147483647] flex min-h-screen items-center justify-center bg-slate-950 p-6 text-center text-white">
+    <div className="fixed inset-0 z-[9999] flex min-h-screen items-center justify-center bg-slate-950 p-6 text-center text-white">
       <div>
         <h1 className="text-3xl font-bold">Access blocked</h1>
         <p className="mt-3 text-sm text-slate-200">Close developer tools and refresh the page.</p>

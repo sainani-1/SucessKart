@@ -1,10 +1,4 @@
-import AdminExamSettings from './pages/AdminExamSettings';
-import AdminContestSetup from './logicBuilding/AdminContestSetup';
-import LogicBuildingContest from './logicBuilding/LogicBuildingContest';
-import AdminChangeCourse from './pages/AdminChangeCourse';
-import AdminScoreboard from './logicBuilding/AdminScoreboard';
-import LogicBuildingLeaderboard from './logicBuilding/LogicBuildingLeaderboard';
-import React, { useEffect, useState } from 'react';
+import React, { lazy, Suspense, useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import Layout from './components/Layout';
@@ -13,150 +7,159 @@ import RequireAdminMFA from './components/RequireAdminMFA';
 import RequireSensitiveAdminMFA from './components/RequireSensitiveAdminMFA';
 import RequireConfiguredSensitiveAdminMFA from './components/RequireConfiguredSensitiveAdminMFA';
 import { supabase } from './supabaseClient';
-import AdminMFASetup from "./pages/AdminMFASetup";
-import AdminMFAVerify from "./pages/AdminMFAVerify";
-import AdminAuthChoice from "./pages/AdminAuthChoice";
-// Pages
-import Login from './pages/Login';
-import Register from './pages/Register';
-import ResetPassword from './pages/ResetPassword';
-import Home from './pages/Home';
-import About from './pages/About';
-import Plans from './pages/Plans';
-import Dashboard from './pages/Dashboard';
-import CourseList from './pages/CourseList';
-import CourseDetail from './pages/CourseDetail';
-import Exam from './pages/Exam';
-import TestExam from './pages/TestExam';
-import Profile from './pages/Profile';
-import Settings from './pages/Settings';
-import VerifyCertificate from './pages/VerifyCertificate';
-import RegisterAdmin from './pages/RegisterAdmin';
-import RegisterTeacher from './pages/RegisterTeacher';
-import CareerGuidance from './pages/CareerGuidance';
-import MyCertificates from './pages/MyCertificates';
-import MyRegisteredExams from './pages/MyRegisteredExams';
-import AdminDashboard from './pages/AdminDashboard';
-import AdminSettings from './pages/AdminSettings';
-import AdminCourses from './pages/AdminCourses';
-import StudentProgress from './pages/StudentProgress';
-import StudentDetail from './pages/StudentDetail';
-import ManagePremium from './pages/ManagePremium';
-import TeacherAssignment from './pages/TeacherAssignment';
-import GuidanceSessions from './pages/GuidanceSessions';
-import TeacherLeaves from './pages/TeacherLeaves';
-import ChatWithTeacher from './pages/ChatWithTeacher';
-import Attendance from './pages/Attendance';
-import MyStudents from './pages/MyStudents';
-import AssignedClasses from './pages/AssignedClasses';
-import Payment from './pages/Payment';
-import ClassSchedule from './pages/ClassSchedule';
-import AccountManagement from './pages/AccountManagement';
-import TeacherChat from './pages/TeacherChat';
-import LiveClass from './pages/LiveClass';
-import Notifications from './pages/Notifications';
-import AdminNotifications from './pages/AdminNotifications';
-import SessionReassignments from './pages/SessionReassignments';
-import CareerChatbot from './pages/CareerChatbot';
-import AILearningPath from './pages/AILearningPath';
-import AdminExamOverrides from './pages/AdminExamOverrides';
-import InterviewPrep from './pages/InterviewPrep';
-import PremiumStatus from './pages/PremiumStatus';
-import NotesLibrary from './pages/NotesLibrary';
-import Offers from './pages/Offers';
-import AdminExamRetakes from './pages/AdminExamRetakes';
-import AdminActiveCoupons from './pages/AdminActiveCoupons';
-import UserManagementPage from './pages/UserManagementPage';
-import TeacherProgress from './pages/TeacherProgress';
-import TeacherConductTests from './pages/TeacherConductTests';
-import ClearDoubts from './pages/ClearDoubts';
-import AdminUserIds from './pages/AdminUserIds';
-import NotFound from './pages/NotFound';
-import AdminSendGift from './pages/AdminSendGift';
-import RequestTeacher from './pages/RequestTeacher';
-import TeacherRequests from './pages/TeacherRequests';
-import AdminTeacherRequests from './pages/AdminTeacherRequests';
-import CertificateBlocks from './pages/CertificateBlocks';
-import AdminResetPassword from './pages/AdminResetPassword';
-import AdminUserPasswordResetPage from './pages/AdminUserPasswordResetPage';
-import StartupIdeas from './pages/StartupIdeas';
-import AdminStartupIdeas from './pages/AdminStartupIdeas';
-import StartupCollaborations from './pages/StartupCollaborations';
-import AdminStartupCollaborations from './pages/AdminStartupCollaborations';
-import AdminPrizeCertificates from './pages/AdminPrizeCertificates';
-import AdminStudentReassignments from './pages/AdminStudentReassignments';
-import AdminMFAManagement from './pages/AdminMFAManagement';
-import CertificatePreview from './pages/CertificatePreview';
-import AdminDeletedAccounts from './pages/AdminDeletedAccounts';
-import TermsAndConditions from './pages/TermsAndConditions';
-import CompleteGoogleProfile from './pages/CompleteGoogleProfile';
-import FaceAuthSettings from './pages/FaceAuthSettings';
-import FaceMfaVerify from './pages/FaceMfaVerify';
-
-
-import AdminSupportContact from './pages/AdminSupportContact';
-import AdminActivityLogs from './pages/AdminActivityLogs';
-import AdminOnline from './pages/AdminOnline';
-import AdminVisitors from './pages/AdminVisitors';
-import StudentWriteTest from './pages/StudentWriteTest';
-import ResumeBuilder from './pages/ResumeBuilder';
-import ReportIssue from './pages/ReportIssue';
-import AdminIssueReports from './pages/AdminIssueReports';
-import AdminExamBans from './pages/AdminExamBans';
-import AdminGrowthAnalytics from './pages/AdminGrowthAnalytics';
-import AdminLeadInbox from './pages/AdminLeadInbox';
-import AdminPaymentAttempts from './pages/AdminPaymentAttempts';
-import AdminPaymentQR from './pages/AdminPaymentQR';
-import AdminPaymentResponses from './pages/AdminPaymentResponses';
-import AdminSendEmail from './pages/AdminSendEmail';
-import CodingPlayground from './pages/CodingPlayground';
-import DiscussionForum from './pages/DiscussionForum';
-import InternshipBoard from './pages/InternshipBoard';
-import ProjectShowcase from './pages/ProjectShowcase';
-import SkillBadges from './pages/SkillBadges';
-import AdminWebsiteProtection from './pages/AdminWebsiteProtection';
-import UniversalAssistant from './pages/UniversalAssistant';
-import AdminUserAccess from './pages/AdminUserAccess';
-import LiveExamProctoring from './pages/LiveExamProctoring';
-import FacultyAttendance from './pages/FacultyAttendance';
-import AdminAccessCodes from './pages/AdminAccessCodes';
-import AdminLiveExamBookingControls from './pages/AdminLiveExamBookingControls';
-import AdminChooseMeet from './pages/AdminChooseMeet';
-import AdminDemoSessions from './pages/AdminDemoSessions';
-import ClassFeedback from './pages/ClassFeedback';
-import AdminAutoAssignedStudents from './pages/AdminAutoAssignedStudents';
-import AdminMFARules from './pages/AdminMFARules';
-import AdminMultiSessionAlerts from './pages/AdminMultiSessionAlerts';
-import AdminNotesLibrary from './pages/AdminNotesLibrary';
-import StudentIdVerification from './pages/StudentIdVerification';
-import AdminIdVerifications from './pages/AdminIdVerifications';
-import AdminCertificateNameRequests from './pages/AdminCertificateNameRequests';
-import VerifierDashboard from './pages/VerifierDashboard';
-import AdminUsernames from './pages/AdminUsernames';
-import PremiumPlusResumeReviews from './pages/PremiumPlusResumeReviews';
-import PremiumPlusMockInterviews from './pages/PremiumPlusMockInterviews';
-import PremiumPlusRoadmap from './pages/PremiumPlusRoadmap';
-import CareerSupportDashboard from './pages/CareerSupportDashboard';
-import TeacherCareerQueue from './pages/TeacherCareerQueue';
-import AdminCareerAnalytics from './pages/AdminCareerAnalytics';
-import PortfolioBuilder from './pages/PortfolioBuilder';
-import PublicPortfolio from './pages/PublicPortfolio';
-import AdminLoginOtpSettings from './pages/AdminLoginOtpSettings';
-import AdminErrorLogs from './pages/AdminErrorLogs';
 import { isProfileComplete } from './utils/profileCompletion';
 import { getFaceAuthSettings, isFaceMfaVerified } from './utils/faceAuth';
 import { useVisitorTracking } from './hooks/useVisitorTracking';
-import {
-  AchievementTimeline,
-  AdminAtRiskStudents,
-  AdminSecurityReview,
-  CourseCompletionChecklist,
-  CourseDoubtHelper,
-  ExamReadinessScore,
-  MotivationLeaderboard,
-  StudentDailyPlanner,
-  TeacherPerformancePanel,
-} from './pages/ZeroCostGrowthPanels';
+
+const AdminExamSettings = lazy(() => import('./pages/AdminExamSettings'));
+const AdminContestSetup = lazy(() => import('./logicBuilding/AdminContestSetup'));
+const LogicBuildingContest = lazy(() => import('./logicBuilding/LogicBuildingContest'));
+const AdminChangeCourse = lazy(() => import('./pages/AdminChangeCourse'));
+const AdminScoreboard = lazy(() => import('./logicBuilding/AdminScoreboard'));
+const LogicBuildingLeaderboard = lazy(() => import('./logicBuilding/LogicBuildingLeaderboard'));
+const AdminMFASetup = lazy(() => import("./pages/AdminMFASetup"));
+const AdminMFAVerify = lazy(() => import("./pages/AdminMFAVerify"));
+const AdminAuthChoice = lazy(() => import("./pages/AdminAuthChoice"));
+const Login = lazy(() => import('./pages/Login'));
+const Register = lazy(() => import('./pages/Register'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword'));
+const Home = lazy(() => import('./pages/Home'));
+const About = lazy(() => import('./pages/About'));
+const Plans = lazy(() => import('./pages/Plans'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const CourseList = lazy(() => import('./pages/CourseList'));
+const CourseDetail = lazy(() => import('./pages/CourseDetail'));
+const Exam = lazy(() => import('./pages/Exam'));
+const TestExam = lazy(() => import('./pages/TestExam'));
+const Profile = lazy(() => import('./pages/Profile'));
+const Settings = lazy(() => import('./pages/Settings'));
+const VerifyCertificate = lazy(() => import('./pages/VerifyCertificate'));
+const RegisterAdmin = lazy(() => import('./pages/RegisterAdmin'));
+const RegisterTeacher = lazy(() => import('./pages/RegisterTeacher'));
+const CareerGuidance = lazy(() => import('./pages/CareerGuidance'));
+const MyCertificates = lazy(() => import('./pages/MyCertificates'));
+const MyRegisteredExams = lazy(() => import('./pages/MyRegisteredExams'));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
+const AdminSettings = lazy(() => import('./pages/AdminSettings'));
+const AdminCourses = lazy(() => import('./pages/AdminCourses'));
+const StudentProgress = lazy(() => import('./pages/StudentProgress'));
+const StudentDetail = lazy(() => import('./pages/StudentDetail'));
+const ManagePremium = lazy(() => import('./pages/ManagePremium'));
+const TeacherAssignment = lazy(() => import('./pages/TeacherAssignment'));
+const GuidanceSessions = lazy(() => import('./pages/GuidanceSessions'));
+const TeacherLeaves = lazy(() => import('./pages/TeacherLeaves'));
+const ChatWithTeacher = lazy(() => import('./pages/ChatWithTeacher'));
+const Attendance = lazy(() => import('./pages/Attendance'));
+const MyStudents = lazy(() => import('./pages/MyStudents'));
+const AssignedClasses = lazy(() => import('./pages/AssignedClasses'));
+const Payment = lazy(() => import('./pages/Payment'));
+const ClassSchedule = lazy(() => import('./pages/ClassSchedule'));
+const AccountManagement = lazy(() => import('./pages/AccountManagement'));
+const TeacherChat = lazy(() => import('./pages/TeacherChat'));
+const LiveClass = lazy(() => import('./pages/LiveClass'));
+const Notifications = lazy(() => import('./pages/Notifications'));
+const AdminNotifications = lazy(() => import('./pages/AdminNotifications'));
+const SessionReassignments = lazy(() => import('./pages/SessionReassignments'));
+const CareerChatbot = lazy(() => import('./pages/CareerChatbot'));
+const AILearningPath = lazy(() => import('./pages/AILearningPath'));
+const AdminExamOverrides = lazy(() => import('./pages/AdminExamOverrides'));
+const InterviewPrep = lazy(() => import('./pages/InterviewPrep'));
+const PremiumStatus = lazy(() => import('./pages/PremiumStatus'));
+const NotesLibrary = lazy(() => import('./pages/NotesLibrary'));
+const Offers = lazy(() => import('./pages/Offers'));
+const AdminExamRetakes = lazy(() => import('./pages/AdminExamRetakes'));
+const AdminActiveCoupons = lazy(() => import('./pages/AdminActiveCoupons'));
+const UserManagementPage = lazy(() => import('./pages/UserManagementPage'));
+const TeacherProgress = lazy(() => import('./pages/TeacherProgress'));
+const TeacherConductTests = lazy(() => import('./pages/TeacherConductTests'));
+const ClearDoubts = lazy(() => import('./pages/ClearDoubts'));
+const AdminUserIds = lazy(() => import('./pages/AdminUserIds'));
+const NotFound = lazy(() => import('./pages/NotFound'));
+const AdminSendGift = lazy(() => import('./pages/AdminSendGift'));
+const RequestTeacher = lazy(() => import('./pages/RequestTeacher'));
+const TeacherRequests = lazy(() => import('./pages/TeacherRequests'));
+const AdminTeacherRequests = lazy(() => import('./pages/AdminTeacherRequests'));
+const CertificateBlocks = lazy(() => import('./pages/CertificateBlocks'));
+const AdminResetPassword = lazy(() => import('./pages/AdminResetPassword'));
+const AdminUserPasswordResetPage = lazy(() => import('./pages/AdminUserPasswordResetPage'));
+const StartupIdeas = lazy(() => import('./pages/StartupIdeas'));
+const AdminStartupIdeas = lazy(() => import('./pages/AdminStartupIdeas'));
+const StartupCollaborations = lazy(() => import('./pages/StartupCollaborations'));
+const AdminStartupCollaborations = lazy(() => import('./pages/AdminStartupCollaborations'));
+const AdminPrizeCertificates = lazy(() => import('./pages/AdminPrizeCertificates'));
+const AdminStudentReassignments = lazy(() => import('./pages/AdminStudentReassignments'));
+const AdminMFAManagement = lazy(() => import('./pages/AdminMFAManagement'));
+const CertificatePreview = lazy(() => import('./pages/CertificatePreview'));
+const AdminDeletedAccounts = lazy(() => import('./pages/AdminDeletedAccounts'));
+const TermsAndConditions = lazy(() => import('./pages/TermsAndConditions'));
+const CompleteGoogleProfile = lazy(() => import('./pages/CompleteGoogleProfile'));
+const FaceAuthSettings = lazy(() => import('./pages/FaceAuthSettings'));
+const FaceMfaVerify = lazy(() => import('./pages/FaceMfaVerify'));
+const AdminSupportContact = lazy(() => import('./pages/AdminSupportContact'));
+const AdminActivityLogs = lazy(() => import('./pages/AdminActivityLogs'));
+const AdminOnline = lazy(() => import('./pages/AdminOnline'));
+const AdminVisitors = lazy(() => import('./pages/AdminVisitors'));
+const StudentWriteTest = lazy(() => import('./pages/StudentWriteTest'));
+const ResumeBuilder = lazy(() => import('./pages/ResumeBuilder'));
+const ReportIssue = lazy(() => import('./pages/ReportIssue'));
+const AdminIssueReports = lazy(() => import('./pages/AdminIssueReports'));
+const AdminExamBans = lazy(() => import('./pages/AdminExamBans'));
+const AdminGrowthAnalytics = lazy(() => import('./pages/AdminGrowthAnalytics'));
+const AdminLeadInbox = lazy(() => import('./pages/AdminLeadInbox'));
+const AdminPaymentAttempts = lazy(() => import('./pages/AdminPaymentAttempts'));
+const AdminPaymentQR = lazy(() => import('./pages/AdminPaymentQR'));
+const AdminPaymentResponses = lazy(() => import('./pages/AdminPaymentResponses'));
+const AdminSendEmail = lazy(() => import('./pages/AdminSendEmail'));
+const CodingPlayground = lazy(() => import('./pages/CodingPlayground'));
+const DiscussionForum = lazy(() => import('./pages/DiscussionForum'));
+const InternshipBoard = lazy(() => import('./pages/InternshipBoard'));
+const ProjectShowcase = lazy(() => import('./pages/ProjectShowcase'));
+const SkillBadges = lazy(() => import('./pages/SkillBadges'));
+const AdminWebsiteProtection = lazy(() => import('./pages/AdminWebsiteProtection'));
+const UniversalAssistant = lazy(() => import('./pages/UniversalAssistant'));
+const AdminUserAccess = lazy(() => import('./pages/AdminUserAccess'));
+const LiveExamProctoring = lazy(() => import('./pages/LiveExamProctoring'));
+const FacultyAttendance = lazy(() => import('./pages/FacultyAttendance'));
+const AdminAccessCodes = lazy(() => import('./pages/AdminAccessCodes'));
+const AdminLiveExamBookingControls = lazy(() => import('./pages/AdminLiveExamBookingControls'));
+const AdminChooseMeet = lazy(() => import('./pages/AdminChooseMeet'));
+const AdminDemoSessions = lazy(() => import('./pages/AdminDemoSessions'));
+const ClassFeedback = lazy(() => import('./pages/ClassFeedback'));
+const AdminAutoAssignedStudents = lazy(() => import('./pages/AdminAutoAssignedStudents'));
+const AdminMFARules = lazy(() => import('./pages/AdminMFARules'));
+const AdminMultiSessionAlerts = lazy(() => import('./pages/AdminMultiSessionAlerts'));
+const AdminNotesLibrary = lazy(() => import('./pages/AdminNotesLibrary'));
+const StudentIdVerification = lazy(() => import('./pages/StudentIdVerification'));
+const AdminIdVerifications = lazy(() => import('./pages/AdminIdVerifications'));
+const AdminCertificateNameRequests = lazy(() => import('./pages/AdminCertificateNameRequests'));
+const VerifierDashboard = lazy(() => import('./pages/VerifierDashboard'));
+const AdminUsernames = lazy(() => import('./pages/AdminUsernames'));
+const PremiumPlusResumeReviews = lazy(() => import('./pages/PremiumPlusResumeReviews'));
+const PremiumPlusMockInterviews = lazy(() => import('./pages/PremiumPlusMockInterviews'));
+const PremiumPlusRoadmap = lazy(() => import('./pages/PremiumPlusRoadmap'));
+const CareerSupportDashboard = lazy(() => import('./pages/CareerSupportDashboard'));
+const TeacherCareerQueue = lazy(() => import('./pages/TeacherCareerQueue'));
+const AdminCareerAnalytics = lazy(() => import('./pages/AdminCareerAnalytics'));
+const PortfolioBuilder = lazy(() => import('./pages/PortfolioBuilder'));
+const PublicPortfolio = lazy(() => import('./pages/PublicPortfolio'));
+const AdminLoginOtpSettings = lazy(() => import('./pages/AdminLoginOtpSettings'));
+const AdminTriedToRegister = lazy(() => import('./pages/AdminTriedToRegister'));
+const AdminUserTools = lazy(() => import('./pages/AdminUserTools'));
+const AdminErrorLogs = lazy(() => import('./pages/AdminErrorLogs'));
+const AchievementTimeline = lazy(() => import('./pages/ZeroCostGrowthPanels').then(m => ({ default: m.AchievementTimeline })));
+const AdminAtRiskStudents = lazy(() => import('./pages/ZeroCostGrowthPanels').then(m => ({ default: m.AdminAtRiskStudents })));
+const AdminSecurityReview = lazy(() => import('./pages/ZeroCostGrowthPanels').then(m => ({ default: m.AdminSecurityReview })));
+const CourseCompletionChecklist = lazy(() => import('./pages/ZeroCostGrowthPanels').then(m => ({ default: m.CourseCompletionChecklist })));
+const CourseDoubtHelper = lazy(() => import('./pages/ZeroCostGrowthPanels').then(m => ({ default: m.CourseDoubtHelper })));
+const ExamReadinessScore = lazy(() => import('./pages/ZeroCostGrowthPanels').then(m => ({ default: m.ExamReadinessScore })));
+const MotivationLeaderboard = lazy(() => import('./pages/ZeroCostGrowthPanels').then(m => ({ default: m.MotivationLeaderboard })));
+const StudentDailyPlanner = lazy(() => import('./pages/ZeroCostGrowthPanels').then(m => ({ default: m.StudentDailyPlanner })));
+const TeacherPerformancePanel = lazy(() => import('./pages/ZeroCostGrowthPanels').then(m => ({ default: m.TeacherPerformancePanel })));
+
+const ViewPortfolioRedirect = () => {
+  const loc = useLocation();
+  return <Navigate to={loc.pathname.replace('/view-portifolio/', '/view-portfolio/')} replace />;
+};
 
 const ProtectedRoute = ({ children }) => {
   const auth = useAuth();
@@ -190,11 +193,11 @@ const ProtectedRoute = ({ children }) => {
     };
   }, [realProfile?.is_disabled, realProfile?.is_locked]);
 
-  if (loading || !auth || (user && !profileChecked)) {
-    return <LoadingSpinner message="Loading profile..." />;
-  }
+  if (!auth) return null;
   if (!user) return <Navigate to="/login" />;
   if (!isImpersonating && !profile) {
+    if (!profileChecked) return <LoadingSpinner message="Loading..." />;
+    if (user?.user_metadata?.role === 'admin') return <Navigate to="/app" replace />;
     return <Navigate to="/complete-profile" replace />;
   }
   if (!isImpersonating && profile && profile.role !== 'admin' && !isProfileComplete(profile)) {
@@ -350,6 +353,7 @@ function App() {
   useVisitorTracking();
   return (
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <Suspense fallback={<LoadingSpinner message="Loading..." />}>
       <Routes>
         {/* Public Routes */}
         <Route path="/" element={<Home />} />
@@ -369,7 +373,7 @@ function App() {
         <Route path="/verify" element={<VerifyCertificate />} />
         <Route path="/certificate-preview/:id" element={<CertificatePreview />} />
         <Route path="/view-portfolio/:username" element={<PublicPortfolio />} />
-        <Route path="/view-portifolio/:username" element={<PublicPortfolio />} />
+        <Route path="/view-portifolio/:username" element={<ViewPortfolioRedirect />} />
         <Route
           path="/admin-reset-pass"
           element={
@@ -523,6 +527,8 @@ function App() {
           <Route path="admin/reset-password" element={<AdminRoute><AdminResetPassword /></AdminRoute>} />
           <Route path="admin/mfa-management" element={<AdminRoute><AdminMFAManagement /></AdminRoute>} />
           <Route path="admin/login-otp" element={<AdminRoute><AdminLoginOtpSettings /></AdminRoute>} />
+          <Route path="admin/tried-to-register" element={<AdminRoute><AdminTriedToRegister /></AdminRoute>} />
+          <Route path="admin/user-tools" element={<AdminRoute><AdminUserTools /></AdminRoute>} />
           <Route path="admin/mfa-rules" element={<AdminRoute><RequireSensitiveAdminMFA><AdminMFARules /></RequireSensitiveAdminMFA></AdminRoute>} />
           <Route path="admin/multi-session-alerts" element={<AdminRoute><AdminMultiSessionAlerts /></AdminRoute>} />
           <Route path="admin/deleted-accounts" element={<AdminRoute><AdminDeletedAccounts /></AdminRoute>} />
@@ -545,6 +551,7 @@ function App() {
         <Route path="/admin-mfa-setup" element={<AdminMFASetup />} />
         <Route path="/admin-mfa-verify" element={<AdminMFAVerify />} />
       </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 }

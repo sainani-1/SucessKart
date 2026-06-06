@@ -38,6 +38,12 @@ const AccountManagement = () => {
     Boolean(premiumUntil) && new Date(premiumUntil).getUTCFullYear() >= 9999;
   const isLifetimeLock = (lockedUntil) =>
     Boolean(lockedUntil) && new Date(lockedUntil).getUTCFullYear() >= 9999;
+  const isEffectivelyLocked = (profile) => {
+    if (!profile?.is_locked) return false;
+    if (!profile?.locked_until) return false;
+    if (isLifetimeLock(profile.locked_until)) return true;
+    return new Date(profile.locked_until).getTime() > Date.now();
+  };
 
   useEffect(() => {
     loadUsers();
@@ -59,7 +65,7 @@ const AccountManagement = () => {
     );
 
     if (filterType === 'locked') {
-      filtered = filtered.filter(u => u.is_locked);
+      filtered = filtered.filter(u => isEffectivelyLocked(u));
     } else if (filterType === 'premium') {
       filtered = filtered.filter((u) => isPremiumActive(u));
     } else if (filterType === 'no-premium') {
@@ -404,7 +410,7 @@ const AccountManagement = () => {
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    {user.is_locked ? (
+                    {isEffectivelyLocked(user) ? (
                       <div className="flex items-center gap-2">
                         <Lock size={16} className="text-red-600" />
                         <div>
@@ -455,7 +461,7 @@ const AccountManagement = () => {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex gap-2">
-                      {user.is_locked ? (
+                      {isEffectivelyLocked(user) ? (
                         <button
                           onClick={() => openModal(user, 'unlock')}
                           className="px-3 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200 text-xs font-semibold flex items-center gap-1"

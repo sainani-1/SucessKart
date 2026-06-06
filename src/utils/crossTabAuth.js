@@ -118,7 +118,7 @@ export const requestSessionFromOtherTabs = (timeoutMs = 1200) =>
 
     const acceptMessage = (message) => {
       if (!message || message.type !== SESSION_EVENT) return;
-      if (message.requestId && message.requestId !== requestId) return;
+      if (!message.requestId || message.requestId !== requestId) return;
       if (!message.session?.access_token || !message.session?.refresh_token) return;
       finish({
         access_token: message.session.access_token,

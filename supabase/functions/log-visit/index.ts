@@ -6,6 +6,29 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+async function geoLookup(ip: string) {
+  if (!ip || ip === "127.0.0.1" || ip === "::1" || ip.startsWith("192.168.") || ip.startsWith("10.")) {
+    return { country: "", city: "", isp: "", latitude: "", longitude: "" };
+  }
+  try {
+    const res = await fetch(`http://ip-api.com/json/${ip}?fields=country,city,isp,lat,lon,status`, {
+      signal: AbortSignal.timeout(3000),
+    });
+    if (!res.ok) return { country: "", city: "", isp: "", latitude: "", longitude: "" };
+    const data = await res.json();
+    if (data.status !== "success") return { country: "", city: "", isp: "", latitude: "", longitude: "" };
+    return {
+      country: data.country || "",
+      city: data.city || "",
+      isp: data.isp || "",
+      latitude: String(data.lat || ""),
+      longitude: String(data.lon || ""),
+    };
+  } catch {
+    return { country: "", city: "", isp: "", latitude: "", longitude: "" };
+  }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -17,10 +40,9 @@ Deno.serve(async (req: Request) => {
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
-    const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY");
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
-    if (!supabaseUrl || !supabaseKey || !serviceRoleKey) {
+    if (!supabaseUrl || !serviceRoleKey) {
       return new Response(JSON.stringify({ error: "Missing env vars" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -34,6 +56,9 @@ Deno.serve(async (req: Request) => {
       || body?.ip_address
       || "";
 
+    // Look up geo info from IP (no permission needed, server-side)
+    const geo = await geoLookup(ipAddress);
+
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
     const { error } = await supabase.from("visitor_logs").insert({
@@ -46,12 +71,14 @@ Deno.serve(async (req: Request) => {
       os_version: body?.os_version || "",
       referrer: body?.referrer || "",
       page_url: body?.page_url || "",
-      country: body?.country || "",
-      city: body?.city || "",
-      isp: body?.isp || "",
-      latitude: body?.latitude || "",
-      longitude: body?.longitude || "",
+      country: geo.country || body?.country || "",
+      city: geo.city || body?.city || "",
+      isp: geo.isp || body?.isp || "",
+      latitude: geo.latitude || body?.latitude || "",
+      longitude: geo.longitude || body?.longitude || "",
       user_id: body?.user_id || null,
+      username: body?.username || null,
+      email: body?.email || null,
     });
 
     if (error) {
@@ -61,7 +88,7 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    return new Response(JSON.stringify({ success: true }), {
+    return new Response(JSON.stringify({ success: true, ip: ipAddress, geo }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

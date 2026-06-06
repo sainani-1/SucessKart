@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../context/AuthContext';
-import { Trophy, Plus, X, ExternalLink, User, Image } from 'lucide-react';
+import { Trophy, Plus, X, ExternalLink, User, Flag, Trash2 } from 'lucide-react';
 import LoadingSpinner from '../components/LoadingSpinner';
 import AlertModal from '../components/AlertModal';
 import PremiumPlusUpgradeGate from '../components/PremiumPlusUpgradeGate';
@@ -12,7 +12,7 @@ const formatDate = (val) => val ? new Date(val).toLocaleDateString('en-IN', { da
 const ProjectShowcase = () => {
   const { profile } = useAuth();
   const planType = getPremiumPlanType(profile);
-  const isStaff = profile?.role === 'admin' || profile?.role === 'teacher';
+  const isAdmin = profile?.role === 'admin';
 
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -20,6 +20,10 @@ const ProjectShowcase = () => {
   const [showGate, setShowGate] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [alertModal, setAlertModal] = useState({ show: false, title: '', message: '', type: 'info' });
+
+  const [deleteConfirm, setDeleteConfirm] = useState({ show: false, projectId: null, projectTitle: '' });
+  const [reportModal, setReportModal] = useState({ show: false, projectId: null, projectTitle: '' });
+  const [reportReason, setReportReason] = useState('');
 
   const [form, setForm] = useState({ title: '', description: '', project_url: '' });
   const [file, setFile] = useState(null);
@@ -48,10 +52,12 @@ const ProjectShowcase = () => {
     if (!file) return null;
     const ext = file.name.split('.').pop();
     const filePath = `project_showcase/${userId}_${Date.now()}.${ext}`;
-    const { error: uploadError } = await supabase.storage
+    const { data: uploadData, error: uploadError } = await supabase.storage
       .from('project-images')
       .upload(filePath, file, { upsert: true });
-    if (uploadError) throw uploadError;
+    if (uploadError) {
+      throw new Error(`Storage upload failed: ${uploadError.message} (${uploadError.statusCode || 'no status'})`);
+    }
     const { data } = supabase.storage.from('project-images').getPublicUrl(filePath);
     return data?.publicUrl || null;
   };
@@ -64,6 +70,11 @@ const ProjectShowcase = () => {
     }
     setSubmitting(true);
     try {
+      if (file && file.size > 2 * 1024 * 1024) {
+        setAlertModal({ show: true, title: 'File Too Large', message: 'Image must be under 2 MB.', type: 'warning' });
+        setSubmitting(false);
+        return;
+      }
       let imageUrl = null;
       if (file) {
         imageUrl = await uploadImage(profile.id);
@@ -86,6 +97,41 @@ const ProjectShowcase = () => {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleDeleteProject = async () => {
+    const { projectId } = deleteConfirm;
+    if (!projectId) return;
+    const { error } = await supabase.from('project_showcase').delete().eq('id', projectId);
+    if (error) {
+      setAlertModal({ show: true, title: 'Error', message: 'Failed to delete project.', type: 'error' });
+    } else {
+      setProjects((prev) => prev.filter((p) => p.id !== projectId));
+    }
+    setDeleteConfirm({ show: false, projectId: null, projectTitle: '' });
+  };
+
+  const handleReportProject = async () => {
+    if (!reportReason.trim()) {
+      setAlertModal({ show: true, title: 'Missing Reason', message: 'Please provide a reason for reporting this project.', type: 'warning' });
+      return;
+    }
+    try {
+      const { error } = await supabase.from('issue_reports').insert({
+        reporter_id: profile?.id,
+        reporter_role: profile?.role || 'unknown',
+        category: 'other',
+        subject: `Reported Project: ${reportModal.projectTitle}`,
+        description: reportReason.trim(),
+        status: 'open',
+      });
+      if (error) throw error;
+      setAlertModal({ show: true, title: 'Report Submitted', message: 'The project has been reported to the admin team.', type: 'success' });
+    } catch (err) {
+      setAlertModal({ show: true, title: 'Error', message: 'Failed to submit report. Please try again.', type: 'error' });
+    }
+    setReportModal({ show: false, projectId: null, projectTitle: '' });
+    setReportReason('');
   };
 
   if (loading) return <LoadingSpinner message="Loading projects..." />;
@@ -121,7 +167,27 @@ const ProjectShowcase = () => {
       ) : (
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {projects.map((project) => (
-            <div key={project.id} className="group rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:shadow-lg">
+            <div key={project.id} className="group relative rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:shadow-lg">
+              {isAdmin && (
+                <div className="absolute right-2 top-2 z-10 flex gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setReportModal({ show: true, projectId: project.id, projectTitle: project.title })}
+                    className="rounded-lg bg-white/90 p-1.5 text-red-500 shadow hover:bg-red-50 hover:text-red-700"
+                    title="Report Project"
+                  >
+                    <Flag size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDeleteConfirm({ show: true, projectId: project.id, projectTitle: project.title })}
+                    className="rounded-lg bg-white/90 p-1.5 text-slate-500 shadow hover:bg-red-50 hover:text-red-700"
+                    title="Delete Project"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              )}
               {project.image_url && (
                 <div className="aspect-video w-full overflow-hidden rounded-t-2xl bg-slate-100">
                   <img src={project.image_url} alt={project.title} className="h-full w-full object-cover" />
@@ -225,6 +291,68 @@ const ProjectShowcase = () => {
           message="Only Premium Plus members can showcase projects. Upgrade to share your work with the community."
           onClose={() => setShowGate(false)}
         />
+      )}
+
+      {reportModal.show && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-slate-900">Report Project</h2>
+              <button type="button" onClick={() => { setReportModal({ show: false, projectId: null, projectTitle: '' }); setReportReason(''); }} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100">
+                <X size={20} />
+              </button>
+            </div>
+            <p className="mb-3 text-sm text-slate-600">Reason for reporting <strong>{reportModal.projectTitle}</strong>:</p>
+            <textarea
+              value={reportReason}
+              onChange={(e) => setReportReason(e.target.value)}
+              rows={4}
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm focus:border-red-300 focus:outline-none focus:ring-2 focus:ring-red-200 resize-none"
+              placeholder="Explain why this project is inappropriate..."
+            />
+            <div className="mt-4 flex gap-3">
+              <button
+                type="button"
+                onClick={() => { setReportModal({ show: false, projectId: null, projectTitle: '' }); setReportReason(''); }}
+                className="w-full rounded-xl border border-slate-300 py-3 font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleReportProject}
+                className="w-full rounded-xl bg-red-600 py-3 font-bold text-white transition hover:bg-red-700"
+              >
+                Submit Report
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteConfirm.show && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <h2 className="text-lg font-bold text-slate-900">Delete Project</h2>
+            <p className="mt-2 text-sm text-slate-600">Are you sure you want to delete <strong>{deleteConfirm.projectTitle}</strong>? This action cannot be undone.</p>
+            <div className="mt-6 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setDeleteConfirm({ show: false, projectId: null, projectTitle: '' })}
+                className="w-full rounded-xl border border-slate-300 py-3 font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteProject}
+                className="w-full rounded-xl bg-red-600 py-3 font-bold text-white transition hover:bg-red-700"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       <AlertModal

@@ -134,6 +134,7 @@ export default function AdminMFAVerify() {
 
       const { data: userResp } = await supabase.auth.getUser();
       sessionStorage.setItem("admin_mfa_verified", "true");
+      sessionStorage.setItem("admin_mfa_verified_at", String(Date.now()));
       if (userResp?.user?.id) {
         sessionStorage.setItem("admin_mfa_verified_user", userResp.user.id);
         if (isSensitivePasswordScope) {

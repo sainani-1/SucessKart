@@ -40,7 +40,7 @@ const serializeCookie = (name, value, options = {}) => {
   parts.push('HttpOnly');
   parts.push('Path=' + (options.path || '/'));
   parts.push('SameSite=Lax');
-  if (process.env.NODE_ENV === 'production') parts.push('Secure');
+  if (typeof window === 'undefined' || location.protocol === 'https:') parts.push('Secure');
   if (options.maxAge != null) parts.push(`Max-Age=${options.maxAge}`);
   return parts.join('; ');
 };
@@ -49,7 +49,7 @@ const serializeReadableCookie = (name, value, options = {}) => {
   const parts = [`${name}=${encodeURIComponent(value || '')}`];
   parts.push('Path=' + (options.path || '/'));
   parts.push('SameSite=Lax');
-  if (process.env.NODE_ENV === 'production') parts.push('Secure');
+  if (typeof window === 'undefined' || location.protocol === 'https:') parts.push('Secure');
   if (options.maxAge != null) parts.push(`Max-Age=${options.maxAge}`);
   return parts.join('; ');
 };
@@ -76,6 +76,10 @@ const validateSupabaseAccessToken = async (accessToken) => {
   return response.json();
 };
 
+const appendCookies = (res, cookies) => {
+  cookies.forEach(cookie => res.appendHeader('Set-Cookie', cookie));
+};
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'POST, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-CSRF-Token');
@@ -88,7 +92,7 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'DELETE') {
-    res.setHeader('Set-Cookie', clearCookies());
+    appendCookies(res, clearCookies());
     json(res, 200, { ok: true });
     return;
   }
@@ -118,7 +122,7 @@ export default async function handler(req, res) {
     }
 
     const csrf = crypto.randomUUID();
-    res.setHeader('Set-Cookie', [
+    appendCookies(res, [
       serializeCookie(ACCESS_COOKIE, accessToken, { maxAge: expiresIn }),
       serializeCookie(REFRESH_COOKIE, refreshToken, { maxAge: THIRTY_DAYS }),
       serializeReadableCookie(CSRF_COOKIE, csrf, { maxAge: THIRTY_DAYS }),

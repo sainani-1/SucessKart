@@ -13,6 +13,7 @@ type CreatePayload = {
   phone?: string;
   role?: "student" | "teacher" | "admin" | "instructor" | "verifier";
   core_subject?: string | null;
+  invite?: boolean;
 };
 
 Deno.serve(async (req: Request) => {
@@ -62,7 +63,7 @@ Deno.serve(async (req: Request) => {
 
     const body = (await req.json()) as CreatePayload;
     const email = String(body.email || "").trim().toLowerCase();
-    const password = String(body.password || "");
+    const password = String(body.password || crypto.randomUUID().slice(0, 12));
     const fullName = String(body.full_name || "").trim();
     const phone = String(body.phone || "").trim();
     const role = (String(body.role || "student").trim().toLowerCase() || "student") as
@@ -72,6 +73,7 @@ Deno.serve(async (req: Request) => {
       | "instructor"
       | "verifier";
     const coreSubject = body.core_subject ? String(body.core_subject).trim() : null;
+    const isInvite = body.invite === true;
 
     if (!email || !fullName || !phone) {
       return new Response("email, full_name and phone are required.", {
@@ -79,7 +81,7 @@ Deno.serve(async (req: Request) => {
         headers: corsHeaders,
       });
     }
-    if (password.length < 6) {
+    if (!isInvite && password.length < 6) {
       return new Response("password must be at least 6 characters.", {
         status: 400,
         headers: corsHeaders,
@@ -95,7 +97,7 @@ Deno.serve(async (req: Request) => {
     const { data: created, error: createError } = await adminClient.auth.admin.createUser({
       email,
       password,
-      email_confirm: true,
+      email_confirm: !isInvite,
       user_metadata: {
         full_name: fullName,
         phone,
